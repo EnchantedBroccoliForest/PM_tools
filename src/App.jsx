@@ -32,8 +32,12 @@ function App() {
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
   const [draftLoading, setDraftLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [acceptLoading, setAcceptLoading] = useState(false);
   const [draftContent, setDraftContent] = useState(null);
   const [reviewContent, setReviewContent] = useState(null);
+  const [finalContent, setFinalContent] = useState(null);
+  const [hasUpdated, setHasUpdated] = useState(false);
   const [reviewModel, setReviewModel] = useState(AVAILABLE_MODELS[8].id);
   const [error, setError] = useState(null);
 
@@ -93,6 +97,8 @@ Provide a comprehensive draft that includes:
       const content = data.choices[0].message.content;
       setDraftContent(content);
       setReviewContent(null);
+      setHasUpdated(false);
+      setFinalContent(null);
     } catch (err) {
       setError(err.message || 'An error occurred while generating draft');
       console.error('Error:', err);
@@ -155,6 +161,166 @@ ${draftContent}`
     } finally {
       setReviewLoading(false);
     }
+  };
+
+  const handleUpdate = async () => {
+    if (!draftContent || !reviewContent) return;
+
+    setUpdateLoading(true);
+    setError(null);
+
+    try {
+      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+      if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
+        throw new Error('OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.');
+      }
+
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'Prediction Market Creator'
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert at creating prediction market questions with clear, unambiguous resolution criteria. You help create well-defined markets that can be objectively resolved.'
+            },
+            {
+              role: 'user',
+              content: `This is a critical review of the draft. Review and first determine if the critiques make sense. Incorporate the suggestions or criticisms from the Reviewer that make sense and generate a new draft.
+
+ORIGINAL DRAFT:
+${draftContent}
+
+CRITICAL REVIEW:
+${reviewContent}`
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 3000
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to generate updated draft');
+      }
+
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+      setDraftContent(content);
+      setReviewContent(null);
+      setHasUpdated(true);
+    } catch (err) {
+      setError(err.message || 'An error occurred while updating draft');
+      console.error('Error:', err);
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleAccept = async () => {
+    if (!draftContent) return;
+
+    setAcceptLoading(true);
+    setError(null);
+
+    try {
+      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+      if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
+        throw new Error('OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.');
+      }
+
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'Prediction Market Creator'
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format.'
+            },
+            {
+              role: 'user',
+              content: `Based on the following draft, generate the final prediction market details in a structured JSON format.
+
+DRAFT:
+${draftContent}
+
+USER PROVIDED DATES:
+Start Date: ${startDate}
+End Date: ${endDate}
+
+Generate a JSON response with exactly these fields:
+{
+  "outcomes": [
+    {
+      "name": "Outcome name",
+      "resolutionCriteria": "Specific criteria for this outcome"
+    }
+  ],
+  "marketStartTimeUTC": "YYYY-MM-DDTHH:MM:SSZ format based on start date",
+  "marketEndTimeUTC": "YYYY-MM-DDTHH:MM:SSZ format based on end date",
+  "shortDescription": "A brief 1-2 sentence market description",
+  "fullResolutionRules": "Complete resolution rules",
+  "edgeCases": "All edge cases and how they will be handled"
+}`
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 3000
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to generate final content');
+      }
+
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+
+      let parsedContent;
+      try {
+        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+        if (jsonMatch) {
+          parsedContent = JSON.parse(jsonMatch[1]);
+        } else {
+          parsedContent = JSON.parse(content);
+        }
+      } catch (parseError) {
+        parsedContent = { raw: content };
+      }
+
+      setFinalContent(parsedContent);
+    } catch (err) {
+      setError(err.message || 'An error occurred while finalizing market');
+      console.error('Error:', err);
+    } finally {
+      setAcceptLoading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setDraftContent(null);
+    setReviewContent(null);
+    setFinalContent(null);
+    setHasUpdated(false);
+    setQuestion('');
+    setStartDate('');
+    setEndDate('');
+    setError(null);
   };
 
   return (
@@ -275,7 +441,7 @@ ${draftContent}`
               <button
                 type="button"
                 className="review-button"
-                disabled={reviewLoading || draftLoading}
+                disabled={reviewLoading || draftLoading || updateLoading || acceptLoading}
                 onClick={handleReview}
               >
                 {reviewLoading ? (
@@ -287,6 +453,24 @@ ${draftContent}`
                   'Review'
                 )}
               </button>
+              {reviewContent && (
+                <button
+                  type="button"
+                  className="update-button"
+                  disabled={updateLoading || draftLoading || reviewLoading || acceptLoading}
+                  onClick={handleUpdate}
+                  style={{ marginLeft: '1rem' }}
+                >
+                  {updateLoading ? (
+                    <>
+                      <span className="spinner"></span>
+                      Updating...
+                    </>
+                  ) : (
+                    'Update'
+                  )}
+                </button>
+              )}
             </div>
 
             <div className="side-by-side" style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
@@ -308,6 +492,95 @@ ${draftContent}`
                 </div>
               )}
             </div>
+
+            {hasUpdated && (
+              <div className="accept-section" style={{ marginTop: '2rem', textAlign: 'center' }}>
+                <button
+                  type="button"
+                  className="accept-button"
+                  disabled={acceptLoading || draftLoading || reviewLoading || updateLoading}
+                  onClick={handleAccept}
+                >
+                  {acceptLoading ? (
+                    <>
+                      <span className="spinner"></span>
+                      Finalizing...
+                    </>
+                  ) : (
+                    'Accept'
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {finalContent && (
+          <div className="final-content" style={{ marginTop: '2rem' }}>
+            <h2>Final Market Details</h2>
+
+            {finalContent.raw ? (
+              <div className="content-box">
+                <p style={{ whiteSpace: 'pre-wrap' }}>{finalContent.raw}</p>
+              </div>
+            ) : (
+              <>
+                <div className="content-section">
+                  <h3>1. Outcomes and Resolution Criteria</h3>
+                  <div className="content-box">
+                    {finalContent.outcomes?.map((outcome, index) => (
+                      <div key={index} style={{ marginBottom: '1rem' }}>
+                        <strong>{outcome.name}</strong>
+                        <p style={{ whiteSpace: 'pre-wrap', marginTop: '0.5rem' }}>{outcome.resolutionCriteria}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="content-section">
+                  <h3>2. Market Start Time (UTC)</h3>
+                  <div className="content-box">
+                    <p>{finalContent.marketStartTimeUTC}</p>
+                  </div>
+                </div>
+
+                <div className="content-section">
+                  <h3>3. Market End Time (UTC)</h3>
+                  <div className="content-box">
+                    <p>{finalContent.marketEndTimeUTC}</p>
+                  </div>
+                </div>
+
+                <div className="content-section">
+                  <h3>4. Short Description</h3>
+                  <div className="content-box">
+                    <p>{finalContent.shortDescription}</p>
+                  </div>
+                </div>
+
+                <div className="content-section">
+                  <h3>5. Full Resolution Rules</h3>
+                  <div className="content-box">
+                    <p style={{ whiteSpace: 'pre-wrap' }}>{finalContent.fullResolutionRules}</p>
+                  </div>
+                </div>
+
+                <div className="content-section">
+                  <h3>6. Edge Cases</h3>
+                  <div className="content-box">
+                    <p style={{ whiteSpace: 'pre-wrap' }}>{finalContent.edgeCases}</p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <button
+              className="reset-button"
+              style={{ marginTop: '2rem' }}
+              onClick={handleReset}
+            >
+              Create Another Market
+            </button>
           </div>
         )}
       </div>
