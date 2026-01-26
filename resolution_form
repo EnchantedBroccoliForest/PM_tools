@@ -39,8 +39,11 @@ function App() {
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
   const [loading, setLoading] = useState(false);
   const [draftLoading, setDraftLoading] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState(null);
   const [draftContent, setDraftContent] = useState(null);
+  const [reviewContent, setReviewContent] = useState(null);
+  const [reviewModel, setReviewModel] = useState(AVAILABLE_MODELS[8].id); // Default to Claude Opus 4.5
   const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
@@ -194,11 +197,68 @@ Provide a comprehensive draft that includes:
       const data = await response.json();
       const content = data.choices[0].message.content;
       setDraftContent(content);
+      setReviewContent(null); // Clear previous review when new draft is generated
     } catch (err) {
       setError(err.message || 'An error occurred while generating draft');
       console.error('Error:', err);
     } finally {
       setDraftLoading(false);
+    }
+  };
+
+  const handleReview = async () => {
+    if (!draftContent) return;
+
+    setReviewLoading(true);
+    setError(null);
+
+    try {
+      const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
+      if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
+        throw new Error('OpenRouter API key not configured. Please add REACT_APP_OPENROUTER_API_KEY to your .env file.');
+      }
+
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'Prediction Market Creator'
+        },
+        body: JSON.stringify({
+          model: reviewModel,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a critical reviewer specializing in prediction market design. Your job is to find flaws, ambiguities, and potential issues in market definitions.'
+            },
+            {
+              role: 'user',
+              content: `Review this draft for a prediction market. Challenge the resolution rules rigorously, identify potential areas of misinterpretations and suggest edits.
+
+DRAFT TO REVIEW:
+${draftContent}`
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 3000
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to generate review');
+      }
+
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+      setReviewContent(content);
+    } catch (err) {
+      setError(err.message || 'An error occurred while generating review');
+      console.error('Error:', err);
+    } finally {
+      setReviewLoading(false);
     }
   };
 
@@ -331,10 +391,60 @@ Provide a comprehensive draft that includes:
         </form>
 
         {draftContent && (
-          <div className="draft-content">
-            <h2>Draft Output</h2>
-            <div className="content-box">
-              <p style={{ whiteSpace: 'pre-wrap' }}>{draftContent}</p>
+          <div className="draft-review-section">
+            <div className="review-controls">
+              <div className="form-group" style={{ display: 'inline-block', marginRight: '1rem' }}>
+                <label htmlFor="reviewModel">Review Model:</label>
+                <select
+                  id="reviewModel"
+                  value={reviewModel}
+                  onChange={(e) => setReviewModel(e.target.value)}
+                  className="input"
+                  disabled={reviewLoading}
+                  style={{ marginLeft: '0.5rem' }}
+                >
+                  {AVAILABLE_MODELS.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                className="review-button"
+                disabled={reviewLoading || loading || draftLoading}
+                onClick={handleReview}
+              >
+                {reviewLoading ? (
+                  <>
+                    <span className="spinner"></span>
+                    Reviewing...
+                  </>
+                ) : (
+                  'Review'
+                )}
+              </button>
+            </div>
+
+            <div className="side-by-side" style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <div className="draft-content" style={{ flex: 1 }}>
+                <h2>Draft Output</h2>
+                <p className="model-label">Model: {AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || selectedModel}</p>
+                <div className="content-box">
+                  <p style={{ whiteSpace: 'pre-wrap' }}>{draftContent}</p>
+                </div>
+              </div>
+
+              {reviewContent && (
+                <div className="review-content" style={{ flex: 1 }}>
+                  <h2>Review Output</h2>
+                  <p className="model-label">Model: {AVAILABLE_MODELS.find(m => m.id === reviewModel)?.name || reviewModel}</p>
+                  <div className="content-box">
+                    <p style={{ whiteSpace: 'pre-wrap' }}>{reviewContent}</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -386,6 +496,7 @@ Provide a comprehensive draft that includes:
               onClick={() => {
                 setGeneratedContent(null);
                 setDraftContent(null);
+                setReviewContent(null);
                 setQuestion('');
                 setStartDate('');
                 setEndDate('');
