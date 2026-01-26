@@ -4,7 +4,8 @@ import './index.css';
 
 function App() {
   const [question, setQuestion] = useState('');
-  const [resolutionDate, setResolutionDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState(null);
   const [error, setError] = useState(null);
@@ -12,8 +13,8 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!question.trim() || !resolutionDate) {
-      setError('Please fill in both the question and resolution date');
+    if (!question.trim() || !startDate || !endDate) {
+      setError('Please fill in all fields: question, start date, and end date');
       return;
     }
 
@@ -44,8 +45,9 @@ function App() {
             {
               role: 'user',
               content: `Create a prediction market for the following question: "${question}"
-              
-Resolution Date: ${resolutionDate}
+
+Start Date: ${startDate}
+End Date: ${endDate}
 
 Please provide:
 1. A well-defined resolution criteria that is appropriate for prediction markets. This should be clear, objective, and unambiguous.
@@ -160,14 +162,28 @@ Format your response as JSON with the following structure:
           </div>
 
           <div className="form-group">
-            <label htmlFor="resolutionDate">
-              Market Resolution Date *
+            <label htmlFor="startDate">
+              Start Date *
             </label>
             <input
-              id="resolutionDate"
+              id="startDate"
               type="date"
-              value={resolutionDate}
-              onChange={(e) => setResolutionDate(e.target.value)}
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="endDate">
+              End Date *
+            </label>
+            <input
+              id="endDate"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
               className="input"
               disabled={loading}
             />
@@ -182,7 +198,7 @@ Format your response as JSON with the following structure:
           <button 
             type="submit" 
             className="submit-button"
-            disabled={loading || !question.trim() || !resolutionDate}
+            disabled={loading || !question.trim() || !startDate || !endDate}
           >
             {loading ? (
               <>
@@ -225,7 +241,8 @@ Format your response as JSON with the following structure:
               onClick={() => {
                 setGeneratedContent(null);
                 setQuestion('');
-                setResolutionDate('');
+                setStartDate('');
+                setEndDate('');
                 setError(null);
               }}
             >
