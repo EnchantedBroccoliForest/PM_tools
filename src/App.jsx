@@ -360,6 +360,11 @@ Generate a JSON response with exactly these fields:
               className="input"
               disabled={draftLoading}
             />
+            {startDate && (
+              <p className="utc-hint">
+                UTC: {new Date(startDate + 'T00:00:00').toISOString().replace('T', ' ').slice(0, -5)} UTC
+              </p>
+            )}
           </div>
 
           <div className="form-group">
@@ -374,6 +379,11 @@ Generate a JSON response with exactly these fields:
               className="input"
               disabled={draftLoading}
             />
+            {endDate && (
+              <p className="utc-hint">
+                UTC: {new Date(endDate + 'T23:59:59').toISOString().replace('T', ' ').slice(0, -5)} UTC
+              </p>
+            )}
           </div>
 
           <div className="form-group">
