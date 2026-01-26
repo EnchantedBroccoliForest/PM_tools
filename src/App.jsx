@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
-import ReactDOM from 'react-dom/client';
-import './index.css';
+import { useState } from 'react';
+import './App.css';
 
 function App() {
   const AVAILABLE_MODELS = [
-    // OpenAI Models
     { id: 'openai/gpt-5.2-extended-thinking', name: 'GPT-5.2 Extended Thinking' },
     { id: 'openai/gpt-5.2', name: 'GPT-5.2' },
     { id: 'openai/gpt-5.1', name: 'GPT-5.1' },
@@ -13,22 +11,17 @@ function App() {
     { id: 'openai/gpt-4.5-preview', name: 'GPT-4.5 Preview' },
     { id: 'openai/gpt-4o', name: 'GPT-4o' },
     { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
-    // Anthropic Models
     { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5' },
     { id: 'anthropic/claude-opus-4', name: 'Claude Opus 4' },
     { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' },
     { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
     { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku' },
-    // Google Models
     { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro' },
     { id: 'google/gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro' },
     { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash' },
-    // DeepSeek Models
     { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1' },
     { id: 'deepseek/deepseek-v3', name: 'DeepSeek V3' },
-    // Meta Models
     { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B' },
-    // Mistral Models
     { id: 'mistralai/mistral-large', name: 'Mistral Large' },
     { id: 'mistralai/mixtral-8x22b-instruct', name: 'Mixtral 8x22B' },
   ];
@@ -43,7 +36,7 @@ function App() {
   const [generatedContent, setGeneratedContent] = useState(null);
   const [draftContent, setDraftContent] = useState(null);
   const [reviewContent, setReviewContent] = useState(null);
-  const [reviewModel, setReviewModel] = useState(AVAILABLE_MODELS[8].id); // Default to Claude Opus 4.5
+  const [reviewModel, setReviewModel] = useState(AVAILABLE_MODELS[8].id);
   const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
@@ -59,12 +52,11 @@ function App() {
     setGeneratedContent(null);
 
     try {
-      const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
+      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
       if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-        throw new Error('OpenRouter API key not configured. Please add REACT_APP_OPENROUTER_API_KEY to your .env file.');
+        throw new Error('OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.');
       }
 
-      // Call OpenRouter API
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -113,10 +105,8 @@ Format your response as JSON with the following structure:
       const data = await response.json();
       const content = data.choices[0].message.content;
       
-      // Try to parse JSON from the response
       let parsedContent;
       try {
-        // Extract JSON from markdown code blocks if present
         const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
         if (jsonMatch) {
           parsedContent = JSON.parse(jsonMatch[1]);
@@ -124,7 +114,6 @@ Format your response as JSON with the following structure:
           parsedContent = JSON.parse(content);
         }
       } catch (parseError) {
-        // If parsing fails, create a structured object from the text
         const lines = content.split('\n');
         parsedContent = {
           resolutionCriteria: extractSection(lines, 'resolution', 'criteria'),
@@ -148,9 +137,9 @@ Format your response as JSON with the following structure:
     setDraftContent(null);
 
     try {
-      const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
+      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
       if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-        throw new Error('OpenRouter API key not configured. Please add REACT_APP_OPENROUTER_API_KEY to your .env file.');
+        throw new Error('OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.');
       }
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -197,7 +186,7 @@ Provide a comprehensive draft that includes:
       const data = await response.json();
       const content = data.choices[0].message.content;
       setDraftContent(content);
-      setReviewContent(null); // Clear previous review when new draft is generated
+      setReviewContent(null);
     } catch (err) {
       setError(err.message || 'An error occurred while generating draft');
       console.error('Error:', err);
@@ -213,9 +202,9 @@ Provide a comprehensive draft that includes:
     setError(null);
 
     try {
-      const apiKey = process.env.REACT_APP_OPENROUTER_API_KEY;
+      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
       if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-        throw new Error('OpenRouter API key not configured. Please add REACT_APP_OPENROUTER_API_KEY to your .env file.');
+        throw new Error('OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.');
       }
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -262,7 +251,6 @@ ${draftContent}`
     }
   };
 
-  // Helper function to extract sections from text
   const extractSection = (lines, ...keywords) => {
     let section = [];
     let inSection = false;
@@ -275,7 +263,6 @@ ${draftContent}`
       }
       if (inSection) {
         if (line.trim() === '' && section.length > 0) {
-          // Check if next non-empty line starts a new section
           let nextNonEmpty = i + 1;
           while (nextNonEmpty < lines.length && lines[nextNonEmpty].trim() === '') {
             nextNonEmpty++;
@@ -512,9 +499,4 @@ ${draftContent}`
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+export default App;

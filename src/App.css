@@ -1,0 +1,262 @@
+.App {
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  color: #fff;
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: #a0a0a0;
+  font-size: 1.1rem;
+}
+
+.model-version {
+  color: #646cff;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.market-form {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  color: #fff;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #646cff;
+  box-shadow: 0 0 0 3px rgba(100, 108, 255, 0.2);
+}
+
+.input::placeholder {
+  color: #666;
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+select.input {
+  cursor: pointer;
+}
+
+select.input option {
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.error-message {
+  background: rgba(255, 0, 0, 0.1);
+  border: 1px solid rgba(255, 0, 0, 0.3);
+  color: #ff6b6b;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.draft-button,
+.review-button,
+.submit-button,
+.reset-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.draft-button {
+  background: #4a9eff;
+  color: #fff;
+  width: 100%;
+}
+
+.draft-button:hover:not(:disabled) {
+  background: #3a8eef;
+}
+
+.review-button {
+  background: #9b59b6;
+  color: #fff;
+}
+
+.review-button:hover:not(:disabled) {
+  background: #8e44ad;
+}
+
+.submit-button {
+  background: linear-gradient(135deg, #646cff 0%, #9b59b6 100%);
+  color: #fff;
+  width: 100%;
+}
+
+.submit-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(100, 108, 255, 0.4);
+}
+
+.reset-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.reset-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.draft-button:disabled,
+.review-button:disabled,
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.draft-review-section {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.review-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.side-by-side {
+  display: flex;
+  gap: 1rem;
+}
+
+.draft-content,
+.review-content {
+  flex: 1;
+}
+
+.draft-content h2,
+.review-content h2 {
+  color: #fff;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.model-label {
+  color: #646cff;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.content-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+  color: #e0e0e0;
+  line-height: 1.6;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.generated-content {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2rem;
+  border-radius: 12px;
+}
+
+.generated-content h2 {
+  color: #fff;
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.content-section {
+  margin-bottom: 1.5rem;
+}
+
+.content-section h3 {
+  color: #646cff;
+  font-size: 1.2rem;
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .side-by-side {
+    flex-direction: column;
+  }
+  
+  .review-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .review-controls .form-group {
+    margin-right: 0 !important;
+  }
+}
