@@ -30,106 +30,12 @@ function App() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
-  const [loading, setLoading] = useState(false);
   const [draftLoading, setDraftLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState(null);
   const [draftContent, setDraftContent] = useState(null);
   const [reviewContent, setReviewContent] = useState(null);
   const [reviewModel, setReviewModel] = useState(AVAILABLE_MODELS[8].id);
   const [error, setError] = useState(null);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!question.trim() || !startDate || !endDate) {
-      setError('Please fill in all fields: question, start date, and end date');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setGeneratedContent(null);
-
-    try {
-      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-      if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-        throw new Error('OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.');
-      }
-
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Prediction Market Creator'
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an expert at creating prediction market questions with clear, unambiguous resolution criteria. You help create well-defined markets that can be objectively resolved.'
-            },
-            {
-              role: 'user',
-              content: `Create a prediction market for the following question: "${question}"
-
-Start Date: ${startDate}
-End Date: ${endDate}
-
-Please provide:
-1. A well-defined resolution criteria that is appropriate for prediction markets. This should be clear, objective, and unambiguous.
-2. A long-form description that explains the market, provides context, and helps traders understand what they're betting on.
-3. Edge cases to consider - potential ambiguities or scenarios that might affect resolution.
-
-Format your response as JSON with the following structure:
-{
-  "resolutionCriteria": "...",
-  "description": "...",
-  "edgeCases": "..."
-}`
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 2000
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to generate content');
-      }
-
-      const data = await response.json();
-      const content = data.choices[0].message.content;
-      
-      let parsedContent;
-      try {
-        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-        if (jsonMatch) {
-          parsedContent = JSON.parse(jsonMatch[1]);
-        } else {
-          parsedContent = JSON.parse(content);
-        }
-      } catch (parseError) {
-        const lines = content.split('\n');
-        parsedContent = {
-          resolutionCriteria: extractSection(lines, 'resolution', 'criteria'),
-          description: extractSection(lines, 'description'),
-          edgeCases: extractSection(lines, 'edge', 'cases')
-        };
-      }
-
-      setGeneratedContent(parsedContent);
-    } catch (err) {
-      setError(err.message || 'An error occurred while generating content');
-      console.error('Error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDraft = async () => {
     setDraftLoading(true);
@@ -251,37 +157,6 @@ ${draftContent}`
     }
   };
 
-  const extractSection = (lines, ...keywords) => {
-    let section = [];
-    let inSection = false;
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].toLowerCase();
-      if (keywords.some(keyword => line.includes(keyword) && (line.includes(':') || line.includes('#')))) {
-        inSection = true;
-        continue;
-      }
-      if (inSection) {
-        if (line.trim() === '' && section.length > 0) {
-          let nextNonEmpty = i + 1;
-          while (nextNonEmpty < lines.length && lines[nextNonEmpty].trim() === '') {
-            nextNonEmpty++;
-          }
-          if (nextNonEmpty < lines.length && 
-              (lines[nextNonEmpty].toLowerCase().includes(':') || 
-               lines[nextNonEmpty].toLowerCase().includes('#'))) {
-            break;
-          }
-        }
-        if (inSection) {
-          section.push(lines[i]);
-        }
-      }
-    }
-    
-    return section.join('\n').trim() || 'Content not found in expected format';
-  };
-
   return (
     <div className="App">
       <div className="container">
@@ -291,7 +166,7 @@ ${draftContent}`
           <p className="model-version">Model: {AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || selectedModel}</p>
         </header>
 
-        <form onSubmit={handleSubmit} className="market-form">
+        <div className="market-form">
           <div className="form-group">
             <label htmlFor="question">
               Prediction Market Question *
@@ -303,7 +178,7 @@ ${draftContent}`
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="e.g., Will AI achieve AGI by 2030?"
               className="input"
-              disabled={loading}
+              disabled={draftLoading}
             />
           </div>
 
@@ -317,7 +192,7 @@ ${draftContent}`
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               className="input"
-              disabled={loading}
+              disabled={draftLoading}
             />
           </div>
 
@@ -331,7 +206,7 @@ ${draftContent}`
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               className="input"
-              disabled={loading}
+              disabled={draftLoading}
             />
           </div>
 
@@ -344,7 +219,7 @@ ${draftContent}`
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
               className="input"
-              disabled={loading}
+              disabled={draftLoading}
             >
               {AVAILABLE_MODELS.map((model) => (
                 <option key={model.id} value={model.id}>
@@ -363,7 +238,7 @@ ${draftContent}`
           <button
             type="button"
             className="draft-button"
-            disabled={draftLoading || loading || !question.trim() || !startDate || !endDate}
+            disabled={draftLoading || !question.trim() || !startDate || !endDate}
             onClick={handleDraft}
           >
             {draftLoading ? (
@@ -375,7 +250,7 @@ ${draftContent}`
               'Draft'
             )}
           </button>
-        </form>
+        </div>
 
         {draftContent && (
           <div className="draft-review-section">
@@ -400,7 +275,7 @@ ${draftContent}`
               <button
                 type="button"
                 className="review-button"
-                disabled={reviewLoading || loading || draftLoading}
+                disabled={reviewLoading || draftLoading}
                 onClick={handleReview}
               >
                 {reviewLoading ? (
@@ -433,65 +308,6 @@ ${draftContent}`
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="market-form" style={{ marginTop: draftContent ? '2rem' : '0' }}>
-          <button
-            type="submit"
-            className="submit-button"
-            disabled={loading || draftLoading || !question.trim() || !startDate || !endDate}
-          >
-            {loading ? (
-              <>
-                <span className="spinner"></span>
-                Generating...
-              </>
-            ) : (
-              'Generate Market Details'
-            )}
-          </button>
-        </form>
-
-        {generatedContent && (
-          <div className="generated-content">
-            <h2>Generated Market Details</h2>
-            
-            <div className="content-section">
-              <h3>Resolution Criteria</h3>
-              <div className="content-box">
-                <p>{generatedContent.resolutionCriteria}</p>
-              </div>
-            </div>
-
-            <div className="content-section">
-              <h3>Description</h3>
-              <div className="content-box">
-                <p style={{ whiteSpace: 'pre-wrap' }}>{generatedContent.description}</p>
-              </div>
-            </div>
-
-            <div className="content-section">
-              <h3>Edge Cases to Consider</h3>
-              <div className="content-box">
-                <p style={{ whiteSpace: 'pre-wrap' }}>{generatedContent.edgeCases}</p>
-              </div>
-            </div>
-
-            <button
-              className="reset-button"
-              onClick={() => {
-                setGeneratedContent(null);
-                setDraftContent(null);
-                setReviewContent(null);
-                setQuestion('');
-                setStartDate('');
-                setEndDate('');
-                setError(null);
-              }}
-            >
-              Create Another Market
-            </button>
           </div>
         )}
       </div>
