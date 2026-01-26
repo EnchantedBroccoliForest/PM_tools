@@ -29,7 +29,7 @@ function App() {
   const [question, setQuestion] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
+  const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[1].id);
   const [draftLoading, setDraftLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
@@ -38,7 +38,7 @@ function App() {
   const [reviewContent, setReviewContent] = useState(null);
   const [finalContent, setFinalContent] = useState(null);
   const [hasUpdated, setHasUpdated] = useState(false);
-  const [reviewModel, setReviewModel] = useState(AVAILABLE_MODELS[8].id);
+  const [reviewModel, setReviewModel] = useState(AVAILABLE_MODELS[13].id);
   const [error, setError] = useState(null);
 
   const handleDraft = async () => {
@@ -454,22 +454,24 @@ Generate a JSON response with exactly these fields:
                 )}
               </button>
               {reviewContent && (
-                <button
-                  type="button"
-                  className="update-button"
-                  disabled={updateLoading || draftLoading || reviewLoading || acceptLoading}
-                  onClick={handleUpdate}
-                  style={{ marginLeft: '1rem' }}
-                >
-                  {updateLoading ? (
-                    <>
-                      <span className="spinner"></span>
-                      Updating...
-                    </>
-                  ) : (
-                    'Update'
-                  )}
-                </button>
+                <div style={{ display: 'inline-block', marginLeft: '1rem' }}>
+                  <button
+                    type="button"
+                    className="review-button"
+                    disabled={updateLoading || draftLoading || reviewLoading || acceptLoading}
+                    onClick={handleUpdate}
+                  >
+                    {updateLoading ? (
+                      <>
+                        <span className="spinner"></span>
+                        Updating...
+                      </>
+                    ) : (
+                      'Update'
+                    )}
+                  </button>
+                  <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#a0a0a0', marginTop: '0.5rem' }}>update the draft based on the reviewer's critique</p>
+                </div>
               )}
             </div>
 
@@ -484,7 +486,7 @@ Generate a JSON response with exactly these fields:
 
               {reviewContent && (
                 <div className="review-content" style={{ flex: 1 }}>
-                  <h2>Review Output</h2>
+                  <h2>Review Critique</h2>
                   <p className="model-label">Model: {AVAILABLE_MODELS.find(m => m.id === reviewModel)?.name || reviewModel}</p>
                   <div className="content-box">
                     <p style={{ whiteSpace: 'pre-wrap' }}>{reviewContent}</p>
@@ -497,7 +499,7 @@ Generate a JSON response with exactly these fields:
               <div className="accept-section" style={{ marginTop: '2rem', textAlign: 'center' }}>
                 <button
                   type="button"
-                  className="accept-button"
+                  className="review-button"
                   disabled={acceptLoading || draftLoading || reviewLoading || updateLoading}
                   onClick={handleAccept}
                 >
