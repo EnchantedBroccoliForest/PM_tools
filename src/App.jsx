@@ -58,7 +58,7 @@ function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Prediction Market Creator'
+          'X-Title': 'Market Creator'
         },
         body: JSON.stringify({
           model: selectedModel,
@@ -69,7 +69,7 @@ function App() {
             },
             {
               role: 'user',
-              content: `Draft a prediction market question based on user inputs. Be extremely rigorous. Cover all possible edge cases.
+              content: `Draft a prediction market proposal based on user inputs. Be extremely rigorous. Write a detailed Resolution Rules and provide links to all sources. Come up with a complete set of mutually-exclusive outcomes and their resolution criteria. Cover all possible edge cases.
 
 User's Question: "${question}"
 Start Date: ${startDate}
@@ -125,18 +125,18 @@ Provide a comprehensive draft that includes:
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Prediction Market Creator'
+          'X-Title': 'Market Creator'
         },
         body: JSON.stringify({
           model: reviewModel,
           messages: [
             {
               role: 'system',
-              content: 'You are a critical reviewer specializing in prediction market design. Your job is to find flaws, ambiguities, and potential issues in market definitions.'
+              content: 'You are a critical reviewer specializing in prediction market design. You are a very well trained contract reviewer. Your job is to find flaws, ambiguities, and potential issues in market definitions, resolution rules, and the completeness of the outcome set.'
             },
             {
               role: 'user',
-              content: `Review this draft for a prediction market. Challenge the resolution rules rigorously, identify potential areas of misinterpretations and suggest edits.
+              content: `Review this draft for a prediction market. Challenge the resolution rules rigorously, identify potential areas of misinterpretations or incompleteness and suggest edits.
 
 DRAFT TO REVIEW:
 ${draftContent}`
@@ -181,7 +181,7 @@ ${draftContent}`
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Prediction Market Creator'
+          'X-Title': 'Market Creator'
         },
         body: JSON.stringify({
           model: selectedModel,
@@ -192,7 +192,7 @@ ${draftContent}`
             },
             {
               role: 'user',
-              content: `This is a critical review of the draft. Review and first determine if the critiques make sense. Incorporate the suggestions or criticisms from the Reviewer that make sense and generate a new draft.
+              content: `This is a critical review of the draft. Review and first determine if the critiques make logical sense. Incorporate the suggestions or criticisms from the Reviewer that are correct and generate a new draft.
 
 ORIGINAL DRAFT:
 ${draftContent}
@@ -242,7 +242,7 @@ ${reviewContent}`
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Prediction Market Creator'
+          'X-Title': 'Market Creator'
         },
         body: JSON.stringify({
           model: selectedModel,
@@ -253,7 +253,7 @@ ${reviewContent}`
             },
             {
               role: 'user',
-              content: `Based on the following draft, generate the final prediction market details in a structured JSON format.
+              content: `Based on the following draft, generate the final and condensed prediction market details in a structured JSON format.
 
 DRAFT:
 ${draftContent}
