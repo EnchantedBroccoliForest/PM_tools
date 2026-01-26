@@ -4,14 +4,31 @@ import './index.css';
 
 function App() {
   const AVAILABLE_MODELS = [
-    { id: 'openai/gpt-4', name: 'GPT-4' },
-    { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo' },
-    { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
-    { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus' },
-    { id: 'anthropic/claude-3-sonnet', name: 'Claude 3 Sonnet' },
-    { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku' },
-    { id: 'google/gemini-pro', name: 'Gemini Pro' },
-    { id: 'meta-llama/llama-3-70b-instruct', name: 'Llama 3 70B' },
+    // OpenAI Models
+    { id: 'openai/gpt-5.1', name: 'GPT-5.1' },
+    { id: 'openai/o4-mini', name: 'O4 Mini' },
+    { id: 'openai/o3', name: 'O3' },
+    { id: 'openai/gpt-4.5-preview', name: 'GPT-4.5 Preview' },
+    { id: 'openai/gpt-4o', name: 'GPT-4o' },
+    { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
+    // Anthropic Models
+    { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5' },
+    { id: 'anthropic/claude-opus-4', name: 'Claude Opus 4' },
+    { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' },
+    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
+    { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku' },
+    // Google Models
+    { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro' },
+    { id: 'google/gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro' },
+    { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash' },
+    // DeepSeek Models
+    { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1' },
+    { id: 'deepseek/deepseek-v3', name: 'DeepSeek V3' },
+    // Meta Models
+    { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B' },
+    // Mistral Models
+    { id: 'mistralai/mistral-large', name: 'Mistral Large' },
+    { id: 'mistralai/mixtral-8x22b-instruct', name: 'Mixtral 8x22B' },
   ];
 
   const [question, setQuestion] = useState('');
