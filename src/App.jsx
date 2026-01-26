@@ -58,7 +58,7 @@ function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Prediction Market Creator'
+          'X-Title': 'Market Creator'
         },
         body: JSON.stringify({
           model: selectedModel,
