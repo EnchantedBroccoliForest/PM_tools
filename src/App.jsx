@@ -327,7 +327,7 @@ Generate a JSON response with exactly these fields:
     <div className="App">
       <div className="container">
         <header className="header">
-          <h1>Create Prediction Market</h1>
+          <h1>Market Creator</h1>
           <p className="subtitle">AI-assisted market creation via OpenRouter</p>
           <p className="model-version">Model: {AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || selectedModel}</p>
         </header>
