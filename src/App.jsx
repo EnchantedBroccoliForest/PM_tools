@@ -40,6 +40,41 @@ function App() {
   const [hasUpdated, setHasUpdated] = useState(false);
   const [reviewModel, setReviewModel] = useState(AVAILABLE_MODELS[13].id);
   const [error, setError] = useState(null);
+  const [dateError, setDateError] = useState(null);
+
+  const validateDates = (start, end) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (start) {
+      const startDateObj = new Date(start);
+      if (startDateObj <= today) {
+        return 'Start Date must be in the future';
+      }
+    }
+    
+    if (start && end) {
+      const startDateObj = new Date(start);
+      const endDateObj = new Date(end);
+      if (endDateObj <= startDateObj) {
+        return 'End Date must be later than Start Date';
+      }
+    }
+    
+    return null;
+  };
+
+  const handleStartDateChange = (e) => {
+    const newStartDate = e.target.value;
+    setStartDate(newStartDate);
+    setDateError(validateDates(newStartDate, endDate));
+  };
+
+  const handleEndDateChange = (e) => {
+    const newEndDate = e.target.value;
+    setEndDate(newEndDate);
+    setDateError(validateDates(startDate, newEndDate));
+  };
 
   const handleDraft = async () => {
     setDraftLoading(true);
@@ -321,6 +356,7 @@ Generate a JSON response with exactly these fields:
     setStartDate('');
     setEndDate('');
     setError(null);
+    setDateError(null);
   };
 
   return (
@@ -356,10 +392,15 @@ Generate a JSON response with exactly these fields:
               id="startDate"
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={handleStartDateChange}
               className="input"
               disabled={draftLoading}
             />
+            {startDate && (
+              <p className="utc-hint">
+                UTC: {new Date(startDate + 'T00:00:00').toISOString().replace('T', ' ').slice(0, -5)} UTC
+              </p>
+            )}
           </div>
 
           <div className="form-group">
@@ -370,10 +411,15 @@ Generate a JSON response with exactly these fields:
               id="endDate"
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={handleEndDateChange}
               className="input"
               disabled={draftLoading}
             />
+            {endDate && (
+              <p className="utc-hint">
+                UTC: {new Date(endDate + 'T23:59:59').toISOString().replace('T', ' ').slice(0, -5)} UTC
+              </p>
+            )}
           </div>
 
           <div className="form-group">
@@ -395,6 +441,12 @@ Generate a JSON response with exactly these fields:
             </select>
           </div>
 
+          {dateError && (
+            <div className="error-message">
+              {dateError}
+            </div>
+          )}
+
           {error && (
             <div className="error-message">
               {error}
@@ -404,7 +456,7 @@ Generate a JSON response with exactly these fields:
           <button
             type="button"
             className="draft-button"
-            disabled={draftLoading || !question.trim() || !startDate || !endDate}
+            disabled={draftLoading || !question.trim() || !startDate || !endDate || dateError}
             onClick={handleDraft}
           >
             {draftLoading ? (
