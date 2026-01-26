@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 
 function App() {
+  const MODEL_VERSION = 'gpt-4';
+
   const [question, setQuestion] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -36,7 +38,7 @@ function App() {
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-4',
+          model: MODEL_VERSION,
           messages: [
             {
               role: 'system',
@@ -143,6 +145,7 @@ Format your response as JSON with the following structure:
         <header className="header">
           <h1>Create Prediction Market</h1>
           <p className="subtitle">AI-assisted market creation powered by ChatGPT</p>
+          <p className="model-version">Model: {MODEL_VERSION}</p>
         </header>
 
         <form onSubmit={handleSubmit} className="market-form">
