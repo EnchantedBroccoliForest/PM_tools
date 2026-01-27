@@ -39,6 +39,7 @@ function App() {
   const [finalContent, setFinalContent] = useState(null);
   const [hasUpdated, setHasUpdated] = useState(false);
   const [reviewModel, setReviewModel] = useState(AVAILABLE_MODELS[13].id);
+  const [humanReviewInput, setHumanReviewInput] = useState('');
   const [error, setError] = useState(null);
   const [dateError, setDateError] = useState(null);
 
@@ -132,6 +133,7 @@ Provide a comprehensive draft that includes:
       const content = data.choices[0].message.content;
       setDraftContent(content);
       setReviewContent(null);
+      setHumanReviewInput('');
       setHasUpdated(false);
       setFinalContent(null);
     } catch (err) {
@@ -233,7 +235,10 @@ ORIGINAL DRAFT:
 ${draftContent}
 
 CRITICAL REVIEW:
-${reviewContent}`
+${reviewContent}${humanReviewInput.trim() ? `
+
+HUMAN REVIEWER FEEDBACK:
+${humanReviewInput}` : ''}`
             }
           ],
           temperature: 0.7,
@@ -250,6 +255,7 @@ ${reviewContent}`
       const content = data.choices[0].message.content;
       setDraftContent(content);
       setReviewContent(null);
+      setHumanReviewInput('');
       setHasUpdated(true);
     } catch (err) {
       setError(err.message || 'An error occurred while updating draft');
@@ -350,6 +356,7 @@ Generate a JSON response with exactly these fields:
   const handleReset = () => {
     setDraftContent(null);
     setReviewContent(null);
+    setHumanReviewInput('');
     setFinalContent(null);
     setHasUpdated(false);
     setQuestion('');
@@ -538,6 +545,23 @@ Generate a JSON response with exactly these fields:
 
               {reviewContent && (
                 <div className="review-content" style={{ flex: 1 }}>
+                  <div className="human-review-section" style={{ marginBottom: '1rem' }}>
+                    <h2>Human Review</h2>
+                    <p className="model-label" style={{ fontStyle: 'italic', color: '#a0a0a0' }}>Add your own critiques (optional)</p>
+                    <textarea
+                      value={humanReviewInput}
+                      onChange={(e) => setHumanReviewInput(e.target.value)}
+                      placeholder="Enter your own critiques or additional feedback here..."
+                      className="input"
+                      style={{
+                        width: '100%',
+                        minHeight: '120px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit'
+                      }}
+                      disabled={updateLoading}
+                    />
+                  </div>
                   <h2>Review Critique</h2>
                   <p className="model-label">Model: {AVAILABLE_MODELS.find(m => m.id === reviewModel)?.name || reviewModel}</p>
                   <div className="content-box">
