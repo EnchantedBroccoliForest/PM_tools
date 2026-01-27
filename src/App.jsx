@@ -105,7 +105,7 @@ function App() {
             },
             {
               role: 'user',
-              content: `Draft a prediction market proposal based on user inputs. Be extremely rigorous. Write a detailed Resolution Rules and provide links to all sources. Come up with a complete set of mutually-exclusive outcomes and their resolution criteria. Cover all possible edge cases.
+              content: `Draft a prediction market proposal based on user inputs. Write a clear, unambiguous Resolution Rules and provide links to all sources. The market must be objectively resolvable with sources that can be easily publicly verified. Come up with a complete set of mutually-exclusive outcomes and their resolution criteria. Cover all possible edge cases.
 
 User's Question: "${question}"
 Start Date: ${startDate}
