@@ -254,8 +254,6 @@ ${humanReviewInput}` : ''}`
       const data = await response.json();
       const content = data.choices[0].message.content;
       setDraftContent(content);
-      setReviewContent(null);
-      setHumanReviewInput('');
       setHasUpdated(true);
     } catch (err) {
       setError(err.message || 'An error occurred while updating draft');
@@ -497,21 +495,24 @@ Generate a JSON response with exactly these fields:
                   ))}
                 </select>
               </div>
-              <button
-                type="button"
-                className="review-button"
-                disabled={reviewLoading || draftLoading || updateLoading || acceptLoading}
-                onClick={handleReview}
-              >
-                {reviewLoading ? (
-                  <>
-                    <span className="spinner"></span>
-                    Reviewing...
-                  </>
-                ) : (
-                  'Review'
-                )}
-              </button>
+              <div style={{ display: 'inline-block' }}>
+                <button
+                  type="button"
+                  className="review-button"
+                  disabled={reviewLoading || draftLoading || updateLoading || acceptLoading}
+                  onClick={handleReview}
+                >
+                  {reviewLoading ? (
+                    <>
+                      <span className="spinner"></span>
+                      Reviewing...
+                    </>
+                  ) : (
+                    'Review'
+                  )}
+                </button>
+                <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#a0a0a0', marginTop: '0.5rem' }}>You can review multiple times with different agent</p>
+              </div>
               {reviewContent && (
                 <div style={{ display: 'inline-block', marginLeft: '1rem' }}>
                   <button
@@ -532,11 +533,31 @@ Generate a JSON response with exactly these fields:
                   <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#a0a0a0', marginTop: '0.5rem' }}>update the draft based on the reviewer's critique</p>
                 </div>
               )}
+              {hasUpdated && (
+                <div style={{ display: 'inline-block', marginLeft: '1rem' }}>
+                  <button
+                    type="button"
+                    className="review-button"
+                    disabled={acceptLoading || draftLoading || reviewLoading || updateLoading}
+                    onClick={handleAccept}
+                  >
+                    {acceptLoading ? (
+                      <>
+                        <span className="spinner"></span>
+                        Finalizing...
+                      </>
+                    ) : (
+                      'Accept'
+                    )}
+                  </button>
+                  <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#a0a0a0', marginTop: '0.5rem' }}>finalize the market</p>
+                </div>
+              )}
             </div>
 
             <div className="side-by-side" style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
               <div className="draft-content" style={{ flex: 1 }}>
-                <h2>Draft Output</h2>
+                <h2>Draft</h2>
                 <p className="model-label">Model: {AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || selectedModel}</p>
                 <div className="content-box">
                   <p style={{ whiteSpace: 'pre-wrap' }}>{draftContent}</p>
@@ -562,7 +583,7 @@ Generate a JSON response with exactly these fields:
                       disabled={updateLoading}
                     />
                   </div>
-                  <h2>Review Critique</h2>
+                  <h2>Agent Review</h2>
                   <p className="model-label">Model: {AVAILABLE_MODELS.find(m => m.id === reviewModel)?.name || reviewModel}</p>
                   <div className="content-box">
                     <p style={{ whiteSpace: 'pre-wrap' }}>{reviewContent}</p>
@@ -570,26 +591,6 @@ Generate a JSON response with exactly these fields:
                 </div>
               )}
             </div>
-
-            {hasUpdated && (
-              <div className="accept-section" style={{ marginTop: '2rem', textAlign: 'center' }}>
-                <button
-                  type="button"
-                  className="review-button"
-                  disabled={acceptLoading || draftLoading || reviewLoading || updateLoading}
-                  onClick={handleAccept}
-                >
-                  {acceptLoading ? (
-                    <>
-                      <span className="spinner"></span>
-                      Finalizing...
-                    </>
-                  ) : (
-                    'Accept'
-                  )}
-                </button>
-              </div>
-            )}
           </div>
         )}
 
