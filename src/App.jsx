@@ -78,9 +78,15 @@ function App() {
   };
 
   const handleDraft = async () => {
-    setDraftLoading(true);
-    setError(null);
+    // Clear ALL previous submission context immediately to ensure complete isolation
+    // Each submission must be independent with no context leakage from previous questions
     setDraftContent(null);
+    setReviewContent(null);
+    setHumanReviewInput('');
+    setFinalContent(null);
+    setHasUpdated(false);
+    setError(null);
+    setDraftLoading(true);
 
     try {
       const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
@@ -132,10 +138,6 @@ Provide a comprehensive draft that includes:
       const data = await response.json();
       const content = data.choices[0].message.content;
       setDraftContent(content);
-      setReviewContent(null);
-      setHumanReviewInput('');
-      setHasUpdated(false);
-      setFinalContent(null);
     } catch (err) {
       setError(err.message || 'An error occurred while generating draft');
       console.error('Error:', err);
