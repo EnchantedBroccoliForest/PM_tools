@@ -731,6 +731,97 @@ select.input optgroup {
 }
 
 /* ================================================
+   Multi-Reviewer Controls
+   ================================================ */
+.review-models-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.review-model-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.remove-reviewer-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  border-radius: var(--r-xs);
+  background: rgba(248, 113, 113, 0.08);
+  color: var(--red);
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.remove-reviewer-btn:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.remove-reviewer-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.add-reviewer-btn {
+  padding: 0.3rem 0.65rem;
+  border: 1px dashed rgba(139, 92, 246, 0.25);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--accent-light);
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.add-reviewer-btn:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.add-reviewer-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Deliberation badge */
+.deliberation-badge {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(16, 185, 129, 0.2) !important;
+}
+
+/* Individual reviews (dimmed when deliberation exists) */
+.individual-review {
+  opacity: 0.65;
+  transition: opacity var(--transition);
+}
+
+.individual-review:hover {
+  opacity: 1;
+}
+
+.individual-review .col-panel-header h2 {
+  font-size: 0.82rem;
+}
+
+.individual-review .content-box {
+  max-height: 280px;
+}
+
+/* ================================================
    Responsive
    ================================================ */
 @media (max-width: 768px) {
