@@ -1,31 +1,79 @@
 import { useState } from 'react';
 import './App.css';
 
-function App() {
-  const AVAILABLE_MODELS = [
-    { id: 'openai/gpt-5.2-extended-thinking', name: 'GPT-5.2 Extended Thinking' },
-    { id: 'openai/gpt-5.2', name: 'GPT-5.2' },
-    { id: 'openai/gpt-5.1', name: 'GPT-5.1' },
-    { id: 'openai/o4-mini', name: 'O4 Mini' },
-    { id: 'openai/o3', name: 'O3' },
-    { id: 'openai/gpt-4.5-preview', name: 'GPT-4.5 Preview' },
-    { id: 'openai/gpt-4o', name: 'GPT-4o' },
-    { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
-    { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5' },
-    { id: 'anthropic/claude-opus-4', name: 'Claude Opus 4' },
-    { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' },
-    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
-    { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku' },
-    { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro' },
-    { id: 'google/gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro' },
-    { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash' },
-    { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1' },
-    { id: 'deepseek/deepseek-v3', name: 'DeepSeek V3' },
-    { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B' },
-    { id: 'mistralai/mistral-large', name: 'Mistral Large' },
-    { id: 'mistralai/mixtral-8x22b-instruct', name: 'Mixtral 8x22B' },
-  ];
+const MODEL_GROUPS = [
+  {
+    label: 'OpenAI',
+    models: [
+      { id: 'openai/gpt-5.2-extended-thinking', name: 'GPT-5.2 Extended Thinking' },
+      { id: 'openai/gpt-5.2', name: 'GPT-5.2' },
+      { id: 'openai/gpt-5.1', name: 'GPT-5.1' },
+      { id: 'openai/o4-mini', name: 'O4 Mini' },
+      { id: 'openai/o3', name: 'O3' },
+      { id: 'openai/gpt-4.5-preview', name: 'GPT-4.5 Preview' },
+      { id: 'openai/gpt-4o', name: 'GPT-4o' },
+      { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
+    ],
+  },
+  {
+    label: 'Anthropic',
+    models: [
+      { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5' },
+      { id: 'anthropic/claude-opus-4', name: 'Claude Opus 4' },
+      { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' },
+      { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
+      { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku' },
+    ],
+  },
+  {
+    label: 'Google',
+    models: [
+      { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro' },
+      { id: 'google/gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro' },
+      { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash' },
+    ],
+  },
+  {
+    label: 'DeepSeek',
+    models: [
+      { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1' },
+      { id: 'deepseek/deepseek-v3', name: 'DeepSeek V3' },
+    ],
+  },
+  {
+    label: 'Meta',
+    models: [
+      { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B' },
+    ],
+  },
+  {
+    label: 'Mistral',
+    models: [
+      { id: 'mistralai/mistral-large', name: 'Mistral Large' },
+      { id: 'mistralai/mixtral-8x22b-instruct', name: 'Mixtral 8x22B' },
+    ],
+  },
+];
 
+const AVAILABLE_MODELS = MODEL_GROUPS.flatMap((g) => g.models);
+
+function ModelSelect({ id, value, onChange, disabled, className }) {
+  return (
+    <select id={id} value={value} onChange={onChange} disabled={disabled} className={className}>
+      {MODEL_GROUPS.map((group) => (
+        <optgroup key={group.label} label={group.label}>
+          {group.models.map((model) => (
+            <option key={model.id} value={model.id}>
+              {model.name}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
+function App() {
   const [question, setQuestion] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -42,18 +90,31 @@ function App() {
   const [humanReviewInput, setHumanReviewInput] = useState('');
   const [error, setError] = useState(null);
   const [dateError, setDateError] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+
+  const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
+
+  const handleCopy = (text, id) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  const getModelName = (id) =>
+    AVAILABLE_MODELS.find((m) => m.id === id)?.name || id;
 
   const validateDates = (start, end) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     if (start) {
       const startDateObj = new Date(start);
       if (startDateObj <= today) {
         return 'Start Date must be in the future';
       }
     }
-    
+
     if (start && end) {
       const startDateObj = new Date(start);
       const endDateObj = new Date(end);
@@ -61,7 +122,7 @@ function App() {
         return 'End Date must be later than Start Date';
       }
     }
-    
+
     return null;
   };
 
@@ -78,8 +139,6 @@ function App() {
   };
 
   const handleDraft = async () => {
-    // Clear ALL previous submission context immediately to ensure complete isolation
-    // Each submission must be independent with no context leakage from previous questions
     setDraftContent(null);
     setReviewContent(null);
     setHumanReviewInput('');
@@ -100,14 +159,14 @@ function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Market Creator'
+          'X-Title': 'Market Creator',
         },
         body: JSON.stringify({
           model: selectedModel,
           messages: [
             {
               role: 'system',
-              content: 'You are an expert at creating prediction market questions with clear, unambiguous resolution criteria. You help create well-defined markets that can be objectively resolved.'
+              content: 'You are an expert at creating prediction market questions with clear, unambiguous resolution criteria. You help create well-defined markets that can be objectively resolved.',
             },
             {
               role: 'user',
@@ -122,12 +181,12 @@ Provide a comprehensive draft that includes:
 2. Detailed resolution criteria
 3. All possible edge cases and how they should be handled
 4. Potential sources for resolution
-5. Any assumptions that need to be made explicit`
-            }
+5. Any assumptions that need to be made explicit`,
+            },
           ],
           temperature: 0.7,
-          max_tokens: 3000
-        })
+          max_tokens: 3000,
+        }),
       });
 
       if (!response.ok) {
@@ -136,8 +195,7 @@ Provide a comprehensive draft that includes:
       }
 
       const data = await response.json();
-      const content = data.choices[0].message.content;
-      setDraftContent(content);
+      setDraftContent(data.choices[0].message.content);
     } catch (err) {
       setError(err.message || 'An error occurred while generating draft');
       console.error('Error:', err);
@@ -164,26 +222,26 @@ Provide a comprehensive draft that includes:
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Market Creator'
+          'X-Title': 'Market Creator',
         },
         body: JSON.stringify({
           model: reviewModel,
           messages: [
             {
               role: 'system',
-              content: 'You are a critical reviewer specializing in prediction market design. You are a very well trained contract reviewer. Your job is to find flaws, ambiguities, and potential issues in market definitions, resolution rules, and the completeness of the outcome set.'
+              content: 'You are a critical reviewer specializing in prediction market design. You are a very well trained contract reviewer. Your job is to find flaws, ambiguities, and potential issues in market definitions, resolution rules, and the completeness of the outcome set.',
             },
             {
               role: 'user',
               content: `Review this draft for a prediction market. Challenge the resolution rules rigorously, identify potential areas of misinterpretations or incompleteness and suggest edits.
 
 DRAFT TO REVIEW:
-${draftContent}`
-            }
+${draftContent}`,
+            },
           ],
           temperature: 0.7,
-          max_tokens: 3000
-        })
+          max_tokens: 3000,
+        }),
       });
 
       if (!response.ok) {
@@ -192,8 +250,7 @@ ${draftContent}`
       }
 
       const data = await response.json();
-      const content = data.choices[0].message.content;
-      setReviewContent(content);
+      setReviewContent(data.choices[0].message.content);
     } catch (err) {
       setError(err.message || 'An error occurred while generating review');
       console.error('Error:', err);
@@ -220,14 +277,14 @@ ${draftContent}`
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Market Creator'
+          'X-Title': 'Market Creator',
         },
         body: JSON.stringify({
           model: selectedModel,
           messages: [
             {
               role: 'system',
-              content: 'You are an expert at creating prediction market questions with clear, unambiguous resolution criteria. You help create well-defined markets that can be objectively resolved.'
+              content: 'You are an expert at creating prediction market questions with clear, unambiguous resolution criteria. You help create well-defined markets that can be objectively resolved.',
             },
             {
               role: 'user',
@@ -240,12 +297,12 @@ CRITICAL REVIEW:
 ${reviewContent}${humanReviewInput.trim() ? `
 
 HUMAN REVIEWER FEEDBACK:
-${humanReviewInput}` : ''}`
-            }
+${humanReviewInput}` : ''}`,
+            },
           ],
           temperature: 0.7,
-          max_tokens: 3000
-        })
+          max_tokens: 3000,
+        }),
       });
 
       if (!response.ok) {
@@ -254,8 +311,7 @@ ${humanReviewInput}` : ''}`
       }
 
       const data = await response.json();
-      const content = data.choices[0].message.content;
-      setDraftContent(content);
+      setDraftContent(data.choices[0].message.content);
       setHasUpdated(true);
     } catch (err) {
       setError(err.message || 'An error occurred while updating draft');
@@ -283,14 +339,14 @@ ${humanReviewInput}` : ''}`
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'Market Creator'
+          'X-Title': 'Market Creator',
         },
         body: JSON.stringify({
           model: selectedModel,
           messages: [
             {
               role: 'system',
-              content: 'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format.'
+              content: 'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format.',
             },
             {
               role: 'user',
@@ -316,12 +372,12 @@ Generate a JSON response with exactly these fields:
   "shortDescription": "A brief 1-2 sentence market description",
   "fullResolutionRules": "Complete resolution rules",
   "edgeCases": "All edge cases and how they will be handled"
-}`
-            }
+}`,
+            },
           ],
           temperature: 0.3,
-          max_tokens: 3000
-        })
+          max_tokens: 3000,
+        }),
       });
 
       if (!response.ok) {
@@ -366,20 +422,40 @@ Generate a JSON response with exactly these fields:
     setDateError(null);
   };
 
+  const anyLoading = draftLoading || reviewLoading || updateLoading || acceptLoading;
+
   return (
     <div className="App">
       <div className="container">
+
+        {/* Header */}
         <header className="header">
           <h1>Market Creator</h1>
-          <p className="subtitle">AI-assisted market creation via OpenRouter</p>
-          <p className="model-version">Model: {AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || selectedModel}</p>
+          <p className="subtitle">AI-assisted prediction market creation via OpenRouter</p>
         </header>
 
+        {/* Step Indicator */}
+        <div className="step-indicator">
+          <div className={`step ${currentStep >= 1 ? 'step--active' : ''} ${currentStep > 1 ? 'step--done' : ''}`}>
+            <div className="step__dot">{currentStep > 1 ? '✓' : '1'}</div>
+            <div className="step__label">Setup</div>
+          </div>
+          <div className={`step-line ${currentStep > 1 ? 'step-line--done' : ''}`} />
+          <div className={`step ${currentStep >= 2 ? 'step--active' : ''} ${currentStep > 2 ? 'step--done' : ''}`}>
+            <div className="step__dot">{currentStep > 2 ? '✓' : '2'}</div>
+            <div className="step__label">Draft & Review</div>
+          </div>
+          <div className={`step-line ${currentStep > 2 ? 'step-line--done' : ''}`} />
+          <div className={`step ${currentStep >= 3 ? 'step--active' : ''}`}>
+            <div className="step__dot">3</div>
+            <div className="step__label">Finalize</div>
+          </div>
+        </div>
+
+        {/* Setup Form */}
         <div className="market-form">
           <div className="form-group">
-            <label htmlFor="question">
-              Prediction Market Question *
-            </label>
+            <label htmlFor="question">Prediction Market Question</label>
             <input
               id="question"
               type="text"
@@ -391,204 +467,212 @@ Generate a JSON response with exactly these fields:
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="startDate">
-              Start Date *
-            </label>
-            <input
-              id="startDate"
-              type="date"
-              value={startDate}
-              onChange={handleStartDateChange}
-              className="input"
-              disabled={draftLoading}
-            />
-            {startDate && (
-              <p className="utc-hint">
-                UTC: {new Date(startDate + 'T00:00:00').toISOString().replace('T', ' ').slice(0, -5)} UTC
-              </p>
-            )}
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="startDate">Start Date</label>
+              <input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={handleStartDateChange}
+                className="input"
+                disabled={draftLoading}
+              />
+              {startDate && (
+                <p className="utc-hint">
+                  {new Date(startDate + 'T00:00:00').toISOString().replace('T', ' ').slice(0, -5)} UTC
+                </p>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="endDate">End Date</label>
+              <input
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={handleEndDateChange}
+                className="input"
+                disabled={draftLoading}
+              />
+              {endDate && (
+                <p className="utc-hint">
+                  {new Date(endDate + 'T23:59:59').toISOString().replace('T', ' ').slice(0, -5)} UTC
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="form-group">
-            <label htmlFor="endDate">
-              End Date *
-            </label>
-            <input
-              id="endDate"
-              type="date"
-              value={endDate}
-              onChange={handleEndDateChange}
-              className="input"
-              disabled={draftLoading}
-            />
-            {endDate && (
-              <p className="utc-hint">
-                UTC: {new Date(endDate + 'T23:59:59').toISOString().replace('T', ' ').slice(0, -5)} UTC
-              </p>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="model">
-              AI Model *
-            </label>
-            <select
+            <label htmlFor="model">Drafting Model</label>
+            <ModelSelect
               id="model"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
               className="input"
               disabled={draftLoading}
-            >
-              {AVAILABLE_MODELS.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
-          {dateError && (
-            <div className="error-message">
-              {dateError}
-            </div>
-          )}
-
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
+          {dateError && <div className="error-message">{dateError}</div>}
+          {error && <div className="error-message">{error}</div>}
 
           <button
             type="button"
             className="draft-button"
-            disabled={draftLoading || !question.trim() || !startDate || !endDate || dateError}
+            disabled={draftLoading || !question.trim() || !startDate || !endDate || !!dateError}
             onClick={handleDraft}
           >
             {draftLoading ? (
               <>
-                <span className="spinner"></span>
+                <span className="spinner" />
                 Drafting...
               </>
             ) : (
-              'Draft'
+              'Draft Market'
             )}
           </button>
         </div>
 
+        {/* Draft & Review Section */}
         {draftContent && (
           <div className="draft-review-section">
-            <div className="review-controls">
-              <div className="form-group" style={{ display: 'inline-block', marginRight: '1rem' }}>
-                <label htmlFor="reviewModel">Review Model:</label>
-                <select
+
+            {/* Action Toolbar */}
+            <div className="action-toolbar">
+              <div className="toolbar-group">
+                <label htmlFor="reviewModel">Review Model</label>
+                <ModelSelect
                   id="reviewModel"
                   value={reviewModel}
                   onChange={(e) => setReviewModel(e.target.value)}
-                  className="input"
-                  disabled={reviewLoading}
-                  style={{ marginLeft: '0.5rem' }}
-                >
-                  {AVAILABLE_MODELS.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
+                  className="toolbar-select"
+                  disabled={anyLoading}
+                />
               </div>
-              <div style={{ display: 'inline-block' }}>
+
+              <div className="toolbar-divider" />
+
+              <div className="toolbar-group">
                 <button
                   type="button"
                   className="review-button"
-                  disabled={reviewLoading || draftLoading || updateLoading || acceptLoading}
+                  disabled={anyLoading}
                   onClick={handleReview}
                 >
                   {reviewLoading ? (
                     <>
-                      <span className="spinner"></span>
+                      <span className="spinner" />
                       Reviewing...
                     </>
                   ) : (
                     'Review'
                   )}
                 </button>
-                <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#a0a0a0', marginTop: '0.5rem' }}>You can review multiple times with different agent</p>
+                <span className="toolbar-hint">Run with different models multiple times</span>
               </div>
+
               {reviewContent && (
-                <div style={{ display: 'inline-block', marginLeft: '1rem' }}>
-                  <button
-                    type="button"
-                    className="review-button"
-                    disabled={updateLoading || draftLoading || reviewLoading || acceptLoading}
-                    onClick={handleUpdate}
-                  >
-                    {updateLoading ? (
-                      <>
-                        <span className="spinner"></span>
-                        Updating...
-                      </>
-                    ) : (
-                      'Update'
-                    )}
-                  </button>
-                  <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#a0a0a0', marginTop: '0.5rem' }}>update the draft based on the reviewer's critique</p>
-                </div>
+                <>
+                  <div className="toolbar-divider" />
+                  <div className="toolbar-group">
+                    <button
+                      type="button"
+                      className="review-button"
+                      disabled={anyLoading}
+                      onClick={handleUpdate}
+                    >
+                      {updateLoading ? (
+                        <>
+                          <span className="spinner" />
+                          Updating...
+                        </>
+                      ) : (
+                        'Update Draft'
+                      )}
+                    </button>
+                    <span className="toolbar-hint">Incorporate critique into draft</span>
+                  </div>
+                </>
               )}
+
               {hasUpdated && (
-                <div style={{ display: 'inline-block', marginLeft: '1rem' }}>
-                  <button
-                    type="button"
-                    className="review-button"
-                    disabled={acceptLoading || draftLoading || reviewLoading || updateLoading}
-                    onClick={handleAccept}
-                  >
-                    {acceptLoading ? (
-                      <>
-                        <span className="spinner"></span>
-                        Finalizing...
-                      </>
-                    ) : (
-                      'Accept'
-                    )}
-                  </button>
-                  <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#a0a0a0', marginTop: '0.5rem' }}>finalize the market</p>
-                </div>
+                <>
+                  <div className="toolbar-divider" />
+                  <div className="toolbar-group">
+                    <button
+                      type="button"
+                      className="accept-button"
+                      disabled={anyLoading}
+                      onClick={handleAccept}
+                    >
+                      {acceptLoading ? (
+                        <>
+                          <span className="spinner" />
+                          Finalizing...
+                        </>
+                      ) : (
+                        'Accept & Finalize'
+                      )}
+                    </button>
+                    <span className="toolbar-hint">Generate structured market details</span>
+                  </div>
+                </>
               )}
             </div>
 
-            <div className="side-by-side" style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-              <div className="draft-content" style={{ flex: 1 }}>
-                <h2>Draft</h2>
-                <p className="model-label">Model: {AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || selectedModel}</p>
+            {/* Side-by-side columns */}
+            <div className="side-by-side">
+
+              {/* Draft column */}
+              <div className="col-panel">
+                <div className="col-panel-header">
+                  <h2>Draft</h2>
+                  <div className="col-panel-actions">
+                    <span className="model-badge">{getModelName(selectedModel)}</span>
+                    <button
+                      className={`copy-btn ${copiedId === 'draft' ? 'copy-btn--copied' : ''}`}
+                      onClick={() => handleCopy(draftContent, 'draft')}
+                    >
+                      {copiedId === 'draft' ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
                 <div className="content-box">
-                  <p style={{ whiteSpace: 'pre-wrap' }}>{draftContent}</p>
+                  <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{draftContent}</p>
                 </div>
               </div>
 
+              {/* Review column */}
               {reviewContent && (
-                <div className="review-content" style={{ flex: 1 }}>
-                  <div className="human-review-section" style={{ marginBottom: '1rem' }}>
-                    <h2>Human Review</h2>
-                    <p className="model-label" style={{ fontStyle: 'italic', color: '#a0a0a0' }}>Add your own critiques (optional)</p>
+                <div className="col-panel">
+                  <div className="human-review-section">
+                    <h2>Your Feedback</h2>
+                    <span className="hint">Optional — included when you click Update Draft</span>
                     <textarea
                       value={humanReviewInput}
                       onChange={(e) => setHumanReviewInput(e.target.value)}
-                      placeholder="Enter your own critiques or additional feedback here..."
+                      placeholder="Add your own critiques or additional feedback..."
                       className="input"
-                      style={{
-                        width: '100%',
-                        minHeight: '120px',
-                        resize: 'vertical',
-                        fontFamily: 'inherit'
-                      }}
+                      style={{ minHeight: '100px', resize: 'vertical', fontFamily: 'inherit' }}
                       disabled={updateLoading}
                     />
                   </div>
-                  <h2>Agent Review</h2>
-                  <p className="model-label">Model: {AVAILABLE_MODELS.find(m => m.id === reviewModel)?.name || reviewModel}</p>
+
+                  <div className="col-panel-header">
+                    <h2>Agent Review</h2>
+                    <div className="col-panel-actions">
+                      <span className="model-badge">{getModelName(reviewModel)}</span>
+                      <button
+                        className={`copy-btn ${copiedId === 'review' ? 'copy-btn--copied' : ''}`}
+                        onClick={() => handleCopy(reviewContent, 'review')}
+                      >
+                        {copiedId === 'review' ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
                   <div className="content-box">
-                    <p style={{ whiteSpace: 'pre-wrap' }}>{reviewContent}</p>
+                    <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{reviewContent}</p>
                   </div>
                 </div>
               )}
@@ -596,74 +680,95 @@ Generate a JSON response with exactly these fields:
           </div>
         )}
 
+        {/* Final Content */}
         {finalContent && (
-          <div className="final-content" style={{ marginTop: '2rem' }}>
-            <h2>Final Market Details</h2>
+          <div className="final-content">
+            <div className="final-header">
+              <h2>Final Market Details</h2>
+              <p>Review and deploy your prediction market</p>
+            </div>
 
             {finalContent.raw ? (
-              <div className="content-box">
-                <p style={{ whiteSpace: 'pre-wrap' }}>{finalContent.raw}</p>
+              <div className="content-section">
+                <div className="content-box">
+                  <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{finalContent.raw}</p>
+                </div>
               </div>
             ) : (
               <>
+                {finalContent.outcomes?.length > 0 && (
+                  <div className="content-section">
+                    <h3>Outcomes & Resolution Criteria</h3>
+                    <div className="outcomes-grid">
+                      {finalContent.outcomes.map((outcome, index) => (
+                        <div key={index} className="outcome-card">
+                          <div className="outcome-index">Outcome {index + 1}</div>
+                          <div className="outcome-name">{outcome.name}</div>
+                          <div className="outcome-criteria">{outcome.resolutionCriteria}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="content-section">
-                  <h3>1. Outcomes and Resolution Criteria</h3>
-                  <div className="content-box">
-                    {finalContent.outcomes?.map((outcome, index) => (
-                      <div key={index} style={{ marginBottom: '1rem' }}>
-                        <strong>{outcome.name}</strong>
-                        <p style={{ whiteSpace: 'pre-wrap', marginTop: '0.5rem' }}>{outcome.resolutionCriteria}</p>
-                      </div>
-                    ))}
+                  <h3>Market Timing</h3>
+                  <div className="time-row">
+                    <div className="time-display">
+                      <div className="time-label">Start Time (UTC)</div>
+                      {finalContent.marketStartTimeUTC}
+                    </div>
+                    <div className="time-display">
+                      <div className="time-label">End Time (UTC)</div>
+                      {finalContent.marketEndTimeUTC}
+                    </div>
                   </div>
                 </div>
 
-                <div className="content-section">
-                  <h3>2. Market Start Time (UTC)</h3>
-                  <div className="content-box">
-                    <p>{finalContent.marketStartTimeUTC}</p>
+                {finalContent.shortDescription && (
+                  <div className="content-section">
+                    <h3>Short Description</h3>
+                    <div className="content-box">
+                      <p style={{ margin: 0 }}>{finalContent.shortDescription}</p>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="content-section">
-                  <h3>3. Market End Time (UTC)</h3>
-                  <div className="content-box">
-                    <p>{finalContent.marketEndTimeUTC}</p>
+                {finalContent.fullResolutionRules && (
+                  <div className="content-section">
+                    <h3>Full Resolution Rules</h3>
+                    <div className="col-panel-header" style={{ marginBottom: '0.5rem' }}>
+                      <span />
+                      <button
+                        className={`copy-btn ${copiedId === 'rules' ? 'copy-btn--copied' : ''}`}
+                        onClick={() => handleCopy(finalContent.fullResolutionRules, 'rules')}
+                      >
+                        {copiedId === 'rules' ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <div className="content-box">
+                      <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{finalContent.fullResolutionRules}</p>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="content-section">
-                  <h3>4. Short Description</h3>
-                  <div className="content-box">
-                    <p>{finalContent.shortDescription}</p>
+                {finalContent.edgeCases && (
+                  <div className="content-section">
+                    <h3>Edge Cases</h3>
+                    <div className="content-box">
+                      <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{finalContent.edgeCases}</p>
+                    </div>
                   </div>
-                </div>
-
-                <div className="content-section">
-                  <h3>5. Full Resolution Rules</h3>
-                  <div className="content-box">
-                    <p style={{ whiteSpace: 'pre-wrap' }}>{finalContent.fullResolutionRules}</p>
-                  </div>
-                </div>
-
-                <div className="content-section">
-                  <h3>6. Edge Cases</h3>
-                  <div className="content-box">
-                    <p style={{ whiteSpace: 'pre-wrap' }}>{finalContent.edgeCases}</p>
-                  </div>
-                </div>
+                )}
               </>
             )}
 
-            <button
-              className="reset-button"
-              style={{ marginTop: '2rem' }}
-              onClick={handleReset}
-            >
+            <button className="reset-button" onClick={handleReset}>
               Create Another Market
             </button>
           </div>
         )}
+
       </div>
     </div>
   );
