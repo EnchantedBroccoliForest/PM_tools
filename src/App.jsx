@@ -1,392 +1,165 @@
-import { useState } from 'react';
 import './App.css';
-
-const MODEL_GROUPS = [
-  {
-    label: 'OpenAI',
-    models: [
-      { id: 'openai/gpt-5.2-extended-thinking', name: 'GPT-5.2 Extended Thinking' },
-      { id: 'openai/gpt-5.2', name: 'GPT-5.2' },
-      { id: 'openai/gpt-5.1', name: 'GPT-5.1' },
-      { id: 'openai/o4-mini', name: 'O4 Mini' },
-      { id: 'openai/o3', name: 'O3' },
-      { id: 'openai/gpt-4.5-preview', name: 'GPT-4.5 Preview' },
-      { id: 'openai/gpt-4o', name: 'GPT-4o' },
-      { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
-    ],
-  },
-  {
-    label: 'Anthropic',
-    models: [
-      { id: 'anthropic/claude-opus-4.5', name: 'Claude Opus 4.5' },
-      { id: 'anthropic/claude-opus-4', name: 'Claude Opus 4' },
-      { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4' },
-      { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
-      { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku' },
-    ],
-  },
-  {
-    label: 'Google',
-    models: [
-      { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro' },
-      { id: 'google/gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro' },
-      { id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash' },
-    ],
-  },
-  {
-    label: 'DeepSeek',
-    models: [
-      { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1' },
-      { id: 'deepseek/deepseek-v3', name: 'DeepSeek V3' },
-    ],
-  },
-  {
-    label: 'Meta',
-    models: [
-      { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B' },
-    ],
-  },
-  {
-    label: 'Mistral',
-    models: [
-      { id: 'mistralai/mistral-large', name: 'Mistral Large' },
-      { id: 'mistralai/mixtral-8x22b-instruct', name: 'Mixtral 8x22B' },
-    ],
-  },
-];
-
-const AVAILABLE_MODELS = MODEL_GROUPS.flatMap((g) => g.models);
-
-function ModelSelect({ id, value, onChange, disabled, className }) {
-  return (
-    <select id={id} value={value} onChange={onChange} disabled={disabled} className={className}>
-      {MODEL_GROUPS.map((group) => (
-        <optgroup key={group.label} label={group.label}>
-          {group.models.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.name}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
-  );
-}
+import { AVAILABLE_MODELS, getModelName } from './constants/models';
+import {
+  SYSTEM_PROMPTS,
+  buildDraftPrompt,
+  buildReviewPrompt,
+  buildDeliberationPrompt,
+  buildUpdatePrompt,
+  buildFinalizePrompt,
+} from './constants/prompts';
+import { queryModel, queryModelsParallel } from './api/openrouter';
+import { useMarketReducer } from './hooks/useMarketReducer';
+import ModelSelect from './components/ModelSelect';
 
 function App() {
-  const [question, setQuestion] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[1].id);
-  const [draftLoading, setDraftLoading] = useState(false);
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [updateLoading, setUpdateLoading] = useState(false);
-  const [acceptLoading, setAcceptLoading] = useState(false);
-  const [draftContent, setDraftContent] = useState(null);
-  const [reviewContent, setReviewContent] = useState(null);
-  const [finalContent, setFinalContent] = useState(null);
-  const [hasUpdated, setHasUpdated] = useState(false);
-  const [reviewModel, setReviewModel] = useState(AVAILABLE_MODELS[13].id);
-  const [humanReviewInput, setHumanReviewInput] = useState('');
-  const [error, setError] = useState(null);
-  const [dateError, setDateError] = useState(null);
-  const [copiedId, setCopiedId] = useState(null);
+  const [state, dispatch] = useMarketReducer();
+
+  const {
+    question,
+    startDate,
+    endDate,
+    selectedModel,
+    reviewModels,
+    humanReviewInput,
+    loading,
+    error,
+    dateError,
+    draftContent,
+    reviews,
+    deliberatedReview,
+    finalContent,
+    hasUpdated,
+    copiedId,
+  } = state;
 
   const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
+  const anyLoading = loading !== null;
 
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text).then(() => {
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
+      dispatch({ type: 'SET_COPIED', id });
+      setTimeout(() => dispatch({ type: 'SET_COPIED', id: null }), 2000);
     });
   };
-
-  const getModelName = (id) =>
-    AVAILABLE_MODELS.find((m) => m.id === id)?.name || id;
 
   const validateDates = (start, end) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     if (start) {
       const startDateObj = new Date(start);
-      if (startDateObj <= today) {
-        return 'Start Date must be in the future';
-      }
+      if (startDateObj <= today) return 'Start Date must be in the future';
     }
-
     if (start && end) {
       const startDateObj = new Date(start);
       const endDateObj = new Date(end);
-      if (endDateObj <= startDateObj) {
-        return 'End Date must be later than Start Date';
-      }
+      if (endDateObj <= startDateObj) return 'End Date must be later than Start Date';
     }
-
     return null;
   };
 
-  const handleStartDateChange = (e) => {
-    const newStartDate = e.target.value;
-    setStartDate(newStartDate);
-    setDateError(validateDates(newStartDate, endDate));
+  const handleDateChange = (field, value) => {
+    const newStart = field === 'startDate' ? value : startDate;
+    const newEnd = field === 'endDate' ? value : endDate;
+    dispatch({ type: 'SET_DATE', field, value, dateError: validateDates(newStart, newEnd) });
   };
 
-  const handleEndDateChange = (e) => {
-    const newEndDate = e.target.value;
-    setEndDate(newEndDate);
-    setDateError(validateDates(startDate, newEndDate));
-  };
-
+  // --- Stage 1: Draft (single model) ---
   const handleDraft = async () => {
-    setDraftContent(null);
-    setReviewContent(null);
-    setHumanReviewInput('');
-    setFinalContent(null);
-    setHasUpdated(false);
-    setError(null);
-    setDraftLoading(true);
-
+    dispatch({ type: 'START_LOADING', phase: 'draft' });
     try {
-      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-      if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-        throw new Error('OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.');
-      }
-
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Market Creator',
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an expert at creating prediction market questions with clear, unambiguous resolution criteria. You help create well-defined markets that can be objectively resolved.',
-            },
-            {
-              role: 'user',
-              content: `Draft a prediction market proposal based on user inputs. Write a clear, unambiguous Resolution Rules and provide links to all sources. The market must be objectively resolvable with sources that can be easily publicly verified. Come up with a complete set of mutually-exclusive outcomes and their resolution criteria. Cover all possible edge cases.
-
-User's Question: "${question}"
-Start Date: ${startDate}
-End Date: ${endDate}
-
-Provide a comprehensive draft that includes:
-1. A refined, unambiguous version of the question
-2. Detailed resolution criteria
-3. All possible edge cases and how they should be handled
-4. Potential sources for resolution
-5. Any assumptions that need to be made explicit`,
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 3000,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to generate draft');
-      }
-
-      const data = await response.json();
-      setDraftContent(data.choices[0].message.content);
+      const content = await queryModel(selectedModel, [
+        { role: 'system', content: SYSTEM_PROMPTS.drafter },
+        { role: 'user', content: buildDraftPrompt(question, startDate, endDate) },
+      ]);
+      dispatch({ type: 'DRAFT_SUCCESS', content });
     } catch (err) {
-      setError(err.message || 'An error occurred while generating draft');
-      console.error('Error:', err);
-    } finally {
-      setDraftLoading(false);
+      dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate draft' });
     }
   };
 
+  // --- Stage 2: Multi-reviewer deliberation (inspired by llm-council Structure D) ---
+  //
+  // Phase 1: All selected review models review independently in parallel
+  // Phase 2: If multiple reviewers, each sees the others' critiques and produces
+  //          a consolidated deliberated review (like deliberate_synthesize.py)
   const handleReview = async () => {
     if (!draftContent) return;
-
-    setReviewLoading(true);
-    setError(null);
+    dispatch({ type: 'START_LOADING', phase: 'review' });
 
     try {
-      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-      if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-        throw new Error('OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.');
+      const reviewerModels = reviewModels.map((id) => ({
+        id,
+        name: getModelName(id),
+      }));
+
+      // Phase 1: Independent parallel reviews
+      const messages = [
+        { role: 'system', content: SYSTEM_PROMPTS.reviewer },
+        { role: 'user', content: buildReviewPrompt(draftContent) },
+      ];
+      const independentReviews = await queryModelsParallel(reviewerModels, messages);
+
+      const successfulReviews = independentReviews.filter((r) => r.content !== null);
+
+      if (successfulReviews.length === 0) {
+        throw new Error('All reviewers failed. Please try again.');
       }
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Market Creator',
-        },
-        body: JSON.stringify({
-          model: reviewModel,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a critical reviewer specializing in prediction market design. You are a very well trained contract reviewer. Your job is to find flaws, ambiguities, and potential issues in market definitions, resolution rules, and the completeness of the outcome set.',
-            },
-            {
-              role: 'user',
-              content: `Review this draft for a prediction market. Challenge the resolution rules rigorously, identify potential areas of misinterpretations or incompleteness and suggest edits.
+      // Phase 2: Deliberation — if we have multiple successful reviews,
+      // use the first reviewer as "chairman" to synthesize a consolidated critique
+      let deliberatedReview = null;
 
-DRAFT TO REVIEW:
-${draftContent}`,
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 3000,
-        }),
+      if (successfulReviews.length > 1) {
+        const deliberationPrompt = buildDeliberationPrompt(draftContent, successfulReviews);
+        deliberatedReview = await queryModel(successfulReviews[0].model, [
+          { role: 'system', content: SYSTEM_PROMPTS.reviewer },
+          { role: 'user', content: deliberationPrompt },
+        ]);
+      }
+
+      dispatch({
+        type: 'REVIEW_SUCCESS',
+        reviews: successfulReviews,
+        deliberatedReview,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to generate review');
-      }
-
-      const data = await response.json();
-      setReviewContent(data.choices[0].message.content);
     } catch (err) {
-      setError(err.message || 'An error occurred while generating review');
-      console.error('Error:', err);
-    } finally {
-      setReviewLoading(false);
+      dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate review' });
     }
   };
 
+  // --- Stage 3: Update draft with review feedback ---
   const handleUpdate = async () => {
-    if (!draftContent || !reviewContent) return;
-
-    setUpdateLoading(true);
-    setError(null);
+    if (!draftContent || reviews.length === 0) return;
+    dispatch({ type: 'START_LOADING', phase: 'update' });
 
     try {
-      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-      if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-        throw new Error('OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.');
-      }
-
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Market Creator',
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an expert at creating prediction market questions with clear, unambiguous resolution criteria. You help create well-defined markets that can be objectively resolved.',
-            },
-            {
-              role: 'user',
-              content: `This is a critical review of the draft. Review and first determine if the critiques make logical sense. Incorporate the suggestions or criticisms from the Reviewer that are correct and generate a new draft.
-
-ORIGINAL DRAFT:
-${draftContent}
-
-CRITICAL REVIEW:
-${reviewContent}${humanReviewInput.trim() ? `
-
-HUMAN REVIEWER FEEDBACK:
-${humanReviewInput}` : ''}`,
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 3000,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to generate updated draft');
-      }
-
-      const data = await response.json();
-      setDraftContent(data.choices[0].message.content);
-      setHasUpdated(true);
+      // Use the deliberated review if available, otherwise fall back to first review
+      const reviewText = deliberatedReview || reviews[0].content;
+      const content = await queryModel(selectedModel, [
+        { role: 'system', content: SYSTEM_PROMPTS.drafter },
+        { role: 'user', content: buildUpdatePrompt(draftContent, reviewText, humanReviewInput) },
+      ]);
+      dispatch({ type: 'UPDATE_SUCCESS', content });
     } catch (err) {
-      setError(err.message || 'An error occurred while updating draft');
-      console.error('Error:', err);
-    } finally {
-      setUpdateLoading(false);
+      dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to update draft' });
     }
   };
 
+  // --- Stage 4: Finalize to structured JSON ---
   const handleAccept = async () => {
     if (!draftContent) return;
-
-    setAcceptLoading(true);
-    setError(null);
+    dispatch({ type: 'START_LOADING', phase: 'accept' });
 
     try {
-      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-      if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-        throw new Error('OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.');
-      }
-
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Market Creator',
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format.',
-            },
-            {
-              role: 'user',
-              content: `Based on the following draft, generate the final and condensed prediction market details in a structured JSON format.
-
-DRAFT:
-${draftContent}
-
-USER PROVIDED DATES:
-Start Date: ${startDate}
-End Date: ${endDate}
-
-Generate a JSON response with exactly these fields:
-{
-  "outcomes": [
-    {
-      "name": "Outcome name",
-      "resolutionCriteria": "Specific criteria for this outcome"
-    }
-  ],
-  "marketStartTimeUTC": "YYYY-MM-DDTHH:MM:SSZ format based on start date",
-  "marketEndTimeUTC": "YYYY-MM-DDTHH:MM:SSZ format based on end date",
-  "shortDescription": "A brief 1-2 sentence market description",
-  "fullResolutionRules": "Complete resolution rules",
-  "edgeCases": "All edge cases and how they will be handled"
-}`,
-            },
-          ],
-          temperature: 0.3,
-          max_tokens: 3000,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to generate final content');
-      }
-
-      const data = await response.json();
-      const content = data.choices[0].message.content;
+      const content = await queryModel(
+        selectedModel,
+        [
+          { role: 'system', content: SYSTEM_PROMPTS.finalizer },
+          { role: 'user', content: buildFinalizePrompt(draftContent, startDate, endDate) },
+        ],
+        { temperature: 0.3 }
+      );
 
       let parsedContent;
       try {
@@ -396,33 +169,17 @@ Generate a JSON response with exactly these fields:
         } else {
           parsedContent = JSON.parse(content);
         }
-      } catch (parseError) {
+      } catch {
         parsedContent = { raw: content };
       }
 
-      setFinalContent(parsedContent);
+      dispatch({ type: 'FINALIZE_SUCCESS', content: parsedContent });
     } catch (err) {
-      setError(err.message || 'An error occurred while finalizing market');
-      console.error('Error:', err);
-    } finally {
-      setAcceptLoading(false);
+      dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to finalize market' });
     }
   };
 
-  const handleReset = () => {
-    setDraftContent(null);
-    setReviewContent(null);
-    setHumanReviewInput('');
-    setFinalContent(null);
-    setHasUpdated(false);
-    setQuestion('');
-    setStartDate('');
-    setEndDate('');
-    setError(null);
-    setDateError(null);
-  };
-
-  const anyLoading = draftLoading || reviewLoading || updateLoading || acceptLoading;
+  const handleReset = () => dispatch({ type: 'RESET' });
 
   return (
     <div className="App">
@@ -437,12 +194,12 @@ Generate a JSON response with exactly these fields:
         {/* Step Indicator */}
         <div className="step-indicator">
           <div className={`step ${currentStep >= 1 ? 'step--active' : ''} ${currentStep > 1 ? 'step--done' : ''}`}>
-            <div className="step__dot">{currentStep > 1 ? '✓' : '1'}</div>
+            <div className="step__dot">{currentStep > 1 ? '\u2713' : '1'}</div>
             <div className="step__label">Setup</div>
           </div>
           <div className={`step-line ${currentStep > 1 ? 'step-line--done' : ''}`} />
           <div className={`step ${currentStep >= 2 ? 'step--active' : ''} ${currentStep > 2 ? 'step--done' : ''}`}>
-            <div className="step__dot">{currentStep > 2 ? '✓' : '2'}</div>
+            <div className="step__dot">{currentStep > 2 ? '\u2713' : '2'}</div>
             <div className="step__label">Draft & Review</div>
           </div>
           <div className={`step-line ${currentStep > 2 ? 'step-line--done' : ''}`} />
@@ -460,10 +217,10 @@ Generate a JSON response with exactly these fields:
               id="question"
               type="text"
               value={question}
-              onChange={(e) => setQuestion(e.target.value)}
+              onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'question', value: e.target.value })}
               placeholder="e.g., Will AI achieve AGI by 2030?"
               className="input"
-              disabled={draftLoading}
+              disabled={loading === 'draft'}
             />
           </div>
 
@@ -474,9 +231,9 @@ Generate a JSON response with exactly these fields:
                 id="startDate"
                 type="date"
                 value={startDate}
-                onChange={handleStartDateChange}
+                onChange={(e) => handleDateChange('startDate', e.target.value)}
                 className="input"
-                disabled={draftLoading}
+                disabled={loading === 'draft'}
               />
               {startDate && (
                 <p className="utc-hint">
@@ -484,16 +241,15 @@ Generate a JSON response with exactly these fields:
                 </p>
               )}
             </div>
-
             <div className="form-group">
               <label htmlFor="endDate">End Date</label>
               <input
                 id="endDate"
                 type="date"
                 value={endDate}
-                onChange={handleEndDateChange}
+                onChange={(e) => handleDateChange('endDate', e.target.value)}
                 className="input"
-                disabled={draftLoading}
+                disabled={loading === 'draft'}
               />
               {endDate && (
                 <p className="utc-hint">
@@ -508,9 +264,9 @@ Generate a JSON response with exactly these fields:
             <ModelSelect
               id="model"
               value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
+              onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'selectedModel', value: e.target.value })}
               className="input"
-              disabled={draftLoading}
+              disabled={loading === 'draft'}
             />
           </div>
 
@@ -520,10 +276,10 @@ Generate a JSON response with exactly these fields:
           <button
             type="button"
             className="draft-button"
-            disabled={draftLoading || !question.trim() || !startDate || !endDate || !!dateError}
+            disabled={loading === 'draft' || !question.trim() || !startDate || !endDate || !!dateError}
             onClick={handleDraft}
           >
-            {draftLoading ? (
+            {loading === 'draft' ? (
               <>
                 <span className="spinner" />
                 Drafting...
@@ -540,15 +296,50 @@ Generate a JSON response with exactly these fields:
 
             {/* Action Toolbar */}
             <div className="action-toolbar">
+              {/* Multi-reviewer selector */}
               <div className="toolbar-group">
-                <label htmlFor="reviewModel">Review Model</label>
-                <ModelSelect
-                  id="reviewModel"
-                  value={reviewModel}
-                  onChange={(e) => setReviewModel(e.target.value)}
-                  className="toolbar-select"
-                  disabled={anyLoading}
-                />
+                <label>Review Council</label>
+                <div className="review-models-list">
+                  {reviewModels.map((modelId, idx) => (
+                    <div key={idx} className="review-model-row">
+                      <ModelSelect
+                        id={`reviewModel-${idx}`}
+                        value={modelId}
+                        onChange={(e) =>
+                          dispatch({ type: 'SET_REVIEW_MODEL', index: idx, value: e.target.value })
+                        }
+                        className="toolbar-select"
+                        disabled={anyLoading}
+                      />
+                      {reviewModels.length > 1 && (
+                        <button
+                          type="button"
+                          className="remove-reviewer-btn"
+                          onClick={() => dispatch({ type: 'REMOVE_REVIEW_MODEL', index: idx })}
+                          disabled={anyLoading}
+                          title="Remove reviewer"
+                        >
+                          x
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {reviewModels.length < 4 && (
+                    <button
+                      type="button"
+                      className="add-reviewer-btn"
+                      onClick={() => dispatch({ type: 'ADD_REVIEW_MODEL' })}
+                      disabled={anyLoading}
+                    >
+                      + Add Reviewer
+                    </button>
+                  )}
+                </div>
+                <span className="toolbar-hint">
+                  {reviewModels.length > 1
+                    ? 'Multiple reviewers will deliberate to produce a stronger critique'
+                    : 'Add more reviewers for multi-model deliberation'}
+                </span>
               </div>
 
               <div className="toolbar-divider" />
@@ -560,19 +351,23 @@ Generate a JSON response with exactly these fields:
                   disabled={anyLoading}
                   onClick={handleReview}
                 >
-                  {reviewLoading ? (
+                  {loading === 'review' ? (
                     <>
                       <span className="spinner" />
-                      Reviewing...
+                      {reviewModels.length > 1 ? 'Deliberating...' : 'Reviewing...'}
                     </>
                   ) : (
-                    'Review'
+                    reviewModels.length > 1 ? 'Review & Deliberate' : 'Review'
                   )}
                 </button>
-                <span className="toolbar-hint">Run with different models multiple times</span>
+                <span className="toolbar-hint">
+                  {reviewModels.length > 1
+                    ? 'Models review independently, then deliberate on disagreements'
+                    : 'Run with different models multiple times'}
+                </span>
               </div>
 
-              {reviewContent && (
+              {reviews.length > 0 && (
                 <>
                   <div className="toolbar-divider" />
                   <div className="toolbar-group">
@@ -582,7 +377,7 @@ Generate a JSON response with exactly these fields:
                       disabled={anyLoading}
                       onClick={handleUpdate}
                     >
-                      {updateLoading ? (
+                      {loading === 'update' ? (
                         <>
                           <span className="spinner" />
                           Updating...
@@ -606,7 +401,7 @@ Generate a JSON response with exactly these fields:
                       disabled={anyLoading}
                       onClick={handleAccept}
                     >
-                      {acceptLoading ? (
+                      {loading === 'accept' ? (
                         <>
                           <span className="spinner" />
                           Finalizing...
@@ -644,36 +439,64 @@ Generate a JSON response with exactly these fields:
               </div>
 
               {/* Review column */}
-              {reviewContent && (
+              {reviews.length > 0 && (
                 <div className="col-panel">
                   <div className="human-review-section">
                     <h2>Your Feedback</h2>
                     <span className="hint">Optional — included when you click Update Draft</span>
                     <textarea
                       value={humanReviewInput}
-                      onChange={(e) => setHumanReviewInput(e.target.value)}
+                      onChange={(e) =>
+                        dispatch({ type: 'SET_FIELD', field: 'humanReviewInput', value: e.target.value })
+                      }
                       placeholder="Add your own critiques or additional feedback..."
                       className="input"
                       style={{ minHeight: '100px', resize: 'vertical', fontFamily: 'inherit' }}
-                      disabled={updateLoading}
+                      disabled={loading === 'update'}
                     />
                   </div>
 
-                  <div className="col-panel-header">
-                    <h2>Agent Review</h2>
-                    <div className="col-panel-actions">
-                      <span className="model-badge">{getModelName(reviewModel)}</span>
-                      <button
-                        className={`copy-btn ${copiedId === 'review' ? 'copy-btn--copied' : ''}`}
-                        onClick={() => handleCopy(reviewContent, 'review')}
-                      >
-                        {copiedId === 'review' ? 'Copied!' : 'Copy'}
-                      </button>
+                  {/* Show deliberated review prominently if available */}
+                  {deliberatedReview && (
+                    <>
+                      <div className="col-panel-header">
+                        <h2>Deliberated Review</h2>
+                        <div className="col-panel-actions">
+                          <span className="model-badge deliberation-badge">Council</span>
+                          <button
+                            className={`copy-btn ${copiedId === 'deliberated' ? 'copy-btn--copied' : ''}`}
+                            onClick={() => handleCopy(deliberatedReview, 'deliberated')}
+                          >
+                            {copiedId === 'deliberated' ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="content-box">
+                        <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{deliberatedReview}</p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Individual reviews (collapsed if deliberation exists) */}
+                  {reviews.map((review, idx) => (
+                    <div key={idx} className={deliberatedReview ? 'individual-review' : ''}>
+                      <div className="col-panel-header">
+                        <h2>{deliberatedReview ? `Reviewer ${idx + 1}` : 'Agent Review'}</h2>
+                        <div className="col-panel-actions">
+                          <span className="model-badge">{review.modelName}</span>
+                          <button
+                            className={`copy-btn ${copiedId === `review-${idx}` ? 'copy-btn--copied' : ''}`}
+                            onClick={() => handleCopy(review.content, `review-${idx}`)}
+                          >
+                            {copiedId === `review-${idx}` ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="content-box">
+                        <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{review.content}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="content-box">
-                    <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{reviewContent}</p>
-                  </div>
+                  ))}
                 </div>
               )}
             </div>
