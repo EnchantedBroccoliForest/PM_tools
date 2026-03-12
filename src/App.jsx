@@ -31,6 +31,8 @@ function App() {
     finalContent,
     hasUpdated,
     copiedId,
+    referenceLinks,
+    referenceFiles,
   } = state;
 
   const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
@@ -64,13 +66,34 @@ function App() {
     dispatch({ type: 'SET_DATE', field, value, dateError: validateDates(newStart, newEnd) });
   };
 
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    const readers = files.map(
+      (file) =>
+        new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve({ name: file.name, content: reader.result });
+          reader.onerror = () => resolve({ name: file.name, content: '[Failed to read file]' });
+          reader.readAsText(file);
+        })
+    );
+
+    Promise.all(readers).then((results) => {
+      dispatch({ type: 'ADD_REFERENCE_FILES', files: results });
+    });
+
+    e.target.value = '';
+  };
+
   // --- Stage 1: Draft (single model) ---
   const handleDraft = async () => {
     dispatch({ type: 'START_LOADING', phase: 'draft' });
     try {
       const content = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildDraftPrompt(question, startDate, endDate) },
+        { role: 'user', content: buildDraftPrompt(question, startDate, endDate, { links: referenceLinks, files: referenceFiles }) },
       ]);
       dispatch({ type: 'DRAFT_SUCCESS', content });
     } catch (err) {
@@ -259,6 +282,78 @@ function App() {
                     className="input"
                     disabled={loading === 'draft'}
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>References <span className="optional-tag">Optional</span></label>
+                  <div className="reference-links">
+                    {referenceLinks.map((link, idx) => (
+                      <div key={idx} className="reference-link-row">
+                        <input
+                          type="url"
+                          value={link}
+                          onChange={(e) =>
+                            dispatch({ type: 'SET_REFERENCE_LINK', index: idx, value: e.target.value })
+                          }
+                          placeholder="https://..."
+                          className="input"
+                          disabled={loading === 'draft'}
+                        />
+                        {referenceLinks.length > 1 && (
+                          <button
+                            type="button"
+                            className="remove-reviewer-btn"
+                            onClick={() => dispatch({ type: 'REMOVE_REFERENCE_LINK', index: idx })}
+                            disabled={loading === 'draft'}
+                            title="Remove link"
+                          >
+                            x
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="add-reviewer-btn"
+                      onClick={() => dispatch({ type: 'ADD_REFERENCE_LINK' })}
+                      disabled={loading === 'draft'}
+                    >
+                      + Add Link
+                    </button>
+                  </div>
+
+                  <div className="reference-files">
+                    <label className="file-upload-btn" aria-disabled={loading === 'draft'}>
+                      Upload Files
+                      <input
+                        type="file"
+                        multiple
+                        accept=".txt,.md,.csv,.json,.pdf,.html,.xml,.log"
+                        onChange={handleFileUpload}
+                        disabled={loading === 'draft'}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                    {referenceFiles.length > 0 && (
+                      <div className="uploaded-files-list">
+                        {referenceFiles.map((file, idx) => (
+                          <div key={idx} className="uploaded-file-tag">
+                            <span className="uploaded-file-name">{file.name}</span>
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => dispatch({ type: 'REMOVE_REFERENCE_FILE', index: idx })}
+                              disabled={loading === 'draft'}
+                              title="Remove file"
+                            >
+                              x
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span className="toolbar-hint">Links or documents to inform the market design</span>
                 </div>
 
                 {dateError && <div className="error-message">{dateError}</div>}

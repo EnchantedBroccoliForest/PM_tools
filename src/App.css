@@ -284,6 +284,124 @@
 /* step-line styles removed — connectors are now panel-connector elements */
 
 /* ================================================
+   References
+   ================================================ */
+.optional-tag {
+  font-weight: 400;
+  font-size: 0.6rem;
+  color: var(--text-3);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 0.35rem;
+}
+
+.reference-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.reference-link-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.reference-link-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.reference-files {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.file-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.75rem;
+  border: 1px dashed rgba(139, 92, 246, 0.25);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--accent-light);
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.file-upload-btn:hover {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.file-upload-btn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.uploaded-files-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.uploaded-file-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: var(--r-xs);
+  font-size: 0.72rem;
+  color: #a5b4fc;
+}
+
+.uploaded-file-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove-file-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--red);
+  font-size: 0.6rem;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition);
+  flex-shrink: 0;
+}
+
+.remove-file-btn:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.3);
+}
+
+.remove-file-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ================================================
    Market Form
    ================================================ */
 .market-form {

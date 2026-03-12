@@ -9,6 +9,8 @@ const initialState = {
   selectedModel: DEFAULT_DRAFT_MODEL,
   reviewModels: [DEFAULT_REVIEW_MODEL],
   humanReviewInput: '',
+  referenceLinks: [''],
+  referenceFiles: [], // Array of { name, content }
 
   // Processing
   loading: null, // null | 'draft' | 'review' | 'update' | 'accept'
@@ -58,6 +60,37 @@ function reducer(state, action) {
         reviewModels: state.reviewModels.map((m, i) =>
           i === action.index ? action.value : m
         ),
+      };
+
+    case 'SET_REFERENCE_LINK':
+      return {
+        ...state,
+        referenceLinks: state.referenceLinks.map((l, i) =>
+          i === action.index ? action.value : l
+        ),
+      };
+
+    case 'ADD_REFERENCE_LINK':
+      return { ...state, referenceLinks: [...state.referenceLinks, ''] };
+
+    case 'REMOVE_REFERENCE_LINK':
+      return {
+        ...state,
+        referenceLinks: state.referenceLinks.length <= 1
+          ? ['']
+          : state.referenceLinks.filter((_, i) => i !== action.index),
+      };
+
+    case 'ADD_REFERENCE_FILES':
+      return {
+        ...state,
+        referenceFiles: [...state.referenceFiles, ...action.files],
+      };
+
+    case 'REMOVE_REFERENCE_FILE':
+      return {
+        ...state,
+        referenceFiles: state.referenceFiles.filter((_, i) => i !== action.index),
       };
 
     case 'START_LOADING':
