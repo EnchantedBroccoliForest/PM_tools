@@ -60,3 +60,21 @@ export const DEFAULT_REVIEW_MODEL = AVAILABLE_MODELS[13].id;
 export function getModelName(id) {
   return AVAILABLE_MODELS.find((m) => m.id === id)?.name || id;
 }
+
+const PROVIDER_ABBREVS = {
+  'OpenAI': 'OA',
+  'Anthropic': 'A',
+  'Google': 'G',
+  'DeepSeek': 'DS',
+  'Meta': 'M',
+  'Mistral': 'Mi',
+};
+
+export function getModelAbbrev(id) {
+  for (const group of MODEL_GROUPS) {
+    if (group.models.some((m) => m.id === id)) {
+      return PROVIDER_ABBREVS[group.label] || group.label[0];
+    }
+  }
+  return '?';
+}
