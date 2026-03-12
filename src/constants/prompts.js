@@ -9,12 +9,15 @@ export const SYSTEM_PROMPTS = {
     'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format.',
 };
 
-export function buildDraftPrompt(question, startDate, endDate) {
+export function buildDraftPrompt(question, startDate, endDate, references) {
+  const referencesSection = references && references.trim()
+    ? `\nReference Links:\n${references.trim()}\n`
+    : '';
   return `Draft a prediction market proposal based on user inputs. Write a clear, unambiguous Resolution Rules and provide links to all sources. The market must be objectively resolvable with sources that can be easily publicly verified. Come up with a complete set of mutually-exclusive outcomes and their resolution criteria. Cover all possible edge cases.
 
 User's Question: "${question}"
 Start Date: ${startDate}
-End Date: ${endDate}
+End Date: ${endDate}${referencesSection}
 
 Provide a comprehensive draft that includes:
 1. A refined, unambiguous version of the question

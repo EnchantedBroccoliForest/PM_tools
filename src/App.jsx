@@ -19,6 +19,7 @@ function App() {
     question,
     startDate,
     endDate,
+    references,
     selectedModel,
     reviewModels,
     humanReviewInput,
@@ -70,7 +71,7 @@ function App() {
     try {
       const content = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildDraftPrompt(question, startDate, endDate) },
+        { role: 'user', content: buildDraftPrompt(question, startDate, endDate, references) },
       ]);
       dispatch({ type: 'DRAFT_SUCCESS', content });
     } catch (err) {
@@ -248,6 +249,21 @@ function App() {
                       <span>&#128336;</span> {new Date(endDate + 'T23:59:59').toISOString().replace('T', ' ').slice(0, -5)} UTC
                     </p>
                   )}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="references">
+                    References <span style={{ fontWeight: 400, opacity: 0.6, fontSize: '0.85em' }}>(optional)</span>
+                  </label>
+                  <textarea
+                    id="references"
+                    value={references}
+                    onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'references', value: e.target.value })}
+                    placeholder="Paste links or notes for the AI to reference, one per line..."
+                    className="input"
+                    style={{ minHeight: '80px', resize: 'vertical', fontFamily: 'inherit' }}
+                    disabled={loading === 'draft'}
+                  />
                 </div>
 
                 <div className="form-group">

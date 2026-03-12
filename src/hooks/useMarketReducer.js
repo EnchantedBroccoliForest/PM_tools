@@ -6,6 +6,7 @@ const initialState = {
   question: '',
   startDate: '',
   endDate: '',
+  references: '',
   selectedModel: DEFAULT_DRAFT_MODEL,
   reviewModels: [DEFAULT_REVIEW_MODEL],
   humanReviewInput: '',
