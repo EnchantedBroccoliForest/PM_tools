@@ -3,10 +3,10 @@ const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff
 
 function getApiKey() {
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
   if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
     throw new Error(
-      'OpenRouter API key not configured. Please add VITE_OPENROUTER_API_KEY to your environment.'
+      'OpenRouter API key not configured. Please add VITE_OPENAI_API_KEY to your environment.'
     );
   }
   return apiKey;
