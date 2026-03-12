@@ -67,8 +67,11 @@
    ================================================ */
 .App {
   position: relative;
-  min-height: 100vh;
-  padding: 2.5rem 1.5rem 4rem;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1.5rem 1.25rem;
   background:
     radial-gradient(ellipse at 15% 0%, rgba(99, 62, 228, 0.1) 0%, transparent 55%),
     radial-gradient(ellipse at 85% 100%, rgba(59, 130, 246, 0.07) 0%, transparent 55%),
@@ -76,8 +79,11 @@
 }
 
 .container {
-  max-width: 1080px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
 
 /* ================================================
@@ -85,15 +91,16 @@
    ================================================ */
 .header {
   text-align: center;
-  margin-bottom: 2.25rem;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
 }
 
 .header h1 {
   font-family: var(--font-mono);
-  font-size: 2.75rem;
+  font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.035em;
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.2rem;
   color: var(--text-1);
   position: relative;
   display: inline-block;
@@ -125,19 +132,112 @@
 }
 
 /* ================================================
-   Step Indicator (Timeline / Financial Ticks)
+   Horizontal Panels Row
    ================================================ */
-.step-indicator {
+.panels-row {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  transition: border-color var(--transition-slow), box-shadow var(--transition-slow);
+}
+
+.panel--active {
+  border-color: rgba(139, 92, 246, 0.3);
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.06);
+}
+
+.panel--done {
+  border-color: rgba(167, 139, 250, 0.2);
+}
+
+.panel--locked {
+  opacity: 0.45;
+}
+
+.panel-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
   justify-content: center;
-  margin-bottom: 2.5rem;
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.panel-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.panel-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+}
+
+.panel-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 120px;
+}
+
+.panel-placeholder p {
+  color: var(--text-3);
+  font-size: 0.85rem;
+  text-align: center;
+  font-style: italic;
+}
+
+.panel-connector {
+  width: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: relative;
 }
 
+.panel-connector::before {
+  content: '';
+  width: 100%;
+  height: 1px;
+  background: var(--border);
+  transition: background 0.4s ease;
+}
+
+.panel-connector--done::before {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.5), rgba(99, 102, 241, 0.4));
+}
+
+/* ================================================
+   Step Indicator (inside panel headers)
+   ================================================ */
+
 .step {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 0.55rem;
 }
@@ -153,15 +253,7 @@
 }
 
 .step__number::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2px;
-  height: 10px;
-  background: var(--border);
-  transition: background var(--transition-slow);
+  display: none;
 }
 
 .step--active .step__number {
@@ -169,17 +261,8 @@
   text-shadow: 0 0 20px var(--accent-glow);
 }
 
-.step--active .step__number::after {
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-
 .step--done .step__number {
   color: var(--accent-light);
-}
-
-.step--done .step__number::after {
-  background: var(--accent-light);
 }
 
 .step__label {
@@ -191,54 +274,20 @@
   transition: color var(--transition);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-top: 6px;
+  margin-top: 0;
 }
 
 .step--active .step__label {
   color: var(--text-2);
 }
 
-.step-line {
-  width: 80px;
-  height: 1px;
-  background: var(--border);
-  margin-top: 12px;
-  flex-shrink: 0;
-  transition: background 0.4s ease;
-  position: relative;
-}
-
-.step-line::before,
-.step-line::after {
-  content: '';
-  position: absolute;
-  top: -3px;
-  width: 1px;
-  height: 7px;
-  background: var(--border);
-}
-
-.step-line::before { left: 25%; }
-.step-line::after { left: 75%; }
-
-.step-line--done {
-  background: linear-gradient(90deg, rgba(139, 92, 246, 0.5), rgba(99, 102, 241, 0.4));
-}
-
-.step-line--done::before,
-.step-line--done::after {
-  background: rgba(139, 92, 246, 0.4);
-}
+/* step-line styles removed — connectors are now panel-connector elements */
 
 /* ================================================
    Market Form
    ================================================ */
 .market-form {
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 2rem;
-  margin-bottom: 1.5rem;
+  padding: 0;
 }
 
 .form-group {
@@ -507,11 +556,10 @@ select.input optgroup {
    Draft & Review Section
    ================================================ */
 .draft-review-section {
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 1.75rem;
-  margin-bottom: 1.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 /* ================================================
@@ -519,14 +567,13 @@ select.input optgroup {
    ================================================ */
 .action-toolbar {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding: 1.1rem 1.25rem;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  margin-bottom: 1.5rem;
 }
 
 .toolbar-group {
@@ -557,9 +604,9 @@ select.input optgroup {
 }
 
 .toolbar-divider {
-  width: 1px;
+  width: 100%;
+  height: 1px;
   background: var(--border);
-  align-self: stretch;
   flex-shrink: 0;
 }
 
@@ -595,8 +642,8 @@ select.input optgroup {
    Side-by-Side Columns
    ================================================ */
 .side-by-side {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 1.25rem;
 }
 
@@ -687,7 +734,6 @@ select.input optgroup {
   color: #b8c5d8;
   font-size: 0.9rem;
   line-height: 1.9;
-  max-height: 520px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
@@ -775,12 +821,7 @@ select.input optgroup {
    Final Content
    ================================================ */
 .final-content {
-  background: var(--surface-1);
-  border: 1px solid rgba(20, 184, 166, 0.18);
-  border-radius: var(--r-lg);
-  padding: 2rem;
-  margin-top: 1.5rem;
-  box-shadow: 0 0 60px rgba(20, 184, 166, 0.05);
+  padding: 0;
 }
 
 .final-header {
@@ -820,8 +861,8 @@ select.input optgroup {
 
 /* Outcome Cards */
 .outcomes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 0.875rem;
 }
 
@@ -890,7 +931,8 @@ select.input optgroup {
 /* Time Display */
 .time-row {
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .time-display {
@@ -1008,41 +1050,42 @@ select.input optgroup {
 /* ================================================
    Responsive
    ================================================ */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .App {
-    padding: 1.5rem 1rem 3rem;
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+    padding: 1rem;
+  }
+
+  .panels-row {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .panel {
+    max-height: none;
+  }
+
+  .panel-body {
+    overflow-y: visible;
+  }
+
+  .panel-connector {
+    width: auto;
+    height: 24px;
+  }
+
+  .panel-connector::before {
+    width: 1px;
+    height: 100%;
+  }
+
+  .panel--locked {
+    display: none;
   }
 
   .header h1 {
-    font-size: 2rem;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-
-  .step-line {
-    width: 40px;
-  }
-
-  .side-by-side {
-    grid-template-columns: 1fr;
-  }
-
-  .action-toolbar {
-    flex-direction: column;
-  }
-
-  .toolbar-divider {
-    width: 100%;
-    height: 1px;
-  }
-
-  .time-row {
-    flex-direction: column;
-  }
-
-  .outcomes-grid {
-    grid-template-columns: 1fr;
+    font-size: 1.5rem;
   }
 }
