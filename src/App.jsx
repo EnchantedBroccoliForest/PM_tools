@@ -1,5 +1,5 @@
 import './App.css';
-import { AVAILABLE_MODELS, getModelName } from './constants/models';
+import { AVAILABLE_MODELS, getModelName, getModelAbbrev } from './constants/models';
 import {
   SYSTEM_PROMPTS,
   buildDraftPrompt,
@@ -187,24 +187,24 @@ function App() {
 
         {/* Header */}
         <header className="header">
-          <h1>Market Creator</h1>
+          <h1>Market Creator<span className="wordmark-dot" /></h1>
           <p className="subtitle">AI-assisted prediction market creation via OpenRouter</p>
         </header>
 
         {/* Step Indicator */}
         <div className="step-indicator">
           <div className={`step ${currentStep >= 1 ? 'step--active' : ''} ${currentStep > 1 ? 'step--done' : ''}`}>
-            <div className="step__dot">{currentStep > 1 ? '\u2713' : '1'}</div>
+            <div className="step__number">1</div>
             <div className="step__label">Setup</div>
           </div>
           <div className={`step-line ${currentStep > 1 ? 'step-line--done' : ''}`} />
           <div className={`step ${currentStep >= 2 ? 'step--active' : ''} ${currentStep > 2 ? 'step--done' : ''}`}>
-            <div className="step__dot">{currentStep > 2 ? '\u2713' : '2'}</div>
+            <div className="step__number">2</div>
             <div className="step__label">Draft & Review</div>
           </div>
           <div className={`step-line ${currentStep > 2 ? 'step-line--done' : ''}`} />
           <div className={`step ${currentStep >= 3 ? 'step--active' : ''}`}>
-            <div className="step__dot">3</div>
+            <div className="step__number">3</div>
             <div className="step__label">Finalize</div>
           </div>
         </div>
@@ -237,7 +237,7 @@ function App() {
               />
               {startDate && (
                 <p className="utc-hint">
-                  {new Date(startDate + 'T00:00:00').toISOString().replace('T', ' ').slice(0, -5)} UTC
+                  <span>&#128336;</span> {new Date(startDate + 'T00:00:00').toISOString().replace('T', ' ').slice(0, -5)} UTC
                 </p>
               )}
             </div>
@@ -253,7 +253,7 @@ function App() {
               />
               {endDate && (
                 <p className="utc-hint">
-                  {new Date(endDate + 'T23:59:59').toISOString().replace('T', ' ').slice(0, -5)} UTC
+                  <span>&#128336;</span> {new Date(endDate + 'T23:59:59').toISOString().replace('T', ' ').slice(0, -5)} UTC
                 </p>
               )}
             </div>
@@ -344,10 +344,10 @@ function App() {
 
               <div className="toolbar-divider" />
 
-              <div className="toolbar-group">
+              <div className="toolbar-group toolbar-group--primary">
                 <button
                   type="button"
-                  className="review-button"
+                  className="review-button--primary"
                   disabled={anyLoading}
                   onClick={handleReview}
                 >
@@ -420,16 +420,16 @@ function App() {
             <div className="side-by-side">
 
               {/* Draft column */}
-              <div className="col-panel">
+              <div className="col-panel col-panel--draft">
                 <div className="col-panel-header">
                   <h2>Draft</h2>
                   <div className="col-panel-actions">
-                    <span className="model-badge">{getModelName(selectedModel)}</span>
+                    <span className="model-badge" data-tooltip={getModelName(selectedModel)}>{getModelAbbrev(selectedModel)}</span>
                     <button
                       className={`copy-btn ${copiedId === 'draft' ? 'copy-btn--copied' : ''}`}
                       onClick={() => handleCopy(draftContent, 'draft')}
                     >
-                      {copiedId === 'draft' ? 'Copied!' : 'Copy'}
+                      {copiedId === 'draft' ? <><span>&#9112;</span> Copied!</> : <><span>&#9112;</span> Copy</>}
                     </button>
                   </div>
                 </div>
@@ -440,7 +440,7 @@ function App() {
 
               {/* Review column */}
               {reviews.length > 0 && (
-                <div className="col-panel">
+                <div className="col-panel col-panel--review">
                   <div className="human-review-section">
                     <h2>Your Feedback</h2>
                     <span className="hint">Optional — included when you click Update Draft</span>
@@ -462,12 +462,12 @@ function App() {
                       <div className="col-panel-header">
                         <h2>Deliberated Review</h2>
                         <div className="col-panel-actions">
-                          <span className="model-badge deliberation-badge">Council</span>
+                          <span className="model-badge deliberation-badge" data-tooltip="Council Deliberation">C</span>
                           <button
                             className={`copy-btn ${copiedId === 'deliberated' ? 'copy-btn--copied' : ''}`}
                             onClick={() => handleCopy(deliberatedReview, 'deliberated')}
                           >
-                            {copiedId === 'deliberated' ? 'Copied!' : 'Copy'}
+                            {copiedId === 'deliberated' ? <><span>&#9112;</span> Copied!</> : <><span>&#9112;</span> Copy</>}
                           </button>
                         </div>
                       </div>
@@ -483,12 +483,12 @@ function App() {
                       <div className="col-panel-header">
                         <h2>{deliberatedReview ? `Reviewer ${idx + 1}` : 'Agent Review'}</h2>
                         <div className="col-panel-actions">
-                          <span className="model-badge">{review.modelName}</span>
+                          <span className="model-badge" data-tooltip={review.modelName}>{getModelAbbrev(review.model)}</span>
                           <button
                             className={`copy-btn ${copiedId === `review-${idx}` ? 'copy-btn--copied' : ''}`}
                             onClick={() => handleCopy(review.content, `review-${idx}`)}
                           >
-                            {copiedId === `review-${idx}` ? 'Copied!' : 'Copy'}
+                            {copiedId === `review-${idx}` ? <><span>&#9112;</span> Copied!</> : <><span>&#9112;</span> Copy</>}
                           </button>
                         </div>
                       </div>
@@ -566,7 +566,7 @@ function App() {
                         className={`copy-btn ${copiedId === 'rules' ? 'copy-btn--copied' : ''}`}
                         onClick={() => handleCopy(finalContent.fullResolutionRules, 'rules')}
                       >
-                        {copiedId === 'rules' ? 'Copied!' : 'Copy'}
+                        {copiedId === 'rules' ? <><span>&#9112;</span> Copied!</> : <><span>&#9112;</span> Copy</>}
                       </button>
                     </div>
                     <div className="content-box">

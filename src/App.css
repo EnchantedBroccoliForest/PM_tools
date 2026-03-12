@@ -8,6 +8,10 @@
   --surface-2: rgba(255, 255, 255, 0.055);
   --surface-3: rgba(255, 255, 255, 0.085);
 
+  /* Distinct panel surfaces */
+  --surface-draft: rgba(30, 25, 18, 0.45);
+  --surface-review: rgba(16, 22, 36, 0.5);
+
   --border: rgba(255, 255, 255, 0.085);
   --border-hover: rgba(255, 255, 255, 0.14);
   --border-focus: rgba(139, 92, 246, 0.5);
@@ -24,8 +28,9 @@
   --blue-hover: #2563eb;
   --blue-glow: rgba(59, 130, 246, 0.25);
 
-  --green: #10b981;
-  --green-glow: rgba(16, 185, 129, 0.15);
+  --teal: #14b8a6;
+  --teal-light: #5eead4;
+  --teal-glow: rgba(20, 184, 166, 0.15);
 
   --red: #f87171;
   --red-bg: rgba(239, 68, 68, 0.08);
@@ -38,12 +43,30 @@
 
   --transition: 0.2s ease;
   --transition-slow: 0.35s ease;
+
+  --font-mono: 'Space Mono', 'SF Mono', 'Fira Code', monospace;
+}
+
+/* ================================================
+   Noise Overlay
+   ================================================ */
+.App::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
 }
 
 /* ================================================
    App Layout
    ================================================ */
 .App {
+  position: relative;
   min-height: 100vh;
   padding: 2.5rem 1.5rem 4rem;
   background:
@@ -66,14 +89,33 @@
 }
 
 .header h1 {
+  font-family: var(--font-mono);
   font-size: 2.75rem;
   font-weight: 700;
   letter-spacing: -0.035em;
   margin: 0 0 0.4rem;
-  background: linear-gradient(120deg, #e2e8f0 20%, #a78bfa 65%, #818cf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-1);
+  position: relative;
+  display: inline-block;
+}
+
+.header h1 .wordmark-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--teal);
+  margin-left: 0.35rem;
+  vertical-align: middle;
+  position: relative;
+  top: -2px;
+  animation: pulse-dot 2.5s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(20, 184, 166, 0.5);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(20, 184, 166, 0.5); }
+  50% { opacity: 0.6; box-shadow: 0 0 16px rgba(20, 184, 166, 0.8); }
 }
 
 .subtitle {
@@ -83,56 +125,73 @@
 }
 
 /* ================================================
-   Step Indicator
+   Step Indicator (Timeline / Financial Ticks)
    ================================================ */
 .step-indicator {
   display: flex;
   align-items: flex-start;
   justify-content: center;
   margin-bottom: 2.5rem;
+  position: relative;
 }
 
 .step {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
 }
 
-.step__dot {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.82rem;
+.step__number {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
   font-weight: 700;
-  background: var(--surface-2);
-  border: 1.5px solid var(--border);
   color: var(--text-3);
+  line-height: 1;
   transition: all var(--transition-slow);
+  position: relative;
 }
 
-.step--active .step__dot {
-  background: linear-gradient(135deg, #6366f1, var(--accent));
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 0 20px var(--accent-glow);
+.step__number::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 10px;
+  background: var(--border);
+  transition: background var(--transition-slow);
 }
 
-.step--done .step__dot {
-  background: rgba(139, 92, 246, 0.18);
-  border-color: rgba(139, 92, 246, 0.4);
+.step--active .step__number {
+  color: var(--text-1);
+  text-shadow: 0 0 20px var(--accent-glow);
+}
+
+.step--active .step__number::after {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.step--done .step__number {
   color: var(--accent-light);
 }
 
+.step--done .step__number::after {
+  background: var(--accent-light);
+}
+
 .step__label {
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 400;
   color: var(--text-3);
   white-space: nowrap;
   transition: color var(--transition);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 6px;
 }
 
 .step--active .step__label {
@@ -141,15 +200,34 @@
 
 .step-line {
   width: 80px;
-  height: 1.5px;
+  height: 1px;
   background: var(--border);
-  margin-top: 17px; /* vertically centers with the 36px dot */
+  margin-top: 12px;
   flex-shrink: 0;
   transition: background 0.4s ease;
+  position: relative;
 }
+
+.step-line::before,
+.step-line::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  width: 1px;
+  height: 7px;
+  background: var(--border);
+}
+
+.step-line::before { left: 25%; }
+.step-line::after { left: 75%; }
 
 .step-line--done {
   background: linear-gradient(90deg, rgba(139, 92, 246, 0.5), rgba(99, 102, 241, 0.4));
+}
+
+.step-line--done::before,
+.step-line--done::after {
+  background: rgba(139, 92, 246, 0.4);
 }
 
 /* ================================================
@@ -171,8 +249,9 @@
   display: block;
   color: var(--text-3);
   margin-bottom: 0.45rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
@@ -189,10 +268,13 @@
 }
 
 .utc-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   color: var(--text-3);
   font-size: 0.73rem;
   margin-top: 0.35rem;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-mono);
 }
 
 /* ================================================
@@ -247,6 +329,7 @@ select.input optgroup {
 .error-message {
   background: var(--red-bg);
   border: 1px solid var(--red-border);
+  border-left: 4px solid var(--red);
   color: var(--red);
   padding: 0.8rem 1rem;
   border-radius: var(--r-sm);
@@ -290,6 +373,38 @@ select.input optgroup {
   box-shadow: none;
 }
 
+/* Primary action: Review & Deliberate */
+.review-button--primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.5rem;
+  border: none;
+  border-radius: var(--r-sm);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #6366f1);
+  box-shadow: 0 2px 16px var(--accent-glow);
+  transition: all var(--transition);
+}
+
+.review-button--primary:hover:not(:disabled) {
+  box-shadow: 0 6px 28px rgba(139, 92, 246, 0.35);
+  transform: translateY(-1px);
+}
+
+.review-button--primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Secondary actions */
 .review-button {
   display: inline-flex;
   align-items: center;
@@ -324,21 +439,21 @@ select.input optgroup {
   justify-content: center;
   gap: 0.5rem;
   padding: 0.55rem 1.25rem;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid rgba(20, 184, 166, 0.3);
   border-radius: var(--r-sm);
   font-size: 0.85rem;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  color: #6ee7b7;
-  background: rgba(16, 185, 129, 0.1);
+  color: var(--teal-light);
+  background: rgba(20, 184, 166, 0.1);
   transition: all var(--transition);
 }
 
 .accept-button:hover:not(:disabled) {
-  background: rgba(16, 185, 129, 0.18);
-  border-color: rgba(16, 185, 129, 0.5);
-  box-shadow: 0 0 16px var(--green-glow);
+  background: rgba(20, 184, 166, 0.18);
+  border-color: rgba(20, 184, 166, 0.5);
+  box-shadow: 0 0 16px var(--teal-glow);
 }
 
 .accept-button:disabled {
@@ -421,9 +536,15 @@ select.input optgroup {
   gap: 0.35rem;
 }
 
+/* Primary toolbar group gets visual emphasis */
+.toolbar-group--primary {
+  flex: none;
+}
+
 .toolbar-group label {
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--text-3);
@@ -506,19 +627,49 @@ select.input optgroup {
   gap: 0.5rem;
 }
 
+/* Model badge — abbreviated circle with tooltip */
 .model-badge {
-  font-size: 0.68rem;
-  font-weight: 500;
-  padding: 0.2rem 0.55rem;
-  border-radius: 100px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  border-radius: 50%;
   background: rgba(99, 102, 241, 0.12);
   color: #a5b4fc;
   border: 1px solid rgba(99, 102, 241, 0.2);
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   flex-shrink: 0;
+  cursor: default;
+  letter-spacing: -0.02em;
+}
+
+.model-badge[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.3rem 0.6rem;
+  background: #1e293b;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 400;
+  border-radius: var(--r-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition);
+  z-index: 10;
+  border: 1px solid var(--border);
+}
+
+.model-badge[data-tooltip]:hover::after {
+  opacity: 1;
 }
 
 /* ================================================
@@ -532,14 +683,26 @@ select.input optgroup {
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  padding: 1.1rem;
+  padding: 1.5rem;
   color: #b8c5d8;
-  font-size: 0.845rem;
-  line-height: 1.75;
+  font-size: 0.9rem;
+  line-height: 1.9;
   max-height: 520px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+/* Draft panel: warm off-black */
+.col-panel--draft .content-box {
+  background: var(--surface-draft);
+  border-color: rgba(255, 200, 100, 0.06);
+}
+
+/* Review panel: cool blue-tinted */
+.col-panel--review .content-box {
+  background: var(--surface-review);
+  border-color: rgba(100, 150, 255, 0.06);
 }
 
 .content-box::-webkit-scrollbar {
@@ -556,12 +719,15 @@ select.input optgroup {
 }
 
 .copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--text-3);
   font-size: 0.68rem;
   font-weight: 600;
-  padding: 0.18rem 0.55rem;
+  padding: 0.25rem 0.55rem;
   border-radius: var(--r-xs);
   cursor: pointer;
   transition: all var(--transition);
@@ -575,9 +741,9 @@ select.input optgroup {
 }
 
 .copy-btn--copied {
-  color: var(--green);
-  border-color: rgba(16, 185, 129, 0.3);
-  background: rgba(16, 185, 129, 0.08);
+  color: var(--teal);
+  border-color: rgba(20, 184, 166, 0.3);
+  background: rgba(20, 184, 166, 0.08);
 }
 
 /* ================================================
@@ -610,11 +776,11 @@ select.input optgroup {
    ================================================ */
 .final-content {
   background: var(--surface-1);
-  border: 1px solid rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(20, 184, 166, 0.18);
   border-radius: var(--r-lg);
   padding: 2rem;
   margin-top: 1.5rem;
-  box-shadow: 0 0 60px rgba(139, 92, 246, 0.05);
+  box-shadow: 0 0 60px rgba(20, 184, 166, 0.05);
 }
 
 .final-header {
@@ -625,12 +791,10 @@ select.input optgroup {
 }
 
 .final-header h2 {
+  font-family: var(--font-mono);
   font-size: 1.4rem;
   font-weight: 700;
-  background: linear-gradient(120deg, #e2e8f0 20%, #a78bfa 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-1);
   margin: 0 0 0.4rem;
 }
 
@@ -645,7 +809,8 @@ select.input optgroup {
 }
 
 .content-section h3 {
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -680,13 +845,28 @@ select.input optgroup {
   border-radius: 3px 0 0 3px;
 }
 
+.outcome-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 60%;
+  height: 60%;
+  background: radial-gradient(ellipse at top left, var(--accent-glow), transparent 70%);
+  pointer-events: none;
+  opacity: 0.4;
+}
+
 .outcome-index {
+  font-family: var(--font-mono);
   font-size: 0.63rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--accent-light);
   margin-bottom: 0.3rem;
+  position: relative;
+  z-index: 1;
 }
 
 .outcome-name {
@@ -694,6 +874,8 @@ select.input optgroup {
   font-weight: 600;
   color: var(--text-1);
   margin-bottom: 0.5rem;
+  position: relative;
+  z-index: 1;
 }
 
 .outcome-criteria {
@@ -701,6 +883,8 @@ select.input optgroup {
   color: var(--text-2);
   line-height: 1.65;
   white-space: pre-wrap;
+  position: relative;
+  z-index: 1;
 }
 
 /* Time Display */
@@ -716,18 +900,18 @@ select.input optgroup {
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   color: var(--text-1);
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
 }
 
 .time-label {
+  font-family: var(--font-mono);
   font-size: 0.63rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-3);
   margin-bottom: 0.25rem;
-  font-family: 'Inter', system-ui, sans-serif;
 }
 
 /* ================================================
@@ -798,9 +982,9 @@ select.input optgroup {
 
 /* Deliberation badge */
 .deliberation-badge {
-  background: rgba(16, 185, 129, 0.12) !important;
-  color: #6ee7b7 !important;
-  border-color: rgba(16, 185, 129, 0.2) !important;
+  background: rgba(20, 184, 166, 0.12) !important;
+  color: var(--teal-light) !important;
+  border-color: rgba(20, 184, 166, 0.2) !important;
 }
 
 /* Individual reviews (dimmed when deliberation exists) */
