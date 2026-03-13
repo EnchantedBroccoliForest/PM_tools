@@ -106,6 +106,24 @@
   display: inline-block;
 }
 
+/* Progress Bar */
+.progress-bar {
+  width: 100%;
+  max-width: 480px;
+  height: 3px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  margin: 0.6rem auto 0;
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--teal));
+  border-radius: 2px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .header h1 .wordmark-dot {
   display: inline-block;
   width: 10px;
@@ -164,6 +182,7 @@
 
 .panel--locked {
   opacity: 0.45;
+  pointer-events: none;
 }
 
 .panel-header {
@@ -197,6 +216,7 @@
 
 .panel-placeholder {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
@@ -208,6 +228,24 @@
   font-size: 0.85rem;
   text-align: center;
   font-style: italic;
+}
+
+.placeholder-icon {
+  color: var(--text-3);
+  opacity: 0.5;
+  margin-bottom: 0.75rem;
+}
+
+.label-hint {
+  font-weight: 400;
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+
+.textarea {
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
 }
 
 .panel-connector {
@@ -279,6 +317,18 @@
 
 .step--active .step__label {
   color: var(--text-2);
+}
+
+.step__check {
+  width: 20px;
+  height: 20px;
+  color: var(--teal);
+  animation: check-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes check-pop {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 /* step-line styles removed — connectors are now panel-connector elements */
@@ -376,6 +426,10 @@ select.input optgroup {
    Error
    ================================================ */
 .error-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   background: var(--red-bg);
   border: 1px solid var(--red-border);
   border-left: 4px solid var(--red);
@@ -385,6 +439,29 @@ select.input optgroup {
   margin-bottom: 1rem;
   font-size: 0.875rem;
   line-height: 1.5;
+  animation: slide-down 0.25s ease-out;
+}
+
+.error-dismiss {
+  background: none;
+  border: none;
+  color: var(--red);
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0 0.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: opacity var(--transition);
+}
+
+.error-dismiss:hover {
+  opacity: 1;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ================================================
@@ -586,6 +663,14 @@ select.input optgroup {
 /* Primary toolbar group gets visual emphasis */
 .toolbar-group--primary {
   flex: none;
+}
+
+/* Horizontal button row for actions */
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
 .toolbar-group label {
@@ -873,6 +958,13 @@ select.input optgroup {
   padding: 1rem 1.1rem 1rem 1.3rem;
   position: relative;
   overflow: hidden;
+  transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
+.outcome-card:hover {
+  border-color: rgba(139, 92, 246, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .outcome-card::before {
@@ -928,12 +1020,7 @@ select.input optgroup {
   z-index: 1;
 }
 
-/* Time Display */
-.time-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
+/* Time Display - base styles, layout overridden below */
 
 .time-display {
   flex: 1;
@@ -1048,6 +1135,145 @@ select.input optgroup {
 }
 
 /* ================================================
+   Fade-in Animation
+   ================================================ */
+.fade-in {
+  animation: fade-in 0.4s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ================================================
+   Skeleton Loading
+   ================================================ */
+.skeleton-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--r-xs);
+}
+
+.skeleton--title {
+  height: 20px;
+  width: 45%;
+}
+
+.skeleton--text {
+  height: 14px;
+  width: 100%;
+}
+
+.skeleton--short {
+  width: 60%;
+}
+
+.skeleton--medium {
+  width: 80%;
+}
+
+.skeleton--block {
+  height: 80px;
+  width: 100%;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ================================================
+   Rich Content (Markdown-like)
+   ================================================ */
+.content-box--rich {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.content-box--rich .md-heading {
+  color: var(--text-1);
+  margin: 1rem 0 0.4rem;
+  font-weight: 600;
+}
+
+.content-box--rich .md-heading:first-child {
+  margin-top: 0;
+}
+
+.content-box--rich h3.md-heading {
+  font-size: 0.95rem;
+}
+
+.content-box--rich h4.md-heading {
+  font-size: 0.88rem;
+}
+
+.content-box--rich h5.md-heading {
+  font-size: 0.82rem;
+  color: var(--text-2);
+}
+
+.content-box--rich .md-paragraph {
+  margin: 0.3rem 0;
+  line-height: 1.75;
+}
+
+.content-box--rich .md-list {
+  margin: 0.4rem 0;
+  padding-left: 1.4rem;
+}
+
+.content-box--rich .md-list li {
+  margin-bottom: 0.3rem;
+  line-height: 1.65;
+}
+
+.content-box--rich strong {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+/* ================================================
+   Time Arrow
+   ================================================ */
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.time-arrow {
+  color: var(--text-3);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.time-value {
+  font-size: 0.88rem;
+  margin-top: 0.15rem;
+}
+
+/* ================================================
+   Final Header Icon
+   ================================================ */
+.final-header__icon {
+  color: var(--teal);
+  margin-bottom: 0.5rem;
+  animation: check-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ================================================
    Responsive
    ================================================ */
 @media (max-width: 1024px) {
@@ -1087,5 +1313,23 @@ select.input optgroup {
 
   .header h1 {
     font-size: 1.5rem;
+  }
+
+  .time-row {
+    flex-direction: column;
+  }
+
+  .time-arrow {
+    transform: rotate(90deg);
+    align-self: center;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar-actions {
+    flex-direction: column;
+    width: 100%;
   }
 }
