@@ -13,6 +13,7 @@ const initialState = {
 
   // Processing
   loading: null, // null | 'draft' | 'review' | 'update' | 'accept'
+  loadingMeta: null, // { models: string[], startTime: number } | null
   error: null,
   dateError: null,
 
@@ -62,18 +63,24 @@ function reducer(state, action) {
       };
 
     case 'START_LOADING':
-      return { ...state, loading: action.phase, error: null };
+      return {
+        ...state,
+        loading: action.phase,
+        loadingMeta: { models: action.models || [], startTime: Date.now() },
+        error: null,
+      };
 
     case 'STOP_LOADING':
-      return { ...state, loading: null };
+      return { ...state, loading: null, loadingMeta: null };
 
     case 'SET_ERROR':
-      return { ...state, loading: null, error: action.error };
+      return { ...state, loading: null, loadingMeta: null, error: action.error };
 
     case 'DRAFT_SUCCESS':
       return {
         ...state,
         loading: null,
+        loadingMeta: null,
         draftContent: action.content,
         reviews: [],
         deliberatedReview: null,
@@ -86,6 +93,7 @@ function reducer(state, action) {
       return {
         ...state,
         loading: null,
+        loadingMeta: null,
         reviews: action.reviews,
         deliberatedReview: action.deliberatedReview || null,
       };
@@ -94,12 +102,13 @@ function reducer(state, action) {
       return {
         ...state,
         loading: null,
+        loadingMeta: null,
         draftContent: action.content,
         hasUpdated: true,
       };
 
     case 'FINALIZE_SUCCESS':
-      return { ...state, loading: null, finalContent: action.content };
+      return { ...state, loading: null, loadingMeta: null, finalContent: action.content };
 
     case 'RESET':
       return initialState;
