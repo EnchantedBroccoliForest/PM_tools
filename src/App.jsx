@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import './App.css';
 import { AVAILABLE_MODELS, getModelName, getModelAbbrev } from './constants/models';
+import LLMLoadingState from './components/LLMLoadingState';
 import {
   SYSTEM_PROMPTS,
   buildDraftPrompt,
@@ -86,6 +87,7 @@ function App() {
     reviewModels,
     humanReviewInput,
     loading,
+    loadingMeta,
     error,
     dateError,
     draftContent,
@@ -141,7 +143,7 @@ function App() {
 
   // --- Stage 1: Draft (single model) ---
   const handleDraft = async () => {
-    dispatch({ type: 'START_LOADING', phase: 'draft' });
+    dispatch({ type: 'START_LOADING', phase: 'draft', models: [getModelName(selectedModel)] });
     try {
       const content = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
@@ -160,7 +162,7 @@ function App() {
   //          a consolidated deliberated review (like deliberate_synthesize.py)
   const handleReview = async () => {
     if (!draftContent) return;
-    dispatch({ type: 'START_LOADING', phase: 'review' });
+    dispatch({ type: 'START_LOADING', phase: 'review', models: reviewModels.map((id) => getModelName(id)) });
 
     try {
       const reviewerModels = reviewModels.map((id) => ({
@@ -206,7 +208,7 @@ function App() {
   // --- Stage 3: Update draft with review feedback ---
   const handleUpdate = async () => {
     if (!draftContent || reviews.length === 0) return;
-    dispatch({ type: 'START_LOADING', phase: 'update' });
+    dispatch({ type: 'START_LOADING', phase: 'update', models: [getModelName(selectedModel)] });
 
     try {
       // Use the deliberated review if available, otherwise fall back to first review
@@ -224,7 +226,7 @@ function App() {
   // --- Stage 4: Finalize to structured JSON ---
   const handleAccept = async () => {
     if (!draftContent) return;
-    dispatch({ type: 'START_LOADING', phase: 'accept' });
+    dispatch({ type: 'START_LOADING', phase: 'accept', models: [getModelName(selectedModel)] });
 
     try {
       const content = await queryModel(
@@ -411,13 +413,7 @@ function App() {
                   <p>Complete setup and draft a market to continue</p>
                 </div>
               ) : loading === 'draft' ? (
-                <div className="skeleton-container">
-                  <div className="skeleton skeleton--title" />
-                  <div className="skeleton skeleton--text" />
-                  <div className="skeleton skeleton--text skeleton--short" />
-                  <div className="skeleton skeleton--text" />
-                  <div className="skeleton skeleton--text skeleton--medium" />
-                </div>
+                <LLMLoadingState phase="draft" meta={loadingMeta} />
               ) : (
                 <div className="draft-review-section fade-in">
 
@@ -560,15 +556,10 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Loading skeleton for review */}
+                  {/* Loading state for review */}
                   {loading === 'review' && reviews.length === 0 && (
                     <div className="col-panel col-panel--review">
-                      <div className="skeleton-container">
-                        <div className="skeleton skeleton--title" />
-                        <div className="skeleton skeleton--text" />
-                        <div className="skeleton skeleton--text skeleton--short" />
-                        <div className="skeleton skeleton--text" />
-                      </div>
+                      <LLMLoadingState phase="review" meta={loadingMeta} />
                     </div>
                   )}
 
@@ -655,13 +646,7 @@ function App() {
                   <p>Draft, review, and update your market to finalize</p>
                 </div>
               ) : loading === 'accept' ? (
-                <div className="skeleton-container">
-                  <div className="skeleton skeleton--title" />
-                  <div className="skeleton skeleton--text" />
-                  <div className="skeleton skeleton--text skeleton--short" />
-                  <div className="skeleton skeleton--block" />
-                  <div className="skeleton skeleton--text skeleton--medium" />
-                </div>
+                <LLMLoadingState phase="accept" meta={loadingMeta} />
               ) : (
                 <div className="final-content fade-in">
                   <div className="final-header">
