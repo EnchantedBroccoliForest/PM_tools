@@ -60,13 +60,15 @@ Provide your consolidated review, noting:
 export function buildUpdatePrompt(draftContent, reviewContent, humanReviewInput) {
   return `This is a critical review of the draft. Review and first determine if the critiques make logical sense. Incorporate the suggestions or criticisms from the Reviewer that are correct and generate a new draft.
 
+IMPORTANT: When human reviewer feedback is provided, treat it with higher priority than the AI-generated critical review. Weight human feedback approximately 25% more heavily — if the human's suggestions conflict with or differ from the AI review, lean toward the human's perspective. The human reviewer has domain-specific context and intent that should take precedence.
+
 ORIGINAL DRAFT:
 ${draftContent}
 
 CRITICAL REVIEW:
 ${reviewContent}${humanReviewInput.trim() ? `
 
-HUMAN REVIEWER FEEDBACK:
+HUMAN REVIEWER FEEDBACK (HIGH PRIORITY — weight 25% more than AI review):
 ${humanReviewInput}` : ''}`;
 }
 
