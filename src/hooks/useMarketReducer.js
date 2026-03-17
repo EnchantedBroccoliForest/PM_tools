@@ -1,6 +1,14 @@
 import { useReducer } from 'react';
 import { DEFAULT_DRAFT_MODEL, DEFAULT_REVIEW_MODEL } from '../constants/models';
 
+function getInitialTheme() {
+  try {
+    const stored = localStorage.getItem('theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {}
+  return 'dark';
+}
+
 const initialState = {
   // Input
   question: '',
@@ -26,6 +34,7 @@ const initialState = {
 
   // UI
   copiedId: null,
+  theme: getInitialTheme(),
 };
 
 function reducer(state, action) {
@@ -115,6 +124,12 @@ function reducer(state, action) {
 
     case 'SET_COPIED':
       return { ...state, copiedId: action.id };
+
+    case 'TOGGLE_THEME': {
+      const next = state.theme === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem('theme', next); } catch {}
+      return { ...state, theme: next };
+    }
 
     default:
       return state;
