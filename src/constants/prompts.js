@@ -7,6 +7,9 @@ export const SYSTEM_PROMPTS = {
 
   finalizer:
     'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format.',
+
+  earlyResolutionAnalyst:
+    'You are an expert analyst specializing in prediction markets. You evaluate whether a market could resolve early — that is, whether its outcome could become effectively certain before the stated end date.',
 };
 
 export function buildDraftPrompt(question, startDate, endDate, references) {
@@ -95,4 +98,29 @@ Generate a JSON response with exactly these fields:
   "fullResolutionRules": "Complete resolution rules",
   "edgeCases": "All edge cases and how they will be handled"
 }`;
+}
+
+export function buildEarlyResolutionPrompt(finalContent) {
+  const outcomes = finalContent.outcomes
+    ?.map((o, i) => `  ${i + 1}. ${o.name}: ${o.resolutionCriteria}`)
+    .join('\n') || 'N/A';
+
+  return `Review the market details below. Based on the list of outcomes and the resolution rules, identify if there is a possibility that this market's outcome becomes certain prior to the stated End Date.
+
+MARKET QUESTION:
+${finalContent.refinedQuestion || 'N/A'}
+
+OUTCOMES:
+${outcomes}
+
+RESOLUTION RULES:
+${finalContent.fullResolutionRules || 'N/A'}
+
+MARKET END DATE: ${finalContent.marketEndTimeUTC || 'N/A'}
+
+Analyze:
+1. Could any outcome become effectively certain (>99% likelihood) before the end date?
+2. What specific events or scenarios could cause early certainty?
+3. Rate the overall early resolution risk: Low / Medium / High
+4. If applicable, recommend mitigations (e.g., adjusted end date, additional edge-case rules).`;
 }
