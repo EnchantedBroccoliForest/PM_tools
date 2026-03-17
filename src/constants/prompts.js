@@ -82,6 +82,7 @@ End Date: ${endDate}
 
 Generate a JSON response with exactly these fields:
 {
+  "refinedQuestion": "The refined, unambiguous version of the market question",
   "outcomes": [
     {
       "name": "Outcome name",

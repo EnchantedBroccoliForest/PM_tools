@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import './App.css';
 import { AVAILABLE_MODELS, getModelName, getModelAbbrev } from './constants/models';
 import LLMLoadingState from './components/LLMLoadingState';
@@ -77,6 +77,12 @@ function App() {
   const [state, dispatch] = useMarketReducer();
   const panel2Ref = useRef(null);
   const panel3Ref = useRef(null);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') || 'dark';
+    }
+    return 'dark';
+  });
 
   const {
     question,
@@ -101,6 +107,14 @@ function App() {
   const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
   const anyLoading = loading !== null;
   const progressPercent = finalContent ? 100 : hasUpdated ? 75 : reviews.length > 0 ? 50 : draftContent ? 33 : 0;
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
 
   // Auto-scroll to active panel on mobile
   useEffect(() => {
@@ -264,7 +278,22 @@ function App() {
 
         {/* Header */}
         <header className="header">
-          <h1>Market Creator<span className="wordmark-dot" /></h1>
+          <div className="header-top">
+            <h1>Market Creator<span className="wordmark-dot" /></h1>
+            <button
+              type="button"
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+              )}
+            </button>
+          </div>
           <p className="subtitle">AI-assisted prediction market creation via OpenRouter</p>
           {/* Progress bar */}
           <div className="progress-bar" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
@@ -275,7 +304,7 @@ function App() {
         {/* Horizontal Panels */}
         <div className="panels-row">
 
-          {/* Panel 1: Setup */}
+          {/* Panel 1: Setup + Draft Output */}
           <div className={`panel ${currentStep === 1 ? 'panel--active' : ''} ${currentStep > 1 ? 'panel--done' : ''}`}>
             <div className="panel-header">
               <div className={`step ${currentStep >= 1 ? 'step--active' : ''} ${currentStep > 1 ? 'step--done' : ''}`}>
@@ -390,13 +419,41 @@ function App() {
                   )}
                 </button>
               </div>
+
+              {/* Draft output — stays in Panel 1 right under the button */}
+              {loading === 'draft' && (
+                <div className="draft-output-section fade-in">
+                  <LLMLoadingState phase="draft" meta={loadingMeta} />
+                </div>
+              )}
+              {draftContent && (
+                <div className="draft-output-section fade-in">
+                  <div className="col-panel col-panel--draft">
+                    <div className="col-panel-header">
+                      <h2>Draft</h2>
+                      <div className="col-panel-actions">
+                        <span className="model-badge" data-tooltip={getModelName(selectedModel)}>{getModelAbbrev(selectedModel)}</span>
+                        <button
+                          className={`copy-btn ${copiedId === 'draft' ? 'copy-btn--copied' : ''}`}
+                          onClick={() => handleCopy(draftContent, 'draft')}
+                        >
+                          {copiedId === 'draft' ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="content-box content-box--rich">
+                      {renderContent(draftContent)}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Connector line */}
           <div className={`panel-connector ${currentStep > 1 ? 'panel-connector--done' : ''}`} />
 
-          {/* Panel 2: Draft & Review */}
+          {/* Panel 2: Draft & Review (feedback + agent reviews) */}
           <div ref={panel2Ref} className={`panel ${currentStep === 2 ? 'panel--active' : ''} ${currentStep > 2 ? 'panel--done' : ''} ${currentStep < 2 ? 'panel--locked' : ''}`}>
             <div className="panel-header">
               <div className={`step ${currentStep >= 2 ? 'step--active' : ''} ${currentStep > 2 ? 'step--done' : ''}`}>
@@ -405,15 +462,13 @@ function App() {
               </div>
             </div>
             <div className="panel-body">
-              {!draftContent && loading !== 'draft' ? (
+              {!draftContent ? (
                 <div className="panel-placeholder">
                   <div className="placeholder-icon">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
                   </div>
                   <p>Complete setup and draft a market to continue</p>
                 </div>
-              ) : loading === 'draft' ? (
-                <LLMLoadingState phase="draft" meta={loadingMeta} />
               ) : (
                 <div className="draft-review-section fade-in">
 
@@ -537,22 +592,20 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Draft content */}
-                  <div className="col-panel col-panel--draft">
-                    <div className="col-panel-header">
-                      <h2>Draft</h2>
-                      <div className="col-panel-actions">
-                        <span className="model-badge" data-tooltip={getModelName(selectedModel)}>{getModelAbbrev(selectedModel)}</span>
-                        <button
-                          className={`copy-btn ${copiedId === 'draft' ? 'copy-btn--copied' : ''}`}
-                          onClick={() => handleCopy(draftContent, 'draft')}
-                        >
-                          {copiedId === 'draft' ? 'Copied!' : 'Copy'}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="content-box content-box--rich">
-                      {renderContent(draftContent)}
+                  {/* Your Feedback */}
+                  <div className="col-panel col-panel--review">
+                    <div className="human-review-section">
+                      <h2>Your Feedback</h2>
+                      <span className="hint">Optional — included when you click Update Draft</span>
+                      <textarea
+                        value={humanReviewInput}
+                        onChange={(e) =>
+                          dispatch({ type: 'SET_FIELD', field: 'humanReviewInput', value: e.target.value })
+                        }
+                        placeholder="Add your own critiques or additional feedback..."
+                        className="input textarea"
+                        disabled={loading === 'update'}
+                      />
                     </div>
                   </div>
 
@@ -563,23 +616,9 @@ function App() {
                     </div>
                   )}
 
-                  {/* Review content */}
+                  {/* Agent Review content */}
                   {reviews.length > 0 && (
                     <div className="col-panel col-panel--review fade-in">
-                      <div className="human-review-section">
-                        <h2>Your Feedback</h2>
-                        <span className="hint">Optional — included when you click Update Draft</span>
-                        <textarea
-                          value={humanReviewInput}
-                          onChange={(e) =>
-                            dispatch({ type: 'SET_FIELD', field: 'humanReviewInput', value: e.target.value })
-                          }
-                          placeholder="Add your own critiques or additional feedback..."
-                          className="input textarea"
-                          disabled={loading === 'update'}
-                        />
-                      </div>
-
                       {deliberatedReview && (
                         <div className="fade-in">
                           <div className="col-panel-header">
@@ -665,6 +704,15 @@ function App() {
                     </div>
                   ) : (
                     <>
+                      {finalContent.refinedQuestion && (
+                        <div className="content-section">
+                          <h3>Refined Market Question</h3>
+                          <div className="content-box refined-question-box">
+                            <p style={{ margin: 0 }}>{finalContent.refinedQuestion}</p>
+                          </div>
+                        </div>
+                      )}
+
                       {finalContent.outcomes?.length > 0 && (
                         <div className="content-section">
                           <h3>Outcomes & Resolution Criteria</h3>
