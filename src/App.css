@@ -95,6 +95,35 @@
   flex-shrink: 0;
 }
 
+.header__top-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-1);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.theme-toggle:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+  border-color: var(--border-hover);
+}
+
 .header h1 {
   font-family: var(--font-mono);
   font-size: 1.75rem;
@@ -1438,4 +1467,200 @@ select.input optgroup {
     flex-direction: column;
     width: 100%;
   }
+}
+
+/* ================================================
+   Light Theme
+   ================================================ */
+.App.theme-light {
+  --bg-dark: #f5f7fa;
+
+  --surface-1: rgba(0, 0, 0, 0.03);
+  --surface-2: rgba(0, 0, 0, 0.06);
+  --surface-3: rgba(0, 0, 0, 0.09);
+
+  --surface-draft: rgba(255, 248, 235, 0.7);
+  --surface-review: rgba(235, 241, 255, 0.7);
+
+  --border: rgba(0, 0, 0, 0.12);
+  --border-hover: rgba(0, 0, 0, 0.2);
+  --border-focus: rgba(109, 60, 218, 0.5);
+
+  --text-1: #1a1a2e;
+  --text-2: #4a5568;
+  --text-3: #718096;
+
+  --accent: #7c3aed;
+  --accent-light: #6d28d9;
+  --accent-glow: rgba(124, 58, 237, 0.15);
+
+  --blue: #2563eb;
+  --blue-hover: #1d4ed8;
+  --blue-glow: rgba(37, 99, 235, 0.15);
+
+  --teal: #0d9488;
+  --teal-light: #0f766e;
+  --teal-glow: rgba(13, 148, 136, 0.1);
+
+  --red: #dc2626;
+  --red-bg: rgba(220, 38, 38, 0.06);
+  --red-border: rgba(220, 38, 38, 0.18);
+
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(124, 58, 237, 0.06) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 100%, rgba(37, 99, 235, 0.04) 0%, transparent 55%),
+    linear-gradient(165deg, #f5f7fa 0%, #edf0f7 55%, #f5f7fa 100%);
+}
+
+/* Remove noise overlay in light mode */
+.App.theme-light::before {
+  display: none;
+}
+
+/* Inputs */
+.App.theme-light .input {
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--text-1);
+}
+
+.App.theme-light .input:focus {
+  background: #fff;
+}
+
+.App.theme-light .input::placeholder {
+  color: var(--text-3);
+}
+
+/* Panels */
+.App.theme-light .panel {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: var(--border);
+}
+
+.App.theme-light .panel--active {
+  border-color: rgba(124, 58, 237, 0.25);
+  box-shadow: 0 2px 20px rgba(124, 58, 237, 0.06);
+}
+
+/* Content boxes */
+.App.theme-light .content-box {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: var(--border);
+  color: #3d4a5c;
+}
+
+.App.theme-light .col-panel--draft .content-box {
+  background: rgba(255, 248, 235, 0.5);
+  border-color: rgba(200, 160, 60, 0.1);
+}
+
+.App.theme-light .col-panel--review .content-box {
+  background: rgba(235, 241, 255, 0.5);
+  border-color: rgba(60, 100, 200, 0.1);
+}
+
+/* Action toolbar */
+.App.theme-light .action-toolbar {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--border);
+}
+
+/* Toolbar selects */
+.App.theme-light .toolbar-select {
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--text-1);
+}
+
+.App.theme-light .toolbar-select option,
+.App.theme-light .toolbar-select optgroup {
+  background: #fff;
+  color: var(--text-1);
+}
+
+.App.theme-light select.input option,
+.App.theme-light select.input optgroup {
+  background: #fff;
+  color: var(--text-1);
+}
+
+/* Buttons — keep gradient but softer */
+.App.theme-light .draft-button {
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.15);
+}
+
+/* Spinner track */
+.App.theme-light .spinner {
+  border-color: rgba(0, 0, 0, 0.1);
+  border-top-color: currentColor;
+}
+
+/* Model badge */
+.App.theme-light .model-badge {
+  background: rgba(99, 102, 241, 0.08);
+  color: #5b21b6;
+  border-color: rgba(99, 102, 241, 0.15);
+}
+
+/* LLM loading model tags */
+.App.theme-light .llm-loading__model-tag {
+  background: rgba(99, 102, 241, 0.08);
+  color: #5b21b6;
+  border-color: rgba(99, 102, 241, 0.15);
+}
+
+/* Outcome cards */
+.App.theme-light .outcome-card {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: var(--border);
+}
+
+.App.theme-light .outcome-card:hover {
+  border-color: rgba(124, 58, 237, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+/* Time display */
+.App.theme-light .time-display {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text-1);
+}
+
+/* Human review section */
+.App.theme-light .human-review-section {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Copy button */
+.App.theme-light .copy-btn {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.App.theme-light .copy-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* Skeleton shimmer */
+.App.theme-light .skeleton {
+  background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.06) 75%);
+  background-size: 200% 100%;
+}
+
+/* Error message */
+.App.theme-light .error-message {
+  background: rgba(220, 38, 38, 0.05);
+}
+
+/* Wordmark dot — softer glow */
+.App.theme-light .wordmark-dot {
+  box-shadow: 0 0 6px rgba(13, 148, 136, 0.35);
+}
+
+/* Scrollbar */
+.App.theme-light .panel-body {
+  scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+}
+
+.App.theme-light .panel-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
 }
