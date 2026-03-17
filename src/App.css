@@ -907,6 +907,27 @@ select.input optgroup {
 }
 
 /* ================================================
+   Draft Output Section (inside Panel 1)
+   ================================================ */
+.draft-output-section {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ================================================
+   Refined Question Box (Panel 3)
+   ================================================ */
+.refined-question-box {
+  background: rgba(139, 92, 246, 0.06);
+  border-color: rgba(139, 92, 246, 0.15);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-1);
+  line-height: 1.65;
+}
+
+/* ================================================
    Human Review Section
    ================================================ */
 .human-review-section {
