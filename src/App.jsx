@@ -9,6 +9,7 @@ import {
   buildDeliberationPrompt,
   buildUpdatePrompt,
   buildFinalizePrompt,
+  buildEarlyResolutionPrompt,
 } from './constants/prompts';
 import { queryModel, queryModelsParallel } from './api/openrouter';
 import { useMarketReducer } from './hooks/useMarketReducer';
@@ -252,6 +253,20 @@ function App() {
       }
 
       dispatch({ type: 'FINALIZE_SUCCESS', content: parsedContent });
+
+      // Auto-run early resolution risk analysis if we got structured output
+      if (!parsedContent.raw) {
+        dispatch({ type: 'START_EARLY_RESOLUTION', models: [getModelName(selectedModel)] });
+        try {
+          const riskContent = await queryModel(selectedModel, [
+            { role: 'system', content: SYSTEM_PROMPTS.earlyResolutionAnalyst },
+            { role: 'user', content: buildEarlyResolutionPrompt(parsedContent) },
+          ]);
+          dispatch({ type: 'EARLY_RESOLUTION_SUCCESS', content: riskContent });
+        } catch (riskErr) {
+          dispatch({ type: 'EARLY_RESOLUTION_ERROR', error: riskErr.message || 'Failed to analyze early resolution risk' });
+        }
+      }
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to finalize market' });
     }
@@ -767,6 +782,31 @@ function App() {
                           </div>
                         </div>
                       )}
+
+                      {/* Early Resolution Risk — auto-populated */}
+                      <div className="content-section">
+                        <div className="col-panel-header" style={{ marginBottom: '0.5rem' }}>
+                          <h3 style={{ margin: 0 }}>Early Resolution Risk</h3>
+                          {finalContent.earlyResolutionRisk && (
+                            <div className="col-panel-actions">
+                              <span className="model-badge" data-tooltip={getModelName(selectedModel)}>{getModelAbbrev(selectedModel)}</span>
+                              <button
+                                className={`copy-btn ${copiedId === 'early-risk' ? 'copy-btn--copied' : ''}`}
+                                onClick={() => handleCopy(finalContent.earlyResolutionRisk, 'early-risk')}
+                              >
+                                {copiedId === 'early-risk' ? 'Copied!' : 'Copy'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {loading === 'early-resolution' ? (
+                          <LLMLoadingState phase="early-resolution" meta={loadingMeta} />
+                        ) : finalContent.earlyResolutionRisk ? (
+                          <div className="content-box content-box--rich early-resolution-box fade-in">
+                            {renderContent(finalContent.earlyResolutionRisk)}
+                          </div>
+                        ) : null}
+                      </div>
                     </>
                   )}
 

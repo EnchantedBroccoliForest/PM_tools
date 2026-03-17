@@ -20,7 +20,7 @@ const initialState = {
   humanReviewInput: '',
 
   // Processing
-  loading: null, // null | 'draft' | 'review' | 'update' | 'accept'
+  loading: null, // null | 'draft' | 'review' | 'update' | 'accept' | 'early-resolution'
   loadingMeta: null, // { models: string[], startTime: number } | null
   error: null,
   dateError: null,
@@ -118,6 +118,29 @@ function reducer(state, action) {
 
     case 'FINALIZE_SUCCESS':
       return { ...state, loading: null, loadingMeta: null, finalContent: action.content };
+
+    case 'START_EARLY_RESOLUTION':
+      return {
+        ...state,
+        loading: 'early-resolution',
+        loadingMeta: { models: action.models || [], startTime: Date.now() },
+      };
+
+    case 'EARLY_RESOLUTION_SUCCESS':
+      return {
+        ...state,
+        loading: null,
+        loadingMeta: null,
+        finalContent: { ...state.finalContent, earlyResolutionRisk: action.content },
+      };
+
+    case 'EARLY_RESOLUTION_ERROR':
+      return {
+        ...state,
+        loading: null,
+        loadingMeta: null,
+        finalContent: { ...state.finalContent, earlyResolutionRisk: `Error: ${action.error}` },
+      };
 
     case 'RESET':
       return initialState;

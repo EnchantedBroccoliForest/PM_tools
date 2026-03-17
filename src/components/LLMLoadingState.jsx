@@ -37,6 +37,15 @@ const PHASE_CONFIG = {
       'Almost there...',
     ],
   },
+  'early-resolution': {
+    label: 'Analyzing early resolution risk',
+    messages: [
+      'Reviewing outcomes and resolution rules...',
+      'Evaluating scenarios for early certainty...',
+      'Assessing risk level...',
+      'Compiling analysis...',
+    ],
+  },
 };
 
 function formatElapsed(ms) {

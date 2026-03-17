@@ -918,6 +918,14 @@ select.input optgroup {
 }
 
 /* ================================================
+   Early Resolution Risk Box (Panel 3)
+   ================================================ */
+.early-resolution-box {
+  background: rgba(251, 191, 36, 0.06);
+  border-color: rgba(251, 191, 36, 0.15);
+}
+
+/* ================================================
    Human Review Section
    ================================================ */
 .human-review-section {
