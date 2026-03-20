@@ -894,9 +894,9 @@ select.input optgroup {
    Draft Output Section (inside Panel 1)
    ================================================ */
 .draft-output-section {
-  margin-top: 1.25rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid var(--accent);
 }
 
 /* ================================================
