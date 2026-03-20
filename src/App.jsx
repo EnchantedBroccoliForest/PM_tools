@@ -296,7 +296,6 @@ function App() {
               )}
             </button>
           </div>
-          <p className="subtitle">AI-assisted prediction market creation via OpenRouter</p>
           {/* Progress bar */}
           <div className="progress-bar" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
             <div className="progress-bar__fill" style={{ width: `${progressPercent}%` }} />

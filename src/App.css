@@ -172,12 +172,6 @@
   50% { opacity: 0.6; box-shadow: 0 0 16px rgba(20, 184, 166, 0.8); }
 }
 
-.subtitle {
-  color: var(--text-2);
-  font-size: 0.975rem;
-  margin: 0;
-}
-
 /* ================================================
    Horizontal Panels Row
    ================================================ */
