@@ -1523,64 +1523,62 @@ select.input optgroup {
    Light Theme
    ================================================ */
 .App.theme-light {
-  --bg-dark: #12121a;
+  --bg-dark: #f5f0e8;
 
-  --surface-1: rgba(0, 229, 255, 0.04);
-  --surface-2: rgba(0, 229, 255, 0.07);
-  --surface-3: rgba(0, 229, 255, 0.11);
+  --surface-1: rgba(139, 119, 90, 0.06);
+  --surface-2: rgba(139, 119, 90, 0.10);
+  --surface-3: rgba(139, 119, 90, 0.15);
 
-  --surface-draft: rgba(255, 0, 110, 0.08);
-  --surface-review: rgba(0, 229, 255, 0.07);
+  --surface-draft: rgba(180, 80, 50, 0.08);
+  --surface-review: rgba(60, 120, 120, 0.08);
 
-  --border: rgba(0, 229, 255, 0.15);
-  --border-hover: rgba(0, 229, 255, 0.3);
-  --border-focus: rgba(255, 0, 110, 0.5);
+  --border: rgba(139, 119, 90, 0.25);
+  --border-hover: rgba(139, 119, 90, 0.4);
+  --border-focus: rgba(180, 80, 50, 0.5);
 
-  --text-1: #e8f5e9;
-  --text-2: #80cbc4;
-  --text-3: #4db6ac;
+  --text-1: #2c2416;
+  --text-2: #5a4d3a;
+  --text-3: #8a7d6b;
 
-  --accent: #ff006e;
-  --accent-light: #ff4d94;
-  --accent-glow: rgba(255, 0, 110, 0.2);
+  --accent: #c0533a;
+  --accent-light: #d4745e;
+  --accent-glow: rgba(192, 83, 58, 0.15);
 
-  --blue: #00e5ff;
-  --blue-hover: #00b8d4;
-  --blue-glow: rgba(0, 229, 255, 0.2);
+  --blue: #2a7d8c;
+  --blue-hover: #1f5f6b;
+  --blue-glow: rgba(42, 125, 140, 0.15);
 
-  --teal: #39ff14;
-  --teal-light: #76ff03;
-  --teal-glow: rgba(57, 255, 20, 0.15);
+  --teal: #3a8a5c;
+  --teal-light: #4da870;
+  --teal-glow: rgba(58, 138, 92, 0.12);
 
-  --red: #ff1744;
-  --red-bg: rgba(255, 23, 68, 0.08);
-  --red-border: rgba(255, 23, 68, 0.25);
+  --red: #c0392b;
+  --red-bg: rgba(192, 57, 43, 0.08);
+  --red-border: rgba(192, 57, 43, 0.25);
 
-  --neon-cyan: #00e5ff;
-  --neon-magenta: #ff006e;
-  --neon-green: #39ff14;
-  --neon-yellow: #ffea00;
-  --neon-purple: #b388ff;
+  --neon-cyan: #2a7d8c;
+  --neon-magenta: #c0533a;
+  --neon-green: #3a8a5c;
+  --neon-yellow: #b8960c;
+  --neon-purple: #7c5cbf;
 
-  background:
-    radial-gradient(ellipse at 15% 0%, rgba(255, 0, 110, 0.1) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 100%, rgba(0, 229, 255, 0.08) 0%, transparent 50%),
-    linear-gradient(165deg, #12121a 0%, #1a1a2e 50%, #12121a 100%);
+  background: linear-gradient(165deg, #f5f0e8 0%, #ebe4d6 50%, #f5f0e8 100%);
 }
 
-/* Scanlines still visible in light mode (it's still cyberpunk) */
+/* Scanlines hidden in light mode */
 .App.theme-light::before {
-  opacity: 0.025;
+  opacity: 0;
 }
 
 /* Inputs */
 .App.theme-light .input {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.6);
   color: var(--text-1);
+  border-color: var(--border);
 }
 
 .App.theme-light .input:focus {
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .App.theme-light .input::placeholder {
@@ -1589,134 +1587,134 @@ select.input optgroup {
 
 /* Panels */
 .App.theme-light .panel {
-  background: rgba(18, 18, 30, 0.9);
+  background: rgba(255, 255, 255, 0.5);
   border-color: var(--border);
 }
 
 .App.theme-light .panel--active {
-  border-color: rgba(0, 229, 255, 0.35);
-  box-shadow: 0 0 25px rgba(0, 229, 255, 0.08);
+  border-color: rgba(42, 125, 140, 0.4);
+  box-shadow: 0 0 25px rgba(42, 125, 140, 0.08);
 }
 
 /* Content boxes */
 .App.theme-light .content-box {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.5);
   border-color: var(--border);
-  color: #a0c4c8;
+  color: var(--text-2);
 }
 
 .App.theme-light .col-panel--draft .content-box {
-  background: rgba(255, 0, 110, 0.06);
-  border-color: rgba(255, 0, 110, 0.1);
+  background: rgba(192, 83, 58, 0.06);
+  border-color: rgba(192, 83, 58, 0.15);
 }
 
 .App.theme-light .col-panel--review .content-box {
-  background: rgba(0, 229, 255, 0.05);
-  border-color: rgba(0, 229, 255, 0.1);
+  background: rgba(42, 125, 140, 0.06);
+  border-color: rgba(42, 125, 140, 0.15);
 }
 
 /* Action toolbar */
 .App.theme-light .action-toolbar {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(139, 119, 90, 0.08);
   border-color: var(--border);
 }
 
 /* Toolbar selects */
 .App.theme-light .toolbar-select {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.6);
   color: var(--text-1);
 }
 
 .App.theme-light .toolbar-select option,
 .App.theme-light .toolbar-select optgroup {
-  background: #1a1a2e;
+  background: #f5f0e8;
   color: var(--text-1);
 }
 
 .App.theme-light select.input option,
 .App.theme-light select.input optgroup {
-  background: #1a1a2e;
+  background: #f5f0e8;
   color: var(--text-1);
 }
 
 /* Buttons */
 .App.theme-light .draft-button {
-  box-shadow: 0 0 20px rgba(0, 229, 255, 0.25);
+  box-shadow: 0 0 20px rgba(42, 125, 140, 0.2);
 }
 
 /* Spinner track */
 .App.theme-light .spinner {
-  border-color: rgba(0, 229, 255, 0.15);
+  border-color: rgba(139, 119, 90, 0.2);
   border-top-color: currentColor;
 }
 
 /* Model badge */
 .App.theme-light .model-badge {
-  background: rgba(0, 229, 255, 0.1);
+  background: rgba(42, 125, 140, 0.1);
   color: var(--neon-cyan);
-  border-color: rgba(0, 229, 255, 0.2);
+  border-color: rgba(42, 125, 140, 0.2);
 }
 
 /* LLM loading model tags */
 .App.theme-light .llm-loading__model-tag {
-  background: rgba(255, 0, 110, 0.1);
+  background: rgba(192, 83, 58, 0.1);
   color: var(--neon-magenta);
-  border-color: rgba(255, 0, 110, 0.2);
+  border-color: rgba(192, 83, 58, 0.2);
 }
 
 /* Outcome cards */
 .App.theme-light .outcome-card {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.5);
   border-color: var(--border);
 }
 
 .App.theme-light .outcome-card:hover {
-  border-color: rgba(0, 229, 255, 0.3);
-  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.1);
+  border-color: rgba(42, 125, 140, 0.35);
+  box-shadow: 0 4px 20px rgba(42, 125, 140, 0.1);
 }
 
 /* Time display */
 .App.theme-light .time-display {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(139, 119, 90, 0.08);
   color: var(--text-1);
 }
 
 /* Human review section */
 .App.theme-light .human-review-section {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(139, 119, 90, 0.06);
 }
 
 /* Copy button */
 .App.theme-light .copy-btn {
-  background: rgba(0, 229, 255, 0.06);
-  border-color: rgba(0, 229, 255, 0.15);
+  background: rgba(42, 125, 140, 0.06);
+  border-color: rgba(42, 125, 140, 0.15);
 }
 
 .App.theme-light .copy-btn:hover {
-  background: rgba(0, 229, 255, 0.12);
+  background: rgba(42, 125, 140, 0.12);
 }
 
 /* Skeleton shimmer */
 .App.theme-light .skeleton {
-  background: linear-gradient(90deg, rgba(0, 229, 255, 0.05) 25%, rgba(0, 229, 255, 0.1) 50%, rgba(0, 229, 255, 0.05) 75%);
+  background: linear-gradient(90deg, rgba(139, 119, 90, 0.06) 25%, rgba(139, 119, 90, 0.12) 50%, rgba(139, 119, 90, 0.06) 75%);
   background-size: 200% 100%;
 }
 
 /* Error message */
 .App.theme-light .error-message {
-  background: rgba(255, 23, 68, 0.08);
+  background: rgba(192, 57, 43, 0.08);
 }
 
 /* Wordmark dot */
 .App.theme-light .wordmark-dot {
-  box-shadow: 0 0 10px rgba(255, 0, 110, 0.6);
+  box-shadow: 0 0 10px rgba(192, 83, 58, 0.5);
 }
 
 /* Scrollbar */
 .App.theme-light .panel-body {
-  scrollbar-color: rgba(0, 229, 255, 0.15) transparent;
+  scrollbar-color: rgba(139, 119, 90, 0.2) transparent;
 }
 
 .App.theme-light .panel-body::-webkit-scrollbar-thumb {
-  background: rgba(0, 229, 255, 0.15);
+  background: rgba(139, 119, 90, 0.2);
 }
