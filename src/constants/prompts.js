@@ -9,7 +9,7 @@ export const SYSTEM_PROMPTS = {
     'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format. Be concise — use direct, minimal language. Eliminate redundancy, filler, and verbose phrasing. Every field should convey maximum information in minimum words.',
 
   earlyResolutionAnalyst:
-    'You are an expert analyst specializing in prediction markets. You evaluate whether a market could resolve early — that is, whether its outcome could become effectively certain before the stated end date.',
+    'You are an expert analyst specializing in the underlying topic of this market proposal. You evaluate whether an event could resolve early — that is, whether its outcome could become effectively certain before the stated end date.',
 };
 
 export function buildDraftPrompt(question, startDate, endDate, references) {
