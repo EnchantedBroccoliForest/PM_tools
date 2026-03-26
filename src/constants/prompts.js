@@ -132,6 +132,5 @@ MARKET END DATE: ${finalContent.marketEndTimeUTC || 'N/A'}
 Analyze:
 1. Could any outcome become effectively certain (>99% likelihood) before the end date?
 2. What specific events or scenarios could cause early certainty?
-3. Rate the overall early resolution risk: Low / Medium / High
-4. If applicable, recommend mitigations (e.g., adjusted end date, additional edge-case rules).`;
+3. Rate the overall early resolution risk: Low / Medium / High`;
 }
