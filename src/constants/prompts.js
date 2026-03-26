@@ -6,7 +6,7 @@ export const SYSTEM_PROMPTS = {
     'You are a critical reviewer specializing in prediction market design. You are a very well trained contract reviewer. Your job is to find flaws, ambiguities, and potential issues in market definitions, resolution rules, and the completeness of the outcome set.',
 
   finalizer:
-    'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format.',
+    'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format. Be concise — use direct, minimal language. Eliminate redundancy, filler, and verbose phrasing. Every field should convey maximum information in minimum words.',
 
   earlyResolutionAnalyst:
     'You are an expert analyst specializing in prediction markets. You evaluate whether a market could resolve early — that is, whether its outcome could become effectively certain before the stated end date.',
@@ -76,7 +76,15 @@ ${humanReviewInput}` : ''}`;
 }
 
 export function buildFinalizePrompt(draftContent, startDate, endDate) {
-  return `Based on the following draft, generate the final and condensed prediction market details in a structured JSON format.
+  return `Based on the following draft, generate the final prediction market details in a structured JSON format.
+
+IMPORTANT — CONCISENESS RULES:
+- Cut all output text by at least 30% compared to the draft. Be direct and terse.
+- Use short declarative sentences. No filler, hedging, or redundant phrasing.
+- Do NOT repeat information across fields — each field should contain unique content only.
+- winCondition and resolutionCriteria must not overlap: winCondition states WHAT must be true; resolutionCriteria states HOW it is verified (source, method, threshold).
+- fullResolutionRules should be a compact numbered list, not prose paragraphs.
+- edgeCases should be a compact numbered list of scenario → resolution pairs.
 
 DRAFT:
 ${draftContent}
@@ -87,19 +95,19 @@ End Date: ${endDate}
 
 Generate a JSON response with exactly these fields:
 {
-  "refinedQuestion": "The refined, unambiguous version of the market question",
+  "refinedQuestion": "Concise, unambiguous market question",
   "outcomes": [
     {
       "name": "Outcome name",
-      "winCondition": "A plain-language sentence that explicitly states what must be true for this outcome to be the winning/resolved outcome (e.g. 'This outcome wins if X happens before Y date')",
-      "resolutionCriteria": "Specific criteria for this outcome"
+      "winCondition": "One sentence: what must be true for this outcome to win",
+      "resolutionCriteria": "Verification method and source — no overlap with winCondition"
     }
   ],
   "marketStartTimeUTC": "YYYY-MM-DDTHH:MM:SSZ format based on start date",
   "marketEndTimeUTC": "YYYY-MM-DDTHH:MM:SSZ format based on end date",
-  "shortDescription": "A brief 1-2 sentence market description",
-  "fullResolutionRules": "Complete resolution rules",
-  "edgeCases": "All edge cases and how they will be handled"
+  "shortDescription": "One sentence market description",
+  "fullResolutionRules": "Compact numbered rules — no redundancy with outcome-level criteria",
+  "edgeCases": "Numbered list: scenario → resolution"
 }`;
 }
 
