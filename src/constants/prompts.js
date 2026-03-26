@@ -91,6 +91,7 @@ Generate a JSON response with exactly these fields:
   "outcomes": [
     {
       "name": "Outcome name",
+      "winCondition": "A plain-language sentence that explicitly states what must be true for this outcome to be the winning/resolved outcome (e.g. 'This outcome wins if X happens before Y date')",
       "resolutionCriteria": "Specific criteria for this outcome"
     }
   ],
@@ -104,7 +105,7 @@ Generate a JSON response with exactly these fields:
 
 export function buildEarlyResolutionPrompt(finalContent) {
   const outcomes = finalContent.outcomes
-    ?.map((o, i) => `  ${i + 1}. ${o.name}: ${o.resolutionCriteria}`)
+    ?.map((o, i) => `  ${i + 1}. ${o.name}${o.winCondition ? `\n     Wins if: ${o.winCondition}` : ''}\n     Resolution Criteria: ${o.resolutionCriteria}`)
     .join('\n') || 'N/A';
 
   return `Review the market details below. Based on the list of outcomes and the resolution rules, identify if there is a possibility that this market's outcome becomes certain prior to the stated End Date.

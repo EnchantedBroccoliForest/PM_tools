@@ -716,12 +716,18 @@ function App() {
 
                       {finalContent.outcomes?.length > 0 && (
                         <div className="content-section">
-                          <h3>Outcomes & Resolution Criteria</h3>
+                          <h3>Outcomes</h3>
                           <div className="outcomes-grid">
                             {finalContent.outcomes.map((outcome, index) => (
                               <div key={index} className="outcome-card">
                                 <div className="outcome-index">Outcome {index + 1}</div>
                                 <div className="outcome-name">{outcome.name}</div>
+                                {outcome.winCondition && (
+                                  <div className="outcome-win-condition">
+                                    <span className="outcome-win-label">Wins if:</span> {outcome.winCondition}
+                                  </div>
+                                )}
+                                <div className="outcome-criteria-label">Resolution Criteria</div>
                                 <div className="outcome-criteria">{outcome.resolutionCriteria}</div>
                               </div>
                             ))}
