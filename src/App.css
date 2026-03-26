@@ -956,26 +956,6 @@ select.input optgroup {
 }
 
 /* ================================================
-   Refined Question Box (Panel 3)
-   ================================================ */
-.refined-question-box {
-  background: rgba(0, 229, 255, 0.05);
-  border-color: rgba(0, 229, 255, 0.2);
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-1);
-  line-height: 1.65;
-}
-
-/* ================================================
-   Early Resolution Risk Box (Panel 3)
-   ================================================ */
-.early-resolution-box {
-  background: rgba(255, 234, 0, 0.06);
-  border-color: rgba(255, 234, 0, 0.2);
-}
-
-/* ================================================
    Human Review Section
    ================================================ */
 .human-review-section {
@@ -1009,151 +989,186 @@ select.input optgroup {
 
 .final-header {
   text-align: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--border);
 }
 
 .final-header h2 {
   font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--neon-cyan);
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   text-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
 }
 
-.final-header p {
-  color: var(--text-3);
-  font-size: 0.8rem;
-  margin: 0;
+.final-header__actions {
+  display: flex;
+  justify-content: center;
 }
 
-.content-section {
+/* Document-style final output */
+.final-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.final-doc__question {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+}
+
+.final-doc__description {
+  font-size: 0.9rem;
+  color: var(--text-2);
+  line-height: 1.6;
+  margin: 0 0 1.25rem;
+}
+
+.final-doc__period {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  margin-bottom: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-1);
+}
+
+.final-doc__period-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.final-doc__period-dates {
+  color: var(--text-1);
+}
+
+.final-doc__section {
   margin-bottom: 1.5rem;
 }
 
-.content-section h3 {
-  font-family: var(--font-display);
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: var(--neon-magenta);
-  margin-bottom: 0.75rem;
-  text-shadow: 0 0 6px rgba(255, 0, 110, 0.3);
+.final-doc__section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
 }
 
-/* Outcome Cards */
-.outcomes-grid {
+.final-doc__heading {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.final-doc__section-header .final-doc__heading {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.final-doc__text {
+  font-size: 0.88rem;
+  color: var(--text-2);
+  line-height: 1.7;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+}
+
+.final-doc__text--risk {
+  background: rgba(255, 234, 0, 0.04);
+  border-color: rgba(255, 234, 0, 0.15);
+}
+
+/* Outcomes – clean list layout */
+.final-doc__outcomes {
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
+  gap: 0;
 }
 
-.outcome-card {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: 1rem 1.1rem 1rem 1.3rem;
-  position: relative;
-  overflow: hidden;
-  transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+.outcome-row {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
 }
 
-.outcome-card:hover {
-  border-color: rgba(0, 229, 255, 0.35);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.1);
+.outcome-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
-.outcome-card::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: linear-gradient(180deg, var(--neon-magenta), var(--neon-cyan));
-  border-radius: 0;
+.outcome-row:first-child {
+  padding-top: 0;
 }
 
-.outcome-card::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 60%;
-  height: 60%;
-  background: radial-gradient(ellipse at top left, rgba(0, 229, 255, 0.1), transparent 70%);
-  pointer-events: none;
-  opacity: 0.5;
+.outcome-row__header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
 }
 
-.outcome-index {
-  font-family: var(--font-display);
-  font-size: 0.63rem;
+.outcome-row__number {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
   color: var(--neon-cyan);
-  margin-bottom: 0.3rem;
-  position: relative;
-  z-index: 1;
-  text-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+  flex-shrink: 0;
+  min-width: 1.2rem;
 }
 
-.outcome-name {
-  font-size: 0.9rem;
+.outcome-row__name {
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-1);
-  margin-bottom: 0.5rem;
-  position: relative;
-  z-index: 1;
 }
 
-.outcome-win-condition {
-  font-size: 0.8rem;
-  color: var(--neon-green, #39ff14);
-  line-height: 1.55;
-  margin-bottom: 0.6rem;
-  padding: 0.45rem 0.65rem;
-  background: rgba(57, 255, 20, 0.06);
-  border-left: 2px solid rgba(57, 255, 20, 0.4);
-  border-radius: 0 var(--r-sm) var(--r-sm) 0;
-  position: relative;
-  z-index: 1;
-}
-
-.outcome-win-label {
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-}
-
-.outcome-criteria-label {
-  font-family: var(--font-display);
-  font-size: 0.63rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--text-3, var(--text-2));
-  margin-bottom: 0.2rem;
-  position: relative;
-  z-index: 1;
-  opacity: 0.7;
-}
-
-.outcome-criteria {
-  font-size: 0.8rem;
+.outcome-row__win {
+  font-size: 0.88rem;
   color: var(--text-2);
-  line-height: 1.65;
-  white-space: pre-wrap;
-  position: relative;
-  z-index: 1;
+  line-height: 1.6;
+  margin-bottom: 0.35rem;
+  padding-left: 1.8rem;
+}
+
+.outcome-row__win strong {
+  color: var(--neon-green, #39ff14);
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.outcome-row__criteria {
+  font-size: 0.88rem;
+  color: var(--text-2);
+  line-height: 1.6;
+  padding-left: 1.8rem;
+}
+
+.outcome-row__criteria strong {
+  color: var(--text-3);
+  font-weight: 600;
+  font-size: 0.82rem;
 }
 
 /* Time Display - base styles, layout overridden below */
@@ -1695,21 +1710,22 @@ select.input optgroup {
   border-color: rgba(192, 83, 58, 0.2);
 }
 
-/* Outcome cards */
-.App.theme-light .outcome-card {
-  background: rgba(255, 255, 255, 0.5);
-  border-color: var(--border);
+/* Final doc */
+.App.theme-light .final-doc__period {
+  background: rgba(139, 119, 90, 0.06);
 }
 
-.App.theme-light .outcome-card:hover {
-  border-color: rgba(42, 125, 140, 0.35);
-  box-shadow: 0 4px 20px rgba(42, 125, 140, 0.1);
+.App.theme-light .final-doc__text {
+  background: rgba(139, 119, 90, 0.04);
 }
 
-.App.theme-light .outcome-win-condition {
+.App.theme-light .final-doc__text--risk {
+  background: rgba(180, 140, 20, 0.06);
+  border-color: rgba(180, 140, 20, 0.2);
+}
+
+.App.theme-light .outcome-row__win strong {
   color: #1a7a2e;
-  background: rgba(26, 122, 46, 0.07);
-  border-left-color: rgba(26, 122, 46, 0.4);
 }
 
 /* Time display */
