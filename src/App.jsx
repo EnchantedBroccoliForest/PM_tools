@@ -694,78 +694,85 @@ function App() {
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                     </div>
                     <h2>Final Market Details</h2>
-                    <p>Review and deploy your prediction market</p>
+                    <div className="final-header__actions">
+                      <button
+                        className={`copy-btn ${copiedId === 'full-output' ? 'copy-btn--copied' : ''}`}
+                        onClick={() => {
+                          const text = [
+                            finalContent.refinedQuestion && `Question: ${finalContent.refinedQuestion}`,
+                            finalContent.shortDescription && `\nDescription: ${finalContent.shortDescription}`,
+                            `\nMarket Period: ${finalContent.marketStartTimeUTC} — ${finalContent.marketEndTimeUTC}`,
+                            finalContent.outcomes?.length > 0 && `\nOutcomes:\n${finalContent.outcomes.map((o, i) =>
+                              `${i + 1}. ${o.name}\n   Winning Condition: ${o.winCondition || 'N/A'}\n   Resolution Criteria: ${o.resolutionCriteria}`
+                            ).join('\n')}`,
+                            finalContent.fullResolutionRules && `\nFull Resolution Rules:\n${finalContent.fullResolutionRules}`,
+                            finalContent.edgeCases && `\nEdge Cases:\n${finalContent.edgeCases}`,
+                          ].filter(Boolean).join('\n');
+                          handleCopy(text, 'full-output');
+                        }}
+                      >
+                        {copiedId === 'full-output' ? 'Copied!' : 'Copy All'}
+                      </button>
+                    </div>
                   </div>
 
                   {finalContent.raw ? (
-                    <div className="content-section">
+                    <div className="final-doc">
                       <div className="content-box content-box--rich">
                         {renderContent(finalContent.raw)}
                       </div>
                     </div>
                   ) : (
-                    <>
+                    <div className="final-doc">
+                      {/* Question + Description */}
                       {finalContent.refinedQuestion && (
-                        <div className="content-section">
-                          <h3>Refined Market Question</h3>
-                          <div className="content-box refined-question-box">
-                            <p style={{ margin: 0 }}>{finalContent.refinedQuestion}</p>
-                          </div>
+                        <div className="final-doc__question">
+                          {finalContent.refinedQuestion}
                         </div>
                       )}
 
+                      {finalContent.shortDescription && (
+                        <p className="final-doc__description">{finalContent.shortDescription}</p>
+                      )}
+
+                      {/* Market Period */}
+                      <div className="final-doc__period">
+                        <span className="final-doc__period-label">Market Period</span>
+                        <span className="final-doc__period-dates">
+                          {finalContent.marketStartTimeUTC} &mdash; {finalContent.marketEndTimeUTC}
+                        </span>
+                      </div>
+
+                      {/* Outcomes */}
                       {finalContent.outcomes?.length > 0 && (
-                        <div className="content-section">
-                          <h3>Outcomes</h3>
-                          <div className="outcomes-grid">
+                        <div className="final-doc__section">
+                          <h3 className="final-doc__heading">Outcomes ({finalContent.outcomes.length})</h3>
+                          <div className="final-doc__outcomes">
                             {finalContent.outcomes.map((outcome, index) => (
-                              <div key={index} className="outcome-card">
-                                <div className="outcome-index">Outcome {index + 1}</div>
-                                <div className="outcome-name">{outcome.name}</div>
+                              <div key={index} className="outcome-row">
+                                <div className="outcome-row__header">
+                                  <span className="outcome-row__number">{index + 1}</span>
+                                  <span className="outcome-row__name">{outcome.name}</span>
+                                </div>
                                 {outcome.winCondition && (
-                                  <div className="outcome-win-condition">
-                                    <span className="outcome-win-label">Wins if:</span> {outcome.winCondition}
+                                  <div className="outcome-row__win">
+                                    <strong>Winning Condition:</strong> {outcome.winCondition}
                                   </div>
                                 )}
-                                <div className="outcome-criteria-label">Resolution Criteria</div>
-                                <div className="outcome-criteria">{outcome.resolutionCriteria}</div>
+                                <div className="outcome-row__criteria">
+                                  <strong>Resolution Criteria:</strong> {outcome.resolutionCriteria}
+                                </div>
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
 
-                      <div className="content-section">
-                        <h3>Market Timing</h3>
-                        <div className="time-row">
-                          <div className="time-display">
-                            <div className="time-label">Start Time (UTC)</div>
-                            <div className="time-value">{finalContent.marketStartTimeUTC}</div>
-                          </div>
-                          <div className="time-arrow">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
-                          </div>
-                          <div className="time-display">
-                            <div className="time-label">End Time (UTC)</div>
-                            <div className="time-value">{finalContent.marketEndTimeUTC}</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {finalContent.shortDescription && (
-                        <div className="content-section">
-                          <h3>Short Description</h3>
-                          <div className="content-box">
-                            <p style={{ margin: 0 }}>{finalContent.shortDescription}</p>
-                          </div>
-                        </div>
-                      )}
-
+                      {/* Resolution Rules */}
                       {finalContent.fullResolutionRules && (
-                        <div className="content-section">
-                          <h3>Full Resolution Rules</h3>
-                          <div className="col-panel-header" style={{ marginBottom: '0.5rem' }}>
-                            <span />
+                        <div className="final-doc__section">
+                          <div className="final-doc__section-header">
+                            <h3 className="final-doc__heading">Resolution Rules</h3>
                             <button
                               className={`copy-btn ${copiedId === 'rules' ? 'copy-btn--copied' : ''}`}
                               onClick={() => handleCopy(finalContent.fullResolutionRules, 'rules')}
@@ -773,25 +780,26 @@ function App() {
                               {copiedId === 'rules' ? 'Copied!' : 'Copy'}
                             </button>
                           </div>
-                          <div className="content-box content-box--rich">
+                          <div className="final-doc__text">
                             {renderContent(finalContent.fullResolutionRules)}
                           </div>
                         </div>
                       )}
 
+                      {/* Edge Cases */}
                       {finalContent.edgeCases && (
-                        <div className="content-section">
-                          <h3>Edge Cases</h3>
-                          <div className="content-box content-box--rich">
+                        <div className="final-doc__section">
+                          <h3 className="final-doc__heading">Edge Cases</h3>
+                          <div className="final-doc__text">
                             {renderContent(finalContent.edgeCases)}
                           </div>
                         </div>
                       )}
 
-                      {/* Early Resolution Risk — auto-populated */}
-                      <div className="content-section">
-                        <div className="col-panel-header" style={{ marginBottom: '0.5rem' }}>
-                          <h3 style={{ margin: 0 }}>Early Resolution Risk</h3>
+                      {/* Early Resolution Risk */}
+                      <div className="final-doc__section">
+                        <div className="final-doc__section-header">
+                          <h3 className="final-doc__heading">Early Resolution Risk</h3>
                           {finalContent.earlyResolutionRisk && (
                             <div className="col-panel-actions">
                               <span className="model-badge" data-tooltip={getModelName(selectedModel)}>{getModelAbbrev(selectedModel)}</span>
@@ -807,12 +815,12 @@ function App() {
                         {loading === 'early-resolution' ? (
                           <LLMLoadingState phase="early-resolution" meta={loadingMeta} />
                         ) : finalContent.earlyResolutionRisk ? (
-                          <div className="content-box content-box--rich early-resolution-box fade-in">
+                          <div className="final-doc__text final-doc__text--risk fade-in">
                             {renderContent(finalContent.earlyResolutionRisk)}
                           </div>
                         ) : null}
                       </div>
-                    </>
+                    </div>
                   )}
 
                   <button className="reset-button" onClick={handleReset}>
