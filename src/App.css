@@ -1665,23 +1665,54 @@ select.input optgroup {
   --neon-yellow: #b8960c;
   --neon-purple: #7c5cbf;
 
-  background: linear-gradient(165deg, #f5f0e8 0%, #ebe4d6 50%, #f5f0e8 100%);
+  background:
+    /* Subtle warm spots — mimics paper aging / natural variation */
+    radial-gradient(ellipse at 10% 20%, rgba(210, 190, 160, 0.25) 0%, transparent 40%),
+    radial-gradient(ellipse at 90% 80%, rgba(200, 180, 150, 0.2) 0%, transparent 35%),
+    radial-gradient(ellipse at 60% 10%, rgba(220, 200, 170, 0.12) 0%, transparent 45%),
+    radial-gradient(ellipse at 30% 90%, rgba(195, 175, 148, 0.15) 0%, transparent 40%),
+    linear-gradient(165deg, #f5f0e8 0%, #efe8da 30%, #f2ece2 60%, #f5f0e8 100%);
 }
 
-/* Scanlines hidden in light mode */
+/* Soft paper texture in light mode */
 .App.theme-light::before {
-  opacity: 0;
+  opacity: 1;
+  background:
+    /* Fine paper grain — tiny noise-like dots */
+    radial-gradient(ellipse at 20% 15%, rgba(160, 140, 110, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 75% 85%, rgba(140, 120, 95, 0.05) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 50%, rgba(170, 150, 120, 0.03) 0%, transparent 60%),
+    /* Micro fiber texture */
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(139, 119, 90, 0.02) 3px,
+      rgba(139, 119, 90, 0.02) 4px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 5px,
+      rgba(139, 119, 90, 0.015) 5px,
+      rgba(139, 119, 90, 0.015) 6px
+    );
+}
+
+/* Soften vignette for light mode */
+.App.theme-light::after {
+  background: radial-gradient(ellipse at 50% 50%, transparent 65%, rgba(200, 185, 160, 0.2) 100%);
 }
 
 /* Inputs */
 .App.theme-light .input {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 252, 245, 0.65);
   color: var(--text-1);
   border-color: var(--border);
 }
 
 .App.theme-light .input:focus {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 253, 248, 0.85);
 }
 
 .App.theme-light .input::placeholder {
@@ -1690,18 +1721,19 @@ select.input optgroup {
 
 /* Panels */
 .App.theme-light .panel {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 252, 245, 0.6);
   border-color: var(--border);
+  box-shadow: 0 1px 3px rgba(139, 119, 90, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .App.theme-light .panel--active {
   border-color: rgba(42, 125, 140, 0.4);
-  box-shadow: 0 0 25px rgba(42, 125, 140, 0.08);
+  box-shadow: 0 1px 4px rgba(42, 125, 140, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 /* Content boxes */
 .App.theme-light .content-box {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 252, 245, 0.5);
   border-color: var(--border);
   color: var(--text-2);
 }
