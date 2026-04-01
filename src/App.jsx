@@ -1,7 +1,11 @@
 import { useRef, useEffect } from 'react';
 import './App.css';
+import './ambient-modes.css';
 import { AVAILABLE_MODELS, getModelName, getModelAbbrev } from './constants/models';
 import LLMLoadingState from './components/LLMLoadingState';
+import AmbientModeToggle from './components/AmbientModeToggle';
+import AmbientOverlay from './components/AmbientOverlay';
+import { useAmbientMode } from './hooks/useAmbientMode';
 import {
   SYSTEM_PROMPTS,
   buildDraftPrompt,
@@ -76,6 +80,7 @@ function formatInline(text) {
 
 function App() {
   const [state, dispatch] = useMarketReducer();
+  const { mode: ambientMode, setMode: setAmbientMode, config: ambientConfig } = useAmbientMode('night');
   const panel2Ref = useRef(null);
   const panel3Ref = useRef(null);
 
@@ -104,7 +109,7 @@ function App() {
 
   const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
   const anyLoading = loading !== null;
-  const progressPercent = finalContent ? 100 : hasUpdated ? 75 : reviews.length > 0 ? 50 : draftContent ? 33 : 0;
+  const progressPercent = finalContent ? 100 : hasUpdated ? 75 : reviews.length > 0 ? 50 : draftContent? 33 : 0;
 
   // Auto-scroll to active panel on mobile
   useEffect(() => {
@@ -156,7 +161,7 @@ function App() {
 
   // --- Stage 1: Draft (single model) ---
   const handleDraft = async () => {
-    dispatch({ type: 'START_LOADING', phase: 'draft', models: [getModelName(selectedModel)] });
+    dispatch({ type: 'START_LOADING', phhase: 'draft', models: [getModelName(selectedModel)] });
     try {
       const content = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
@@ -196,7 +201,7 @@ function App() {
         throw new Error('All reviewers failed. Please try again.');
       }
 
-      // Phase 2: Deliberation — if we have multiple successful reviews,
+      // Phase 2: Deliberation â if we have multiple successful reviews,
       // use the first reviewer as "chairman" to synthesize a consolidated critique
       let deliberatedReview = null;
 
@@ -291,26 +296,15 @@ function App() {
   const handleReset = () => dispatch({ type: 'RESET' });
 
   return (
-    <div className={`App ${theme === 'light' ? 'theme-light' : ''}`}>
+    <div className={`App ${ambientConfig.classes.join(' ')}`}>
+      <AmbientOverlay mode={ambientMode} />
+      <AmbientModeToggle mode={ambientMode} setMode={setAmbientMode} />
       <div className="container">
 
         {/* Header */}
         <header className="header">
           <div className="header__top-row">
             <h1>Market Creator<span className="wordmark-dot" /></h1>
-            <button
-              type="button"
-              className="theme-toggle"
-              onClick={() => dispatch({ type: 'TOGGLE_THEME' })}
-              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            >
-              {theme === 'dark' ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-              )}
-            </button>
           </div>
           {/* Progress bar */}
           <div className="progress-bar" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
@@ -491,7 +485,7 @@ function App() {
               </div>
               )}
 
-              {/* Draft output — stays in Panel 1 right under the button */}
+              {/* Draft output â stays in Panel 1 right under the button */}
               {loading === 'draft' && (
                 <div className="draft-output-section fade-in">
                   <LLMLoadingState phase="draft" meta={loadingMeta} />
@@ -667,7 +661,7 @@ function App() {
                   <div className="col-panel col-panel--review">
                     <div className="human-review-section">
                       <h2>Your Feedback</h2>
-                      <span className="hint">Optional — included when you click Update Draft</span>
+                      <span className="hint">Optional â included when you click Update Draft</span>
                       <textarea
                         value={humanReviewInput}
                         onChange={(e) =>
@@ -771,7 +765,7 @@ function App() {
                           const text = [
                             finalContent.refinedQuestion && `Question: ${finalContent.refinedQuestion}`,
                             finalContent.shortDescription && `\nDescription: ${finalContent.shortDescription}`,
-                            `\nMarket Period: ${finalContent.marketStartTimeUTC} — ${finalContent.marketEndTimeUTC}`,
+                            `\nMarket Period: ${finalContent.marketStartTimeUTC} â ${finalContent.marketEndTimeUTC}`,
                             finalContent.outcomes?.length > 0 && `\nOutcomes:\n${finalContent.outcomes.map((o, i) =>
                               `${i + 1}. ${o.name}\n   Winning Condition: ${o.winCondition || 'N/A'}\n   Resolution Criteria: ${o.resolutionCriteria}`
                             ).join('\n')}`,
