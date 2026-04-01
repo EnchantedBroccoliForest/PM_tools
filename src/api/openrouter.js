@@ -58,7 +58,11 @@ export async function queryModel(model, messages, { temperature = 0.7, maxTokens
       }
 
       const data = await response.json();
-      return data.choices[0].message.content;
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string' || content.trim() === '') {
+        throw new Error('Model returned an empty or malformed response');
+      }
+      return content;
     } catch (err) {
       if (err.name === 'TypeError' && attempt < MAX_RETRIES) {
         // Network error — retry
