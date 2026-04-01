@@ -5,7 +5,9 @@ function getInitialTheme() {
   try {
     const stored = localStorage.getItem('theme');
     if (stored === 'light' || stored === 'dark') return stored;
-  } catch {}
+  } catch {
+    // Ignore storage access errors and use default theme.
+  }
   return 'dark';
 }
 
@@ -158,14 +160,18 @@ function reducer(state, action) {
       };
 
     case 'RESET':
-      return initialState;
+      return { ...initialState, theme: state.theme };
 
     case 'SET_COPIED':
       return { ...state, copiedId: action.id };
 
     case 'TOGGLE_THEME': {
       const next = state.theme === 'dark' ? 'light' : 'dark';
-      try { localStorage.setItem('theme', next); } catch {}
+      try {
+        localStorage.setItem('theme', next);
+      } catch {
+        // Ignore storage write errors; theme still updates in-memory.
+      }
       return { ...state, theme: next };
     }
 

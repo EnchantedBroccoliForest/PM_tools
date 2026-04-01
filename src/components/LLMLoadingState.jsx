@@ -66,20 +66,28 @@ export default function LLMLoadingState({ phase, meta }) {
   // Elapsed timer — update every second
   useEffect(() => {
     if (!meta?.startTime) return;
-    setElapsed(Date.now() - meta.startTime);
+    const kickoff = setTimeout(() => {
+      setElapsed(Date.now() - meta.startTime);
+    }, 0);
     const interval = setInterval(() => {
       setElapsed(Date.now() - meta.startTime);
     }, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(kickoff);
+      clearInterval(interval);
+    };
   }, [meta?.startTime]);
 
   // Cycle status messages every 4 seconds
   useEffect(() => {
-    setMessageIndex(0);
+    const kickoff = setTimeout(() => setMessageIndex(0), 0);
     const interval = setInterval(() => {
       setMessageIndex((prev) => (prev + 1) % config.messages.length);
     }, 4000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(kickoff);
+      clearInterval(interval);
+    };
   }, [phase, config.messages.length]);
 
   const isMultiModel = modelNames.length > 1;

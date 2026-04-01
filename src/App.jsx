@@ -119,7 +119,16 @@ function App() {
     navigator.clipboard.writeText(text).then(() => {
       dispatch({ type: 'SET_COPIED', id });
       setTimeout(() => dispatch({ type: 'SET_COPIED', id: null }), 2000);
+    }).catch(() => {
+      dispatch({ type: 'SET_ERROR', error: 'Failed to copy to clipboard' });
     });
+  };
+
+  const formatUTCDateHint = (dateString, suffix) => {
+    if (!dateString) return null;
+    const parsed = new Date(`${dateString}T${suffix}`);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString().replace('T', ' ').slice(0, -5);
   };
 
   const handleDismissError = () => dispatch({ type: 'SET_ERROR', error: null });
@@ -371,7 +380,7 @@ function App() {
                     />
                     {startDate && (
                       <p className="utc-hint">
-                        {new Date(startDate + 'T00:00:00').toISOString().replace('T', ' ').slice(0, -5)} UTC
+                        {formatUTCDateHint(startDate, '00:00:00')} UTC
                       </p>
                     )}
                   </div>
@@ -387,7 +396,7 @@ function App() {
                     />
                     {endDate && (
                       <p className="utc-hint">
-                        {new Date(endDate + 'T23:59:59').toISOString().replace('T', ' ').slice(0, -5)} UTC
+                        {formatUTCDateHint(endDate, '23:59:59')} UTC
                       </p>
                     )}
                   </div>
