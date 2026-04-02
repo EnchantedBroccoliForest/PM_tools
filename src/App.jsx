@@ -302,7 +302,6 @@ function App() {
         {/* Header */}
         <header className="header">
           <div className="header__top-row">
-            <h1>Market Creator<span className="wordmark-dot" /></h1>
             <AmbientModeToggle mode={ambientMode} setMode={setAmbientMode} />
           </div>
           {/* Progress bar */}
