@@ -6,10 +6,10 @@ export const SYSTEM_PROMPTS = {
     'You are a critical reviewer specializing in prediction market design. You are a very well trained contract reviewer. Your job is to find flaws, ambiguities, and potential issues in market definitions, resolution rules, and the completeness of the outcome set.',
 
   finalizer:
-    'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format. Be concise — use direct, minimal language. Eliminate redundancy, filler, and verbose phrasing. Every field should convey maximum information in minimum words.',
+    'You are an expert at creating prediction market questions. Extract and format the final market details from the draft into a structured format. Be extremely concise — use terse, direct language. No filler, no hedging, no redundancy. Prefer fragments over full sentences where clarity is preserved. Every word must earn its place.',
 
   earlyResolutionAnalyst:
-    'You are an expert analyst specializing in the underlying topic of this market proposal. You evaluate whether an event could resolve early — that is, whether its outcome could become effectively certain before the stated end date.',
+    'You are an expert analyst evaluating whether a prediction market could resolve early — whether its outcome becomes effectively certain before the end date. Be extremely concise. Give a risk rating and brief justification only.',
 };
 
 export function buildDraftPrompt(question, startDate, endDate, references) {
@@ -79,12 +79,13 @@ export function buildFinalizePrompt(draftContent, startDate, endDate) {
   return `Based on the following draft, generate the final prediction market details in a structured JSON format.
 
 IMPORTANT — CONCISENESS RULES:
-- Cut all output text by at least 30% compared to the draft. Be direct and terse.
-- Use short declarative sentences. No filler, hedging, or redundant phrasing.
-- Do NOT repeat information across fields — each field should contain unique content only.
-- winCondition and resolutionCriteria must not overlap: winCondition states WHAT must be true; resolutionCriteria states HOW it is verified (source, method, threshold).
-- fullResolutionRules should be a compact numbered list, not prose paragraphs.
-- edgeCases should be a compact numbered list of scenario → resolution pairs.
+- Cut all output text by at least 50% compared to the draft. Be terse and direct.
+- Use fragments and short declarative sentences. No filler, hedging, qualifiers, or redundant phrasing.
+- Do NOT repeat information across fields — each field must contain unique content only.
+- winCondition: max 1 sentence stating WHAT must be true. resolutionCriteria: max 1 sentence stating HOW it is verified (source, method, threshold). Zero overlap between them.
+- shortDescription: max 15 words.
+- fullResolutionRules: compact numbered list, max 1 line per rule. No prose.
+- edgeCases: compact numbered list, format "scenario → resolution", max 1 line each.
 
 DRAFT:
 ${draftContent}
@@ -129,8 +130,8 @@ ${finalContent.fullResolutionRules || 'N/A'}
 
 MARKET END DATE: ${finalContent.marketEndTimeUTC || 'N/A'}
 
-Analyze:
-1. Could any outcome become effectively certain (>99% likelihood) before the end date?
-2. What specific events or scenarios could cause early certainty?
-3. Rate the overall early resolution risk: Low / Medium / High`;
+Respond concisely (max 4-6 sentences total). State:
+1. Risk rating: Low / Medium / High
+2. Key scenarios (if any) that could cause early certainty
+Keep it brief — no preamble, no restating the question.`;
 }
