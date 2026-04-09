@@ -13,7 +13,7 @@ function getInitialTheme() {
 
 const initialState = {
   // Mode
-  mode: 'draft', // 'draft' | 'review'
+  mode: 'draft', // 'draft' | 'review' | 'ideating'
 
   // Input
   question: '',
@@ -25,8 +25,13 @@ const initialState = {
   humanReviewInput: '',
   pastedDraft: '',
 
+  // Ideating
+  ideatingInput: '',
+  ideatingModel: DEFAULT_DRAFT_MODEL,
+  ideatingContent: null,
+
   // Processing
-  loading: null, // null | 'draft' | 'review' | 'update' | 'accept' | 'early-resolution'
+  loading: null, // null | 'draft' | 'review' | 'update' | 'accept' | 'early-resolution' | 'ideate'
   loadingMeta: null, // { models: string[], startTime: number } | null
   error: null,
   dateError: null,
@@ -135,6 +140,9 @@ function reducer(state, action) {
 
     case 'FINALIZE_SUCCESS':
       return { ...state, loading: null, loadingMeta: null, finalContent: action.content };
+
+    case 'IDEATE_SUCCESS':
+      return { ...state, loading: null, loadingMeta: null, ideatingContent: action.content };
 
     case 'START_EARLY_RESOLUTION':
       return {

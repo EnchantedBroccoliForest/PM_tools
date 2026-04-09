@@ -11,6 +11,7 @@ import {
   buildUpdatePrompt,
   buildFinalizePrompt,
   buildEarlyResolutionPrompt,
+  buildIdeatePrompt,
 } from './constants/prompts';
 import { queryModel, queryModelsParallel } from './api/openrouter';
 import { useMarketReducer } from './hooks/useMarketReducer';
@@ -93,6 +94,9 @@ function App() {
     reviewModels,
     humanReviewInput,
     pastedDraft,
+    ideatingInput,
+    ideatingModel,
+    ideatingContent,
     loading,
     loadingMeta,
     error,
@@ -291,6 +295,20 @@ function App() {
     dispatch({ type: 'SUBMIT_PASTED_DRAFT', content: pastedDraft.trim() });
   };
 
+  // --- Ideating: generate market ideas from vague user direction ---
+  const handleIdeate = async () => {
+    dispatch({ type: 'START_LOADING', phase: 'ideate', models: [getModelName(ideatingModel)] });
+    try {
+      const content = await queryModel(ideatingModel, [
+        { role: 'system', content: SYSTEM_PROMPTS.ideator },
+        { role: 'user', content: buildIdeatePrompt(ideatingInput) },
+      ]);
+      dispatch({ type: 'IDEATE_SUCCESS', content });
+    } catch (err) {
+      dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate market ideas' });
+    }
+  };
+
   const handleReset = () => dispatch({ type: 'RESET' });
 
   return (
@@ -340,9 +358,18 @@ function App() {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
                   Review Market
                 </button>
+                <button
+                  type="button"
+                  className={`mode-toggle__btn ${mode === 'ideating' ? 'mode-toggle__btn--active' : ''}`}
+                  onClick={() => dispatch({ type: 'SET_FIELD', field: 'mode', value: 'ideating' })}
+                  disabled={anyLoading}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.74V17h8v-2.26A7 7 0 0 0 12 2z" /></svg>
+                  Ideating
+                </button>
               </div>
 
-              {mode === 'draft' ? (
+              {mode === 'draft' && (
               <div className="market-form">
                 <div className="form-group">
                   <label htmlFor="question">Prediction Market Question</label>
@@ -449,7 +476,9 @@ function App() {
                   )}
                 </button>
               </div>
-              ) : (
+              )}
+
+              {mode === 'review' && (
               <div className="market-form">
                 <div className="form-group">
                   <label htmlFor="pastedDraft">Paste Existing Draft</label>
@@ -481,13 +510,94 @@ function App() {
               </div>
               )}
 
+              {mode === 'ideating' && (
+              <div className="market-form">
+                <div className="form-group">
+                  <label htmlFor="ideatingInput">Vague Direction</label>
+                  <textarea
+                    id="ideatingInput"
+                    value={ideatingInput}
+                    onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'ideatingInput', value: e.target.value })}
+                    placeholder="Describe a rough area of interest — e.g., 'AI regulation in 2026', 'upcoming crypto ETF decisions', 'European elections'. The model will research and brainstorm market ideas."
+                    className="input textarea textarea--tall"
+                    disabled={loading === 'ideate'}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="ideatingModel">Ideation Model</label>
+                  <ModelSelect
+                    id="ideatingModel"
+                    value={ideatingModel}
+                    onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'ideatingModel', value: e.target.value })}
+                    className="input"
+                    disabled={loading === 'ideate'}
+                  />
+                </div>
+
+                {error && (
+                  <div className="error-message">
+                    <span>{error}</span>
+                    <button className="error-dismiss" onClick={handleDismissError} aria-label="Dismiss">&times;</button>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="draft-button"
+                  disabled={loading === 'ideate' || !ideatingInput.trim()}
+                  onClick={handleIdeate}
+                >
+                  {loading === 'ideate' ? (
+                    <>
+                      <span className="spinner" />
+                      Ideating...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.74V17h8v-2.26A7 7 0 0 0 12 2z" /></svg>
+                      Generate Ideas
+                    </>
+                  )}
+                </button>
+
+                {loading === 'ideate' && (
+                  <div className="draft-output-section fade-in">
+                    <LLMLoadingState phase="ideate" meta={loadingMeta} />
+                  </div>
+                )}
+
+                {ideatingContent && loading !== 'ideate' && (
+                  <div className="draft-output-section fade-in">
+                    <div className="col-panel col-panel--draft">
+                      <div className="col-panel-header">
+                        <h2>Market Ideas</h2>
+                        <div className="col-panel-actions">
+                          <span className="model-badge" data-tooltip={getModelName(ideatingModel)}>{getModelAbbrev(ideatingModel)}</span>
+                          <button
+                            className={`copy-btn ${copiedId === 'ideating' ? 'copy-btn--copied' : ''}`}
+                            onClick={() => handleCopy(ideatingContent, 'ideating')}
+                          >
+                            {copiedId === 'ideating' ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="content-box content-box--rich">
+                        {renderContent(ideatingContent)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              )}
+
               {/* Draft output — stays in Panel 1 right under the button */}
-              {loading === 'draft' && (
+              {mode !== 'ideating' && loading === 'draft' && (
                 <div className="draft-output-section fade-in">
                   <LLMLoadingState phase="draft" meta={loadingMeta} />
                 </div>
               )}
-              {draftContent && (
+              {mode !== 'ideating' && draftContent && (
                 <div className="draft-output-section fade-in">
                   <div className="col-panel col-panel--draft">
                     <div className="col-panel-header">

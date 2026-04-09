@@ -46,6 +46,15 @@ const PHASE_CONFIG = {
       'Compiling analysis...',
     ],
   },
+  ideate: {
+    label: 'Brainstorming market ideas',
+    messages: [
+      'Researching the topic area...',
+      'Scanning for catalysts and trends...',
+      'Generating candidate questions...',
+      'Curating the most interesting ideas...',
+    ],
+  },
 };
 
 function formatElapsed(ms) {
