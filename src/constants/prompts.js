@@ -10,6 +10,9 @@ export const SYSTEM_PROMPTS = {
 
   earlyResolutionAnalyst:
     'You are an expert analyst evaluating whether a prediction market could resolve early — whether its outcome becomes effectively certain before the end date. Be extremely concise. Give a risk rating and brief justification only.',
+
+  ideator:
+    'You are a creative prediction market ideator. Given vague directions from a user, research the topic area and brainstorm a diverse set of concrete, high-quality prediction market ideas. Draw on current events, upcoming catalysts, policy debates, technology trends, and cultural moments. Favor markets that are objectively resolvable, genuinely uncertain, and interesting to bet on.',
 };
 
 export function buildDraftPrompt(question, startDate, endDate, references) {
@@ -110,6 +113,30 @@ Generate a JSON response with exactly these fields:
   "fullResolutionRules": "Compact numbered rules — no redundancy with outcome-level criteria",
   "edgeCases": "Numbered list: scenario → resolution"
 }`;
+}
+
+export function buildIdeatePrompt(direction) {
+  const trimmed = (direction || '').trim();
+  const directionSection = trimmed
+    ? `USER DIRECTION:\n${trimmed}`
+    : 'USER DIRECTION:\n(no specific direction — surprise the user with broadly interesting ideas)';
+
+  return `Generate a diverse set of prediction market ideas based on the vague direction below. Research the topic area using your own knowledge of current events, upcoming catalysts, and relevant trends. Brainstorm freely — it's fine to propose unexpected angles the user may not have considered.
+
+${directionSection}
+
+Produce 6–10 distinct market ideas. For each idea, provide:
+1. **Title** — a concise, specific market question
+2. **Why it's interesting** — 1 sentence on the tension, catalyst, or uncertainty that makes it bet-worthy
+3. **Resolvability** — 1 sentence noting how it could be objectively resolved (key source or event)
+4. **Suggested timeframe** — a rough end date or window
+
+Guidelines:
+- Prefer markets that are genuinely uncertain (not near-certain outcomes)
+- Avoid duplicates — spread across subtopics, timeframes, and angles
+- Keep each idea tight — no preamble, no filler
+- Number the ideas 1., 2., 3., ...
+- End with a brief 1–2 sentence note on themes or follow-up directions the user might explore`;
 }
 
 export function buildEarlyResolutionPrompt(finalContent) {
