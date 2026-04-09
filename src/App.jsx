@@ -1,7 +1,8 @@
 import { useRef, useEffect } from 'react';
 import './App.css';
 import './ambient-modes.css';
-import { AVAILABLE_MODELS, getModelName, getModelAbbrev } from './constants/models';
+import { getModelName, getModelAbbrev } from './constants/models';
+import { useModels } from './hooks/useModels';
 import LLMLoadingState from './components/LLMLoadingState';
 import {
   SYSTEM_PROMPTS,
@@ -81,6 +82,10 @@ function formatInline(text) {
 function App() {
   const [state, dispatch] = useMarketReducer();
   const { mode: ambientMode, setMode: setAmbientMode, config: ambientConfig } = useAmbientMode();
+  // Kicks off the initial OpenRouter model fetch + periodic refresh and
+  // re-renders the app when the model list changes, so getModelName/abbrev
+  // reflect the freshly fetched list.
+  useModels();
   const panel2Ref = useRef(null);
   const panel3Ref = useRef(null);
 
