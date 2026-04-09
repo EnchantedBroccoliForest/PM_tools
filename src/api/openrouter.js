@@ -1,4 +1,5 @@
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff
 
@@ -75,6 +76,30 @@ export async function queryModel(model, messages, { temperature = 0.7, maxTokens
   }
 
   throw lastError;
+}
+
+/**
+ * Fetch the full list of models currently available via OpenRouter.
+ * The /models endpoint is public, so the API key is optional but sent when present.
+ * Returns the raw `data` array (each item has id, name, description, architecture, etc.).
+ */
+export async function fetchAvailableModels() {
+  const headers = {
+    'HTTP-Referer': window.location.origin,
+    'X-Title': 'Market Creator',
+  };
+  try {
+    headers.Authorization = `Bearer ${getApiKey()}`;
+  } catch {
+    // /models works unauthenticated; continue without the header.
+  }
+
+  const response = await fetch(MODELS_URL, { headers });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch models: HTTP ${response.status}`);
+  }
+  const data = await response.json();
+  return Array.isArray(data?.data) ? data.data : [];
 }
 
 /**

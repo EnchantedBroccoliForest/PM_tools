@@ -1,4 +1,6 @@
-export const MODEL_GROUPS = [
+// Static fallback list — used before the OpenRouter API has been fetched,
+// and if the network request fails entirely.
+export const FALLBACK_MODEL_GROUPS = [
   {
     label: 'OpenAI',
     models: [
@@ -52,26 +54,190 @@ export const MODEL_GROUPS = [
   },
 ];
 
-export const AVAILABLE_MODELS = MODEL_GROUPS.flatMap((g) => g.models);
-
-export const DEFAULT_DRAFT_MODEL = AVAILABLE_MODELS[1].id;
-export const DEFAULT_REVIEW_MODEL = AVAILABLE_MODELS[13].id;
-
-export function getModelName(id) {
-  return AVAILABLE_MODELS.find((m) => m.id === id)?.name || id;
-}
-
-const PROVIDER_ABBREVS = {
-  'OpenAI': 'OA',
-  'Anthropic': 'A',
-  'Google': 'G',
-  'DeepSeek': 'DS',
-  'Meta': 'M',
-  'Mistral': 'Mi',
+// Friendly labels for known OpenRouter provider prefixes. Any prefix not listed
+// here falls back to a title-cased version of the raw prefix.
+const PROVIDER_LABELS = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  google: 'Google',
+  deepseek: 'DeepSeek',
+  'meta-llama': 'Meta',
+  mistralai: 'Mistral',
+  'x-ai': 'xAI',
+  cohere: 'Cohere',
+  perplexity: 'Perplexity',
+  qwen: 'Qwen',
+  amazon: 'Amazon',
+  microsoft: 'Microsoft',
+  nvidia: 'NVIDIA',
+  'nous-research': 'Nous Research',
+  'liquid': 'Liquid',
+  'inflection': 'Inflection',
+  '01-ai': '01.AI',
+  'ai21': 'AI21',
 };
 
+// Known providers get a preferred ordering; everything else sorts alphabetically after.
+const PROVIDER_ORDER = [
+  'OpenAI',
+  'Anthropic',
+  'Google',
+  'xAI',
+  'DeepSeek',
+  'Meta',
+  'Mistral',
+  'Qwen',
+  'Cohere',
+  'Perplexity',
+];
+
+const PROVIDER_ABBREVS = {
+  OpenAI: 'OA',
+  Anthropic: 'A',
+  Google: 'G',
+  DeepSeek: 'DS',
+  Meta: 'M',
+  Mistral: 'Mi',
+  xAI: 'X',
+  Cohere: 'Co',
+  Perplexity: 'Px',
+  Qwen: 'Q',
+};
+
+function titleCase(slug) {
+  return slug
+    .split(/[-_]/)
+    .map((part) => (part.length > 0 ? part[0].toUpperCase() + part.slice(1) : ''))
+    .join(' ');
+}
+
+function providerRank(label) {
+  const idx = PROVIDER_ORDER.indexOf(label);
+  return idx === -1 ? PROVIDER_ORDER.length : idx;
+}
+
+function stripProviderPrefix(name, providerLabel) {
+  // OpenRouter names look like "OpenAI: GPT-5.2". Strip the redundant provider prefix.
+  const prefix = `${providerLabel}:`;
+  if (name.startsWith(prefix)) return name.slice(prefix.length).trim();
+  return name;
+}
+
+function isTextOutputModel(model) {
+  const modality = model?.architecture?.modality;
+  if (typeof modality !== 'string') return true; // include when unknown
+  // e.g. "text->text", "text+image->text", "text->image"
+  const arrow = modality.split('->');
+  const output = arrow.length > 1 ? arrow[1] : modality;
+  return output.includes('text');
+}
+
+/**
+ * Convert the raw OpenRouter /models response into the grouped shape the UI expects.
+ */
+export function groupOpenRouterModels(rawModels) {
+  const groupMap = new Map();
+
+  for (const m of rawModels) {
+    if (!m?.id || typeof m.id !== 'string') continue;
+    if (!isTextOutputModel(m)) continue;
+
+    const slashIdx = m.id.indexOf('/');
+    const prefix = slashIdx === -1 ? m.id : m.id.slice(0, slashIdx);
+    const label = PROVIDER_LABELS[prefix] || titleCase(prefix);
+    const displayName = stripProviderPrefix(m.name || m.id, label);
+
+    if (!groupMap.has(label)) groupMap.set(label, []);
+    groupMap.get(label).push({ id: m.id, name: displayName });
+  }
+
+  return [...groupMap.entries()]
+    .sort(([a], [b]) => {
+      const ra = providerRank(a);
+      const rb = providerRank(b);
+      if (ra !== rb) return ra - rb;
+      return a.localeCompare(b);
+    })
+    .map(([label, models]) => ({
+      label,
+      models: models.sort((a, b) => a.name.localeCompare(b.name)),
+    }));
+}
+
+// --- Reactive store -------------------------------------------------------
+
+const CACHE_KEY = 'pm_tools_openrouter_models_v1';
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.groups) || parsed.groups.length === 0) return null;
+    if (typeof parsed.timestamp !== 'number') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(groups) {
+  try {
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ groups, timestamp: Date.now() })
+    );
+  } catch {
+    // Ignore storage errors — cache is best-effort.
+  }
+}
+
+const cached = readCache();
+let currentGroups = cached?.groups || FALLBACK_MODEL_GROUPS;
+let lastUpdatedAt = cached?.timestamp || 0;
+const listeners = new Set();
+
+export function getModelGroups() {
+  return currentGroups;
+}
+
+export function getLastModelsUpdateTime() {
+  return lastUpdatedAt;
+}
+
+export function setModelGroups(groups) {
+  if (!Array.isArray(groups) || groups.length === 0) return;
+  currentGroups = groups;
+  lastUpdatedAt = Date.now();
+  writeCache(groups);
+  for (const listener of listeners) listener();
+}
+
+export function subscribeModels(listener) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+// --- Helpers that operate on the current store ---------------------------
+
+export function getAvailableModels() {
+  return currentGroups.flatMap((g) => g.models);
+}
+
+// Defaults are kept as explicit IDs so they stay stable regardless of how the
+// fetched list is ordered. If an ID is no longer offered, ModelSelect still
+// surfaces it as a fallback option so the user can switch away from it.
+export const DEFAULT_DRAFT_MODEL = 'openai/gpt-5.2';
+export const DEFAULT_REVIEW_MODEL = 'google/gemini-3-pro-preview';
+
+export function getModelName(id) {
+  return getAvailableModels().find((m) => m.id === id)?.name || id;
+}
+
 export function getModelAbbrev(id) {
-  for (const group of MODEL_GROUPS) {
+  for (const group of currentGroups) {
     if (group.models.some((m) => m.id === id)) {
       return PROVIDER_ABBREVS[group.label] || group.label[0];
     }
