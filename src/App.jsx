@@ -17,7 +17,6 @@ import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
 import AmbientModeToggle from './components/AmbientModeToggle';
-import AmbientOverlay from './components/AmbientOverlay';
 
 /** Lightweight markdown-ish rendering: **bold**, bullet lists, numbered lists */
 function renderContent(text) {
@@ -296,7 +295,6 @@ function App() {
 
   return (
     <div className={`App ${ambientConfig.classes.join(' ')}`}>
-      <AmbientOverlay mode={ambientMode} />
       <div className="container">
 
         {/* Header */}
