@@ -2207,6 +2207,147 @@ select.input optgroup {
   opacity: 0.75;
 }
 
+/* --- Phase 2: aggregation checklist, verdicts, criticisms --- */
+
+.run-trace__verdict {
+  display: inline-block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.run-trace__verdict--pass {
+  color: #78c77a;
+}
+
+.run-trace__verdict--fail {
+  color: #e87171;
+}
+
+.run-trace__verdict--escalate,
+.run-trace__verdict--needs_escalation {
+  color: #e8c171;
+}
+
+.run-trace__judge-rationale {
+  margin: 0.25rem 0 0.5rem 0;
+  font-size: 0.75rem;
+  font-style: italic;
+  opacity: 0.75;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border-left: 2px solid rgba(232, 193, 113, 0.4);
+}
+
+.run-trace__checklist-item {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__checklist-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.run-trace__checklist-question {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.run-trace__vote-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.run-trace__vote {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.73rem;
+}
+
+.run-trace__vote-rationale {
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.run-trace__criticism {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__criticism-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.run-trace__criticism-text {
+  font-size: 0.78rem;
+  opacity: 0.85;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.run-trace__severity--blocker {
+  background: rgba(232, 113, 113, 0.2);
+  color: #e87171;
+}
+
+.run-trace__severity--major {
+  background: rgba(232, 150, 113, 0.18);
+  color: #e89671;
+}
+
+.run-trace__severity--minor {
+  background: rgba(232, 193, 113, 0.15);
+  color: #e8c171;
+}
+
+.run-trace__severity--nit {
+  background: rgba(120, 199, 122, 0.12);
+  color: #78c77a;
+}
+
+/* Phase 3: verification list entries */
+.run-trace__verification {
+  padding: 0.4rem 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__verification-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.run-trace__verification-detail {
+  margin-top: 0.25rem;
+  padding-left: 0.25rem;
+  font-size: 0.72rem;
+  opacity: 0.7;
+  font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* Light theme overrides for Run trace */
 .App.theme-light .run-trace {
   border-color: rgba(139, 119, 90, 0.15);

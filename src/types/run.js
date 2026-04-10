@@ -223,6 +223,64 @@ export const LogEntrySchema = z.object({
   ts: z.number(),
 });
 
+// ------------------------------ Phase 2 prompt-response schemas ------------
+//
+// These schemas validate the JSON produced by the structured reviewer and
+// judge aggregator prompts. They are narrower than the Run-level schemas
+// above — rubric ids aren't pinned to the RIGOR_RUBRIC enum because a
+// reviewer may legitimately skip an id or (in error) invent one, and we
+// want to reject inventions without crashing the whole review.
+
+export const RubricVoteSchema = z.object({
+  ruleId: z.string().min(1),
+  verdict: z.enum(['yes', 'no', 'unsure']),
+  rationale: z.string().default(''),
+});
+
+export const StructuredCriticismSchema = z.object({
+  claimId: z.string().min(1),
+  severity: z.enum(['blocker', 'major', 'minor', 'nit']),
+  category: z.enum([
+    'mece',
+    'objectivity',
+    'source',
+    'timing',
+    'ambiguity',
+    'manipulation',
+    'atomicity',
+    'other',
+  ]),
+  rationale: z.string().default(''),
+});
+
+export const StructuredReviewResponseSchema = z.object({
+  reviewProse: z.string().min(1),
+  rubricVotes: z.array(RubricVoteSchema).default([]),
+  criticisms: z.array(StructuredCriticismSchema).default([]),
+});
+
+export const JudgePerItemDecisionSchema = z.object({
+  id: z.string().min(1),
+  decision: z.enum(['pass', 'fail', 'escalate']),
+});
+
+export const JudgeAggregatorResponseSchema = z.object({
+  perItemDecisions: z.array(JudgePerItemDecisionSchema).default([]),
+  overall: z.enum(['pass', 'fail', 'needs_escalation']),
+  rationale: z.string().default(''),
+});
+
+// Phase 3: batched draft-entailment verifier response. Each entry
+// corresponds to one claim id. Unknown/invented ids are dropped by the
+// verify pipeline with a warn log.
+export const EntailmentVerdictSchema = z.object({
+  id: z.string().min(1),
+  entailment: z.enum(['entailed', 'contradicted', 'not_covered', 'not_applicable']),
+  rationale: z.string().default(''),
+});
+
+export const BatchEntailmentResponseSchema = z.array(EntailmentVerdictSchema);
+
 export const RunSchema = z.object({
   runId: z.string(),
   startedAt: z.number(),

@@ -16,6 +16,15 @@ export const SYSTEM_PROMPTS = {
 
   claimExtractor:
     'You are a meticulous claim extractor. Your job is to decompose a prediction market draft into a flat list of atomic, verifiable claims — one sentence per claim, no compound statements. You output strictly valid JSON and nothing else. Do not include prose, preamble, explanation, or markdown fences.',
+
+  structuredReviewer:
+    'You are a rigorous prediction market reviewer. You produce TWO outputs in a single JSON response: (1) a prose critique of the draft, and (2) a rubric vote answering each checklist item as yes / no / unsure with a short rationale. You must output strictly valid JSON matching the schema — no prose before or after, no markdown fences.',
+
+  aggregationJudge:
+    'You are the aggregation judge for a prediction market review. You read a rubric and the per-item votes of several independent reviewers and render a single overall verdict. You are not a tiebreaker alone — you may override a majority when reviewers agreed on something obviously wrong. You output strictly valid JSON matching the schema.',
+
+  entailmentVerifier:
+    'You are a precise entailment verifier. Given a prediction market draft and a list of atomic claims extracted from it, you decide for each claim whether the draft entails it, contradicts it, fails to cover it, or is not applicable. You are strict: a claim is only "entailed" when its content is clearly present in the draft, not merely plausible or consistent. You output strictly valid JSON and nothing else.',
 };
 
 export function buildDraftPrompt(question, startDate, endDate, references) {
@@ -184,6 +193,182 @@ export function buildStrictClaimExtractorRetryPrompt(draftContent) {
 Output ONLY a JSON array. No prose. No markdown fences. No commentary. Nothing before or after the array. The first character of your response must be "[" and the last character must be "]".
 
 ${buildClaimExtractorPrompt(draftContent)}`;
+}
+
+// Structured reviewer prompt — replaces the plain `buildReviewPrompt` for
+// the Phase 2 review path. Asks a single reviewer to produce BOTH a prose
+// critique (so the UI can show it unchanged) and a rubric vote + a list of
+// structured criticisms (so the Run artifact gets real data).
+//
+// The rubric is passed in explicitly so adding or reordering rubric items
+// never requires changing this module — `src/constants/rubric.js` is the
+// single source of truth.
+export function buildStructuredReviewPrompt(draftContent, rubric) {
+  const rubricBlock = rubric
+    .map(
+      (item, i) =>
+        `  ${i + 1}. id: "${item.id}"\n     question: ${item.question}\n     rationale: ${item.rationale}`
+    )
+    .join('\n');
+
+  return `Review the prediction market draft below. Produce a single JSON object (no prose before or after) with exactly these fields:
+
+{
+  "reviewProse": "A paragraph-length critique of the draft in plain text. Flag ambiguities, missing edge cases, resolution risk, and concrete edits. This is shown to the human user verbatim.",
+  "rubricVotes": [
+    {
+      "ruleId": "<one of the rubric ids below>",
+      "verdict": "yes" | "no" | "unsure",
+      "rationale": "One or two sentences. If verdict is 'no' or 'unsure', be specific about what is wrong or what is missing."
+    }
+  ],
+  "criticisms": [
+    {
+      "claimId": "<a claim id from the draft, or 'global' if this critique applies to the whole draft>",
+      "severity": "blocker" | "major" | "minor" | "nit",
+      "category": "mece" | "objectivity" | "source" | "timing" | "ambiguity" | "manipulation" | "atomicity" | "other",
+      "rationale": "One or two sentences stating the problem and the suggested fix."
+    }
+  ]
+}
+
+RUBRIC (vote on every item, in this order):
+${rubricBlock}
+
+RULES:
+  - Output ONLY the JSON object. No markdown fences, no prose before or after.
+  - rubricVotes MUST contain exactly one entry per rubric id, in the order given.
+  - criticisms is a list — it MAY be empty if the draft is genuinely flawless, but usually will not be.
+  - Be honest about "unsure": if you cannot tell from the draft alone, vote unsure with a rationale explaining what evidence you would need.
+
+DRAFT TO REVIEW:
+${draftContent}`;
+}
+
+// Strict retry for the structured reviewer. Used when the first pass
+// returned invalid JSON. Identical content but leans harder on the
+// "JSON only" constraint.
+export function buildStrictStructuredReviewRetryPrompt(draftContent, rubric) {
+  return `Your previous response was not valid JSON. Try again.
+
+Output ONLY a JSON object. No prose. No markdown fences. No commentary. Nothing before or after the object. The first character of your response must be "{" and the last character must be "}".
+
+${buildStructuredReviewPrompt(draftContent, rubric)}`;
+}
+
+// Judge aggregator prompt — only used when the user selects the 'judge'
+// aggregation protocol. Called ONCE after all reviewers have voted. Takes
+// the rubric and the per-item vote tallies and renders a single pass /
+// fail / escalate verdict with a rationale.
+//
+// Rationale is required because the judge result is otherwise opaque — a
+// plain pass/fail verdict from a single extra LLM call would replace one
+// single-point-of-failure (the chairman) with another.
+export function buildJudgeAggregatorPrompt(rubric, checklist) {
+  const rubricById = Object.fromEntries(rubric.map((r) => [r.id, r]));
+  const itemsBlock = checklist
+    .map((item) => {
+      const rub = rubricById[item.id];
+      const question = rub ? rub.question : '(unknown rubric item)';
+      const votesBlock = item.votes
+        .map(
+          (v) =>
+            `    - ${v.reviewerModel}: ${v.verdict}${
+              v.rationale ? ` — ${v.rationale}` : ''
+            }`
+        )
+        .join('\n');
+      return `  id: ${item.id}\n  question: ${question}\n  votes:\n${votesBlock}`;
+    })
+    .join('\n\n');
+
+  return `You are the judge for a rubric-based review of a prediction market draft. Below is each rubric item with the votes cast by independent reviewers.
+
+REVIEWS:
+${itemsBlock}
+
+Produce a single JSON object with exactly these fields:
+
+{
+  "perItemDecisions": [
+    {
+      "id": "<rubric id>",
+      "decision": "pass" | "fail" | "escalate"
+    }
+  ],
+  "overall": "pass" | "fail" | "needs_escalation",
+  "rationale": "One paragraph explaining your verdict — specifically cite which rubric items drove pass vs fail, and name any disagreements between reviewers that you resolved."
+}
+
+RULES:
+  - Output ONLY the JSON object. No prose before or after. No markdown fences.
+  - perItemDecisions MUST contain one entry per rubric item above, in the same order.
+  - "overall" is "pass" only if every per-item decision is "pass". If any item is "fail", overall is "fail". If any item is "escalate" (and none are "fail"), overall is "needs_escalation".
+  - The rationale must name specific rubric ids — do not give a generic summary.`;
+}
+
+export function buildStrictJudgeAggregatorRetryPrompt(rubric, checklist) {
+  return `Your previous response was not valid JSON. Try again.
+
+Output ONLY a JSON object. No prose. No markdown fences. The first character must be "{" and the last character must be "}".
+
+${buildJudgeAggregatorPrompt(rubric, checklist)}`;
+}
+
+// Batched draft-entailment verifier — Phase 3. One LLM call per run
+// instead of one per claim, which keeps verification affordable for
+// drafts with 20+ claims. The verifier is asked to render, for every
+// claim, whether the draft actually entails it. This catches extractor
+// hallucinations (a claim the extractor invented that does not appear
+// in the draft) before those claims reach downstream features.
+//
+// Phase 4 (evidence) will introduce a richer verifier that also checks
+// against retrieved sources. Phase 3 deliberately only checks against
+// the draft text itself so we can run it without any external calls.
+export function buildBatchEntailmentPrompt(claims, draftContent) {
+  const claimsBlock = claims
+    .map(
+      (c, i) =>
+        `  ${i + 1}. id: ${c.id}\n     category: ${c.category}\n     text: ${c.text}`
+    )
+    .join('\n');
+
+  return `For each atomic claim below, decide whether the draft entails it, contradicts it, fails to cover it, or is not applicable.
+
+Definitions (use these exact strings):
+  - "entailed":       the claim's content is clearly present in the draft, either stated explicitly or as an unambiguous paraphrase.
+  - "contradicted":   the draft contains content that is inconsistent with the claim (e.g., a different end date, an opposing resolution rule).
+  - "not_covered":    the draft does not mention the claim's content at all. This usually indicates an extraction error.
+  - "not_applicable": entailment is not a meaningful check for this claim (e.g., the claim is a bare URL, or the claim repeats the question id rather than content).
+
+DRAFT:
+${draftContent}
+
+CLAIMS:
+${claimsBlock}
+
+Output a strict JSON array with exactly one object per claim, IN THE SAME ORDER. Each object has exactly these fields:
+[
+  {
+    "id": "<claim id>",
+    "entailment": "entailed" | "contradicted" | "not_covered" | "not_applicable",
+    "rationale": "one short sentence explaining your decision"
+  }
+]
+
+RULES:
+  - Output ONLY the JSON array. No prose before or after. No markdown fences.
+  - Be strict: "entailed" requires the content to actually be in the draft. "It sounds reasonable" is not entailment.
+  - If you mark a claim "contradicted", the rationale must quote the specific conflicting passage from the draft.
+  - The first character of your response must be "[" and the last must be "]".`;
+}
+
+export function buildStrictBatchEntailmentRetryPrompt(claims, draftContent) {
+  return `Your previous response was not valid JSON. Try again.
+
+Output ONLY a JSON array. No prose. No markdown fences. The first character must be "[" and the last character must be "]".
+
+${buildBatchEntailmentPrompt(claims, draftContent)}`;
 }
 
 // NOTE: this builder takes the *raw updated draft* (not a finalized JSON

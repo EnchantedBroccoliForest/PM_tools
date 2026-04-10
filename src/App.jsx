@@ -7,15 +7,18 @@ import LLMLoadingState from './components/LLMLoadingState';
 import {
   SYSTEM_PROMPTS,
   buildDraftPrompt,
-  buildReviewPrompt,
   buildDeliberationPrompt,
   buildUpdatePrompt,
   buildFinalizePrompt,
   buildEarlyResolutionPrompt,
   buildIdeatePrompt,
 } from './constants/prompts';
-import { queryModel, queryModelsParallel } from './api/openrouter';
+import { queryModel } from './api/openrouter';
 import { extractClaims } from './pipeline/extractClaims';
+import { runStructuredReviewsParallel } from './pipeline/structuredReview';
+import { aggregate } from './pipeline/aggregate';
+import { verifyClaims } from './pipeline/verify';
+import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
 import { parseRun } from './types/run';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
@@ -109,6 +112,7 @@ function App() {
     references,
     selectedModel,
     reviewModels,
+    aggregationProtocol,
     humanReviewInput,
     pastedDraft,
     ideatingInput,
@@ -204,6 +208,11 @@ function App() {
 
   // Kick off claim extraction in the background for a draft and fold the
   // result (and any log entries) into the current run. Never throws.
+  //
+  // Phase 3: chains into verification automatically. Verification needs
+  // both the freshly extracted claims and the draft text, so piggybacking
+  // on extraction keeps the two in sync — every time claims change,
+  // verifications are refreshed against the same draft snapshot.
   const runClaimExtractorAndRecord = async (draftText) => {
     const result = await extractClaims(selectedModel, draftText);
     dispatch({
@@ -221,6 +230,26 @@ function App() {
         level: result.logEntry.level,
         message: result.logEntry.message,
       });
+    }
+
+    // Chain into verification. If extraction returned no claims (either
+    // because the draft is empty or because the extractor failed twice)
+    // the verifier logs a skip and returns immediately.
+    if (result.claims.length > 0) {
+      const vResult = await verifyClaims(result.claims, draftText, selectedModel);
+      recordCost('verify', vResult);
+      dispatch({
+        type: 'RUN_SET_VERIFICATION',
+        verification: vResult.verifications,
+      });
+      if (vResult.logEntry) {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'verify',
+          level: vResult.logEntry.level,
+          message: vResult.logEntry.message,
+        });
+      }
     }
   };
 
@@ -254,12 +283,23 @@ function App() {
     }
   };
 
-  // --- Stage 2: Multi-reviewer deliberation (inspired by llm-council Structure D) ---
+  // --- Stage 2: Structured multi-reviewer review + aggregation (Phase 2) ---
   //
-  // Phase 1: All selected review models review independently in parallel. The
-  //          successful reviews are projected into Criticism objects on the
-  //          Run artifact with synthetic ids; Phase 2 will replace this with
-  //          structured per-claim voting.
+  // Each selected review model runs the structured review prompt in parallel.
+  // Each reviewer produces, in one JSON response:
+  //   - reviewProse:  the paragraph-length critique shown in the existing
+  //                   Panel 2 UI (so human-facing behaviour is unchanged)
+  //   - rubricVotes:  one verdict per rubric item, feeding the aggregator
+  //   - criticisms:   real Criticism records, replacing Phase 1's synthetic
+  //                   global-criticism projection
+  //
+  // After all reviewers return, we roll their votes up via the currently
+  // selected aggregation protocol (majority / unanimity / judge). The judge
+  // protocol is the only one that makes an extra LLM call; the others are
+  // pure-client. A deliberation pass is still run when we have multiple
+  // successful reviews so the existing "deliberated review" UI keeps
+  // working — the chairman is no longer the aggregator of record, only a
+  // human-readable synthesis.
   const handleReview = async () => {
     if (!draftContent) return;
     dispatch({ type: 'START_LOADING', phase: 'review', models: reviewModels.map((id) => getModelName(id)) });
@@ -270,36 +310,50 @@ function App() {
         name: getModelName(id),
       }));
 
-      // Phase 1: Independent parallel reviews
-      const messages = [
-        { role: 'system', content: SYSTEM_PROMPTS.reviewer },
-        { role: 'user', content: buildReviewPrompt(draftContent) },
-      ];
-      const independentReviews = await queryModelsParallel(reviewerModels, messages);
+      // Structured reviews in parallel. Individual failures are surfaced
+      // inside each result (logEntry + null prose) rather than rejecting.
+      const structuredResults = await runStructuredReviewsParallel(
+        reviewerModels,
+        draftContent,
+        RIGOR_RUBRIC
+      );
 
-      // Accumulate per-reviewer cost into the run artifact.
-      for (const r of independentReviews) {
-        if (r.content !== null && r.usage) {
-          recordCost('review', { usage: r.usage, wallClockMs: r.wallClockMs });
+      // Per-reviewer cost + log accounting.
+      for (const r of structuredResults) {
+        if (r.usage) {
+          recordCost('review', { usage: r.usage, wallClockMs: r.wallClockMs || 0 });
+        }
+        if (r.logEntry) {
+          dispatch({
+            type: 'RUN_LOG',
+            stage: 'review',
+            level: r.logEntry.level,
+            message: r.logEntry.message,
+          });
         }
       }
 
-      const successfulReviews = independentReviews.filter((r) => r.content !== null);
-
-      if (successfulReviews.length === 0) {
+      const successful = structuredResults.filter((r) => r.reviewProse !== null);
+      if (successful.length === 0) {
         throw new Error('All reviewers failed. Please try again.');
       }
 
-      // Phase 2: Deliberation — if we have multiple successful reviews,
-      // use the first reviewer as "chairman" to synthesize a consolidated critique.
-      // This chairman pattern is the brief's canonical single-point-of-failure
-      // aggregator and will be replaced by a pluggable decision protocol in
-      // Phase 2. For now we keep it so existing UI behaviour is preserved.
-      let deliberatedReview = null;
+      // Shape successful structured reviews into the legacy `reviews[]`
+      // record the Panel 2 UI reads. This is the compatibility shim that
+      // lets Phase 2 ship without touching the review rendering code.
+      const legacyReviews = successful.map((r) => ({
+        model: r.model,
+        modelName: r.modelName,
+        content: r.reviewProse,
+      }));
 
-      if (successfulReviews.length > 1) {
-        const deliberationPrompt = buildDeliberationPrompt(draftContent, successfulReviews);
-        const delibResult = await queryModel(successfulReviews[0].model, [
+      // Human-readable deliberation — no longer the canonical aggregator,
+      // but still useful to the user as a consolidated read. Only runs
+      // when we have 2+ reviewers.
+      let deliberatedReview = null;
+      if (legacyReviews.length > 1) {
+        const deliberationPrompt = buildDeliberationPrompt(draftContent, legacyReviews);
+        const delibResult = await queryModel(legacyReviews[0].model, [
           { role: 'system', content: SYSTEM_PROMPTS.reviewer },
           { role: 'user', content: deliberationPrompt },
         ]);
@@ -309,36 +363,44 @@ function App() {
 
       dispatch({
         type: 'REVIEW_SUCCESS',
-        reviews: successfulReviews,
+        reviews: legacyReviews,
         deliberatedReview,
       });
 
-      // Run artifact: append a Criticism per successful reviewer. This is a
-      // deliberately thin projection — Phase 2 will replace this with real
-      // structured per-claim voting rooted in the Answer Contract.
-      const now = Date.now();
-      const criticisms = successfulReviews.map((r, i) => ({
-        id: `criticism.${now}.${i}`,
-        reviewerModel: r.model,
-        claimId: 'global',
-        severity: 'minor',
-        category: 'other',
-        rationale: (r.content || '').slice(0, 1000),
-      }));
-      dispatch({ type: 'RUN_APPEND_CRITICISMS', criticisms });
+      // Real Criticism records from every successful reviewer go into the
+      // Run artifact. Phase 1's synthetic projection is gone.
+      const allCriticisms = successful.flatMap((r) => r.criticisms);
+      if (allCriticisms.length > 0) {
+        dispatch({ type: 'RUN_APPEND_CRITICISMS', criticisms: allCriticisms });
+      }
 
-      // Trivial Phase-1 Aggregation: records that the aggregation stage ran
-      // and nothing was escalated. Phase 2 replaces this with checklist-level
-      // majority / unanimity / judge protocols.
-      dispatch({
-        type: 'RUN_SET_AGGREGATION',
-        aggregation: {
-          protocol: 'majority',
-          checklist: [],
-          judgeRationale: null,
-          overall: 'pass',
-        },
-      });
+      // Collect every rubric vote from every reviewer, then run the
+      // selected aggregation protocol.
+      const allVotes = successful.flatMap((r) => r.rubricVotes);
+      const judgeModelId = legacyReviews[0]?.model;
+      const aggResult = await aggregate(
+        aggregationProtocol,
+        RIGOR_RUBRIC,
+        allVotes,
+        judgeModelId
+      );
+
+      if (aggResult.usage && aggResult.usage.totalTokens > 0) {
+        recordCost('aggregation', {
+          usage: aggResult.usage,
+          wallClockMs: aggResult.wallClockMs || 0,
+        });
+      }
+      if (aggResult.logEntry) {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'aggregation',
+          level: aggResult.logEntry.level,
+          message: aggResult.logEntry.message,
+        });
+      }
+
+      dispatch({ type: 'RUN_SET_AGGREGATION', aggregation: aggResult.aggregation });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate review' });
       dispatch({ type: 'RUN_LOG', stage: 'review', level: 'error', message: err.message || 'Review failed' });
@@ -919,6 +981,42 @@ function App() {
 
                     <div className="toolbar-divider" />
 
+                    {/* Phase 2: Aggregation protocol selector. Governs how
+                        per-item rubric votes are rolled up into the final
+                        aggregation decision. */}
+                    <div className="toolbar-group">
+                      <label htmlFor="aggregation-protocol">Aggregation</label>
+                      <select
+                        id="aggregation-protocol"
+                        className="toolbar-select"
+                        value={aggregationProtocol}
+                        disabled={anyLoading}
+                        onChange={(e) =>
+                          dispatch({
+                            type: 'SET_FIELD',
+                            field: 'aggregationProtocol',
+                            value: e.target.value,
+                          })
+                        }
+                      >
+                        {AGGREGATION_PROTOCOLS.map((p) => (
+                          <option key={p} value={p}>
+                            {p.charAt(0).toUpperCase() + p.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="toolbar-hint">
+                        {aggregationProtocol === 'majority' &&
+                          'Plurality vote per rubric item; ties escalate.'}
+                        {aggregationProtocol === 'unanimity' &&
+                          'Every reviewer must agree; a single "no" fails the item.'}
+                        {aggregationProtocol === 'judge' &&
+                          'A judge model reads all votes and renders the verdict.'}
+                      </span>
+                    </div>
+
+                    <div className="toolbar-divider" />
+
                     <div className="toolbar-actions">
                       <div className="toolbar-group toolbar-group--primary">
                         <button
@@ -1396,6 +1494,160 @@ function App() {
                       </ul>
                     )}
                   </div>
+
+                  {/* Phase 2: aggregation checklist — only present once
+                      handleReview has run. Shows the rubric decisions plus
+                      every reviewer's vote under each item. */}
+                  {currentRun.aggregation && (
+                    <div className="run-trace__section">
+                      <h4 className="run-trace__heading">
+                        Aggregation ({currentRun.aggregation.protocol}) —{' '}
+                        <span className={`run-trace__verdict run-trace__verdict--${currentRun.aggregation.overall}`}>
+                          {currentRun.aggregation.overall}
+                        </span>
+                      </h4>
+                      {currentRun.aggregation.judgeRationale && (
+                        <p className="run-trace__judge-rationale">
+                          Judge: {currentRun.aggregation.judgeRationale}
+                        </p>
+                      )}
+                      {currentRun.aggregation.checklist.length === 0 ? (
+                        <p className="run-trace__empty">
+                          No checklist items recorded.
+                        </p>
+                      ) : (
+                        <ul className="run-trace__list">
+                          {currentRun.aggregation.checklist.map((item) => {
+                            const rub = RUBRIC_BY_ID[item.id];
+                            return (
+                              <li key={item.id} className="run-trace__checklist-item">
+                                <div className="run-trace__checklist-header">
+                                  <span className={`run-trace__verdict run-trace__verdict--${item.decision}`}>
+                                    {item.decision}
+                                  </span>
+                                  <code className="run-trace__claim-id">{item.id}</code>
+                                  <span className="run-trace__checklist-question">
+                                    {rub ? rub.question : item.question}
+                                  </span>
+                                </div>
+                                {item.votes.length > 0 && (
+                                  <ul className="run-trace__vote-list">
+                                    {item.votes.map((v, i) => (
+                                      <li key={i} className="run-trace__vote">
+                                        <span className={`run-trace__badge run-trace__verdict--${v.verdict === 'yes' ? 'pass' : v.verdict === 'no' ? 'fail' : 'escalate'}`}>
+                                          {v.verdict}
+                                        </span>
+                                        <span className="run-trace__ts">
+                                          {getModelName(v.reviewerModel)}
+                                        </span>
+                                        {v.rationale && (
+                                          <span className="run-trace__vote-rationale">
+                                            — {v.rationale}
+                                          </span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Phase 2: real criticisms (replaced Phase 1's synthetic
+                      global-criticism projection). Shown here so reviewers
+                      can compare per-claim issues across models. */}
+                  {currentRun.criticisms.length > 0 && (
+                    <div className="run-trace__section">
+                      <h4 className="run-trace__heading">
+                        Criticisms ({currentRun.criticisms.length})
+                      </h4>
+                      <ul className="run-trace__list">
+                        {currentRun.criticisms.map((c) => (
+                          <li key={c.id} className="run-trace__criticism">
+                            <div className="run-trace__criticism-header">
+                              <span className={`run-trace__badge run-trace__severity--${c.severity}`}>
+                                {c.severity}
+                              </span>
+                              <span className="run-trace__badge">{c.category}</span>
+                              <code className="run-trace__claim-id">{c.claimId}</code>
+                              <span className="run-trace__ts">
+                                {getModelName(c.reviewerModel)}
+                              </span>
+                            </div>
+                            <div className="run-trace__criticism-text">{c.rationale}</div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Phase 3: claim verification. Structural + draft
+                      entailment checks. Each line shows the per-claim
+                      verdict plus a compact rationale pulled from either
+                      the structural tool output or the entailment response. */}
+                  {currentRun.verification.length > 0 && (
+                    <div className="run-trace__section">
+                      <h4 className="run-trace__heading">
+                        Verification ({currentRun.verification.length})
+                        {(() => {
+                          const counts = currentRun.verification.reduce(
+                            (acc, v) => {
+                              acc[v.verdict] = (acc[v.verdict] || 0) + 1;
+                              return acc;
+                            },
+                            {}
+                          );
+                          const parts = [];
+                          if (counts.pass) parts.push(`${counts.pass} pass`);
+                          if (counts.soft_fail) parts.push(`${counts.soft_fail} soft`);
+                          if (counts.hard_fail) parts.push(`${counts.hard_fail} hard`);
+                          return parts.length > 0 ? (
+                            <span className="run-trace__summary">
+                              {' — '}
+                              {parts.join(', ')}
+                            </span>
+                          ) : null;
+                        })()}
+                      </h4>
+                      <ul className="run-trace__list">
+                        {currentRun.verification.map((v) => {
+                          // Choose verdict class: reuse aggregation colors
+                          // (pass→pass, soft_fail→escalate, hard_fail→fail).
+                          const verdictClass =
+                            v.verdict === 'pass'
+                              ? 'pass'
+                              : v.verdict === 'hard_fail'
+                                ? 'fail'
+                                : 'escalate';
+                          return (
+                            <li key={v.claimId} className="run-trace__verification">
+                              <div className="run-trace__verification-header">
+                                <span className={`run-trace__badge run-trace__verdict--${verdictClass}`}>
+                                  {v.verdict}
+                                </span>
+                                <span className="run-trace__badge">{v.entailment}</span>
+                                <code className="run-trace__claim-id">{v.claimId}</code>
+                                {v.citationResolves === false && (
+                                  <span className="run-trace__badge run-trace__verdict--fail">
+                                    url missing
+                                  </span>
+                                )}
+                              </div>
+                              {v.toolOutput && (
+                                <div className="run-trace__verification-detail">
+                                  {v.toolOutput}
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
 
                   <div className="run-trace__section">
                     <h4 className="run-trace__heading">Cost</h4>
