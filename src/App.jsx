@@ -9,6 +9,7 @@ import {
   buildDraftPrompt,
   buildDeliberationPrompt,
   buildUpdatePrompt,
+  buildRoutingFocusBlock,
   buildFinalizePrompt,
   buildEarlyResolutionPrompt,
   buildIdeatePrompt,
@@ -18,6 +19,8 @@ import { extractClaims } from './pipeline/extractClaims';
 import { runStructuredReviewsParallel } from './pipeline/structuredReview';
 import { aggregate } from './pipeline/aggregate';
 import { verifyClaims } from './pipeline/verify';
+import { gatherEvidence } from './pipeline/gatherEvidence';
+import { routeClaims, groupRoutingBySeverity } from './pipeline/route';
 import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
 import { parseRun } from './types/run';
 import { useMarketReducer } from './hooks/useMarketReducer';
@@ -103,6 +106,11 @@ function App() {
   useModels();
   const panel2Ref = useRef(null);
   const panel3Ref = useRef(null);
+  // Phase 5: a mirror of `currentRun` kept in a ref so async handlers that
+  // fire successive dispatches (claim extract → verify → evidence → route)
+  // can read the latest criticism/claim set synchronously without waiting
+  // for React to re-render. Updated via useEffect below.
+  const currentRunRef = useRef(null);
 
   const {
     mode,
@@ -130,6 +138,7 @@ function App() {
     earlyResolutionRisk,
     earlyResolutionRiskLevel,
     earlyResolutionAcknowledged,
+    routingAcknowledged,
     currentRun,
     runTraceOpen,
     copiedId,
@@ -140,6 +149,14 @@ function App() {
   // yet acknowledged it. Low / Medium / Unknown do not block.
   const needsRiskAck =
     earlyResolutionRiskLevel === 'high' && !earlyResolutionAcknowledged;
+
+  // Phase 5: the routing gate is independent of the early-resolution gate.
+  // Any claim flagged 'blocking' (or a global blocker criticism, which
+  // the router encodes as overall === 'blocked') prevents Accept until
+  // the user explicitly acknowledges. A `needs_update` overall does NOT
+  // block — it's surfaced as a warning in the Run trace panel only.
+  const routingOverall = currentRun?.routing?.overall || 'clean';
+  const needsRoutingAck = routingOverall === 'blocked' && !routingAcknowledged;
 
   const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
   const anyLoading = loading !== null;
@@ -153,6 +170,12 @@ function App() {
       panel3Ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [currentStep]);
+
+  // Keep the ref mirror of `currentRun` up to date so async pipelines can
+  // read the latest criticism/claim set without closing over stale state.
+  useEffect(() => {
+    currentRunRef.current = currentRun;
+  }, [currentRun]);
 
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -250,6 +273,69 @@ function App() {
           message: vResult.logEntry.message,
         });
       }
+
+      // Phase 4: evidence gathering. Harvest URLs from the references
+      // block and source claims, resolve them in parallel via no-cors
+      // fetch, and fold the resolve results back into the verification
+      // list. This can only downgrade a source-claim verdict from pass
+      // to soft_fail when all URLs fail; it never upgrades an existing
+      // hard_fail. The evidence record itself (ids, claim linkage, URLs)
+      // is written to currentRun.evidence unconditionally so the Run
+      // trace panel can show the harvested citations.
+      const eResult = await gatherEvidence({
+        references,
+        claims: result.claims,
+        verifications: vResult.verifications,
+      });
+      dispatch({
+        type: 'RUN_COST',
+        stage: 'evidence',
+        tokensIn: 0,
+        tokensOut: 0,
+        wallClockMs: eResult.wallClockMs,
+      });
+      dispatch({ type: 'RUN_SET_EVIDENCE', evidence: eResult.evidence });
+      // Re-dispatch verifications with the citation-resolve overrides
+      // applied. We always overwrite here, even if nothing changed, so
+      // that exporting immediately after gatherEvidence returns reflects
+      // the latest state without a race against a stale setState.
+      dispatch({
+        type: 'RUN_SET_VERIFICATION',
+        verification: eResult.updatedVerifications,
+      });
+      if (eResult.logEntry) {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'evidence',
+          level: eResult.logEntry.level,
+          message: eResult.logEntry.message,
+        });
+      }
+
+      // Phase 5: uncertainty-based routing. Pure sync computation over
+      // the claim set, the post-evidence verification list, and whatever
+      // criticisms the review pass has already accumulated (read from
+      // currentRunRef so we pick up criticisms dispatched earlier in
+      // this same handler without waiting for a re-render). Produces a
+      // per-claim severity + a run-level overall the Accept gate reads.
+      const latestCriticisms = currentRunRef.current?.criticisms || [];
+      const routing = routeClaims({
+        claims: result.claims,
+        verifications: eResult.updatedVerifications,
+        criticisms: latestCriticisms,
+        evidence: eResult.evidence,
+      });
+      dispatch({ type: 'RUN_SET_ROUTING', routing });
+      dispatch({
+        type: 'RUN_LOG',
+        stage: 'route',
+        level: routing.overall === 'blocked' ? 'error' : routing.overall === 'needs_update' ? 'warn' : 'info',
+        message:
+          `Routing: overall=${routing.overall}, ` +
+          `${routing.items.filter((i) => i.severity === 'blocking').length} blocking, ` +
+          `${routing.items.filter((i) => i.severity === 'targeted_review').length} targeted, ` +
+          `${routing.items.filter((i) => i.severity === 'ok').length} ok.`,
+      });
     }
   };
 
@@ -401,6 +487,26 @@ function App() {
       }
 
       dispatch({ type: 'RUN_SET_AGGREGATION', aggregation: aggResult.aggregation });
+
+      // Phase 5: re-route claims now that criticisms have landed. The
+      // pre-review routing (from runClaimExtractorAndRecord) was computed
+      // off an empty criticism list; recomputing here lets blocker/major
+      // criticisms promote a claim into 'blocking' or 'targeted_review'
+      // so the Accept gate sees them immediately.
+      const latestRun = currentRunRef.current;
+      const latestClaims = latestRun?.claims || [];
+      const latestVerifs = latestRun?.verification || [];
+      const latestEvidence = latestRun?.evidence || [];
+      // The newly-appended criticisms aren't yet on the ref (dispatch is
+      // async w.r.t. re-render), so union them in explicitly.
+      const combinedCriticisms = [...(latestRun?.criticisms || []), ...allCriticisms];
+      const routing = routeClaims({
+        claims: latestClaims,
+        verifications: latestVerifs,
+        criticisms: combinedCriticisms,
+        evidence: latestEvidence,
+      });
+      dispatch({ type: 'RUN_SET_ROUTING', routing });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate review' });
       dispatch({ type: 'RUN_LOG', stage: 'review', level: 'error', message: err.message || 'Review failed' });
@@ -423,9 +529,18 @@ function App() {
     try {
       // Use the deliberated review if available, otherwise fall back to first review
       const reviewText = deliberatedReview || reviews[0].content;
+      // Phase 5: feed the updater a pre-rendered focus block listing
+      // every blocking / targeted_review claim from the current routing,
+      // so the updater knows which specific claims to fix first. Falls
+      // back to an empty string (unchanged behavior) if routing hasn't
+      // run yet or there's nothing flagged.
+      const focusBlock = buildRoutingFocusBlock(
+        currentRunRef.current?.routing || null,
+        currentRunRef.current?.claims || [],
+      );
       const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildUpdatePrompt(draftContent, reviewText, humanReviewInput) },
+        { role: 'user', content: buildUpdatePrompt(draftContent, reviewText, humanReviewInput, focusBlock) },
       ]);
       updatedDraft = result.content;
       dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });
@@ -478,6 +593,7 @@ function App() {
   const handleAccept = async () => {
     if (!draftContent) return;
     if (needsRiskAck) return; // belt-and-braces; button should already be disabled
+    if (needsRoutingAck) return; // Phase 5: block on un-acknowledged blocking claims
     dispatch({ type: 'START_LOADING', phase: 'accept', models: [getModelName(selectedModel)] });
 
     try {
@@ -1067,9 +1183,15 @@ function App() {
                           <button
                             type="button"
                             className="accept-button"
-                            disabled={anyLoading || needsRiskAck}
+                            disabled={anyLoading || needsRiskAck || needsRoutingAck}
                             onClick={handleAccept}
-                            title={needsRiskAck ? 'Acknowledge the HIGH early-resolution risk below before finalizing.' : undefined}
+                            title={
+                              needsRiskAck
+                                ? 'Acknowledge the HIGH early-resolution risk below before finalizing.'
+                                : needsRoutingAck
+                                  ? 'Resolve or acknowledge the blocking claims flagged by the rigor pipeline before finalizing.'
+                                  : undefined
+                            }
                           >
                             {loading === 'accept' ? (
                               <>
@@ -1127,6 +1249,75 @@ function App() {
                             onClick={() => dispatch({ type: 'ACKNOWLEDGE_EARLY_RESOLUTION' })}
                           >
                             Acknowledge HIGH risk & unlock Finalize
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Phase 5: routing gate — runs pre-finalize. Any
+                      'blocking' routing item (or a global blocker
+                      criticism) prevents Accept until acknowledged. */}
+                  {hasUpdated && currentRun?.routing && currentRun.routing.overall !== 'clean' && (
+                    <div
+                      className={`risk-gate risk-gate--${currentRun.routing.overall === 'blocked' ? 'high' : 'medium'} fade-in`}
+                      role={currentRun.routing.overall === 'blocked' ? 'alert' : 'status'}
+                    >
+                      <div className="risk-gate__header">
+                        <span className="risk-gate__label">Rigor Routing</span>
+                        <span className={`risk-gate__level risk-gate__level--${currentRun.routing.overall === 'blocked' ? 'high' : 'medium'}`}>
+                          {currentRun.routing.overall === 'blocked' ? 'BLOCKED' : 'NEEDS UPDATE'}
+                        </span>
+                      </div>
+                      <div className="risk-gate__body">
+                        {(() => {
+                          const grouped = groupRoutingBySeverity(currentRun.routing);
+                          const claimsById = new Map(currentRun.claims.map((c) => [c.id, c]));
+                          const render = (items) =>
+                            items.slice(0, 8).map((item) => {
+                              const claim = claimsById.get(item.claimId);
+                              return (
+                                <li key={item.claimId}>
+                                  <code>{item.claimId}</code>
+                                  {claim ? ` — ${claim.text}` : ''}
+                                  {item.reasons.length > 0 && (
+                                    <span className="risk-gate__reasons">
+                                      {' '}({item.reasons.join('; ')})
+                                    </span>
+                                  )}
+                                </li>
+                              );
+                            });
+                          return (
+                            <>
+                              {grouped.blocking.length > 0 && (
+                                <>
+                                  <p className="risk-gate__subheading">Blocking ({grouped.blocking.length}):</p>
+                                  <ul className="risk-gate__list">{render(grouped.blocking)}</ul>
+                                </>
+                              )}
+                              {grouped.targeted_review.length > 0 && (
+                                <>
+                                  <p className="risk-gate__subheading">Needs targeted review ({grouped.targeted_review.length}):</p>
+                                  <ul className="risk-gate__list">{render(grouped.targeted_review)}</ul>
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                      {needsRoutingAck && (
+                        <div className="risk-gate__actions">
+                          <p className="risk-gate__warning">
+                            The rigor pipeline flagged blocking claims above. Re-run Review → Update to
+                            address them, or acknowledge to finalize anyway.
+                          </p>
+                          <button
+                            type="button"
+                            className="risk-gate__ack-btn"
+                            onClick={() => dispatch({ type: 'ACKNOWLEDGE_ROUTING' })}
+                          >
+                            Acknowledge blocking claims & unlock Finalize
                           </button>
                         </div>
                       )}
@@ -1642,6 +1833,124 @@ function App() {
                                   {v.toolOutput}
                                 </div>
                               )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Phase 5: uncertainty-based routing. Shows the
+                      overall decision (clean / needs_update / blocked)
+                      plus a count per severity bucket. Individual claims
+                      are listed under their bucket so the user can see
+                      exactly which items the updater is being asked to
+                      fix next. */}
+                  {currentRun.routing && currentRun.routing.items.length > 0 && (
+                    <div className="run-trace__section">
+                      <h4 className="run-trace__heading">
+                        Routing
+                        <span className={`run-trace__badge run-trace__routing--${currentRun.routing.overall}`}>
+                          {currentRun.routing.overall}
+                        </span>
+                        <span className="run-trace__summary">
+                          {' — '}
+                          {currentRun.routing.items.filter((i) => i.severity === 'blocking').length} blocking,{' '}
+                          {currentRun.routing.items.filter((i) => i.severity === 'targeted_review').length} targeted,{' '}
+                          {currentRun.routing.items.filter((i) => i.severity === 'ok').length} ok
+                        </span>
+                      </h4>
+                      <ul className="run-trace__list">
+                        {currentRun.routing.items
+                          .slice()
+                          .sort((a, b) => b.uncertainty - a.uncertainty)
+                          .map((item) => (
+                            <li key={item.claimId} className="run-trace__routing">
+                              <div className="run-trace__routing-header">
+                                <span className={`run-trace__badge run-trace__routing--${item.severity}`}>
+                                  {item.severity}
+                                </span>
+                                <span className="run-trace__badge">
+                                  u={item.uncertainty.toFixed(2)}
+                                </span>
+                                <code className="run-trace__claim-id">{item.claimId}</code>
+                              </div>
+                              {item.reasons.length > 0 && (
+                                <div className="run-trace__routing-reasons">
+                                  {item.reasons.join('; ')}
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Phase 4: harvested evidence with per-URL resolve
+                      status. The resolve flag mirrors the underlying
+                      source claim's Verification.citationResolves (when
+                      linked to a source claim) or defaults to unknown. */}
+                  {currentRun.evidence.length > 0 && (
+                    <div className="run-trace__section">
+                      <h4 className="run-trace__heading">
+                        Evidence ({currentRun.evidence.length})
+                        {(() => {
+                          // Summarise resolve status: look up each evidence's
+                          // owning source-claim verification (if any) and
+                          // count the citationResolves flag. Non-source
+                          // claims have no meaningful resolve signal here.
+                          const verifByClaim = new Map(
+                            currentRun.verification.map((v) => [v.claimId, v])
+                          );
+                          let resolved = 0;
+                          let failed = 0;
+                          for (const e of currentRun.evidence) {
+                            const v = verifByClaim.get(e.claimId);
+                            if (!v) continue;
+                            if (v.citationResolves) resolved += 1;
+                            else failed += 1;
+                          }
+                          if (resolved + failed === 0) return null;
+                          return (
+                            <span className="run-trace__summary">
+                              {' — '}
+                              {resolved} resolved
+                              {failed > 0 ? `, ${failed} failed` : ''}
+                            </span>
+                          );
+                        })()}
+                      </h4>
+                      <ul className="run-trace__list">
+                        {currentRun.evidence.map((e) => {
+                          const verif = currentRun.verification.find(
+                            (v) => v.claimId === e.claimId
+                          );
+                          const resolveState =
+                            verif && verif.citationResolves === false
+                              ? 'failed'
+                              : verif
+                                ? 'resolved'
+                                : 'unchecked';
+                          return (
+                            <li key={e.id} className="run-trace__evidence">
+                              <div className="run-trace__evidence-header">
+                                <span
+                                  className={`run-trace__badge run-trace__evidence--${resolveState}`}
+                                >
+                                  {resolveState}
+                                </span>
+                                <code className="run-trace__claim-id">
+                                  {e.claimId}
+                                </code>
+                              </div>
+                              <a
+                                href={e.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="run-trace__evidence-url"
+                              >
+                                {e.url}
+                              </a>
                             </li>
                           );
                         })}

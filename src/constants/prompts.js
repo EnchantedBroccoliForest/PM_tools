@@ -75,7 +75,16 @@ Provide your consolidated review, noting:
 4. Your final prioritized list of recommended changes`;
 }
 
-export function buildUpdatePrompt(draftContent, reviewContent, humanReviewInput) {
+export function buildUpdatePrompt(draftContent, reviewContent, humanReviewInput, focusBlock) {
+  // Phase 5: `focusBlock` is an optional pre-rendered string produced by
+  // buildRoutingFocusBlock(). When present it lists the specific claims
+  // the routing pipeline flagged as blocking or needing targeted review,
+  // so the updater knows where to direct its attention. Omitting it
+  // preserves the pre-Phase-5 behavior exactly.
+  const focusSection = focusBlock && focusBlock.trim()
+    ? `\n\nROUTING FOCUS (address these FIRST — blocking claims must be fixed before this draft can be finalized):\n${focusBlock}`
+    : '';
+
   return `This is a critical review of the draft. Review and first determine if the critiques make logical sense. Incorporate the suggestions or criticisms from the Reviewer that are correct and generate a new draft.
 
 IMPORTANT: When human reviewer feedback is provided, treat it with higher priority than the AI-generated critical review. Weight human feedback approximately 25% more heavily — if the human's suggestions conflict with or differ from the AI review, lean toward the human's perspective. The human reviewer has domain-specific context and intent that should take precedence.
@@ -87,7 +96,39 @@ CRITICAL REVIEW:
 ${reviewContent}${humanReviewInput.trim() ? `
 
 HUMAN REVIEWER FEEDBACK (HIGH PRIORITY — weight 25% more than AI review):
-${humanReviewInput}` : ''}`;
+${humanReviewInput}` : ''}${focusSection}`;
+}
+
+/**
+ * Render a routing focus block: one bullet per flagged claim with its
+ * severity, the claim text, and the human-readable reasons the router
+ * attached to it. Returns an empty string when there's nothing to focus
+ * on — the caller uses that to omit the whole ROUTING FOCUS section.
+ *
+ * @param {import('../types/run').Routing|null} routing
+ * @param {import('../types/run').Claim[]} claims
+ * @returns {string}
+ */
+export function buildRoutingFocusBlock(routing, claims) {
+  if (!routing || !routing.items || routing.items.length === 0) return '';
+  const claimsById = new Map((claims || []).map((c) => [c.id, c]));
+  const focus = routing.items.filter(
+    (i) => i.severity === 'blocking' || i.severity === 'targeted_review',
+  );
+  if (focus.length === 0) return '';
+  // Sort: blocking before targeted_review, then by descending uncertainty.
+  focus.sort((a, b) => {
+    if (a.severity !== b.severity) return a.severity === 'blocking' ? -1 : 1;
+    return b.uncertainty - a.uncertainty;
+  });
+  return focus
+    .map((item) => {
+      const claim = claimsById.get(item.claimId);
+      const text = claim ? claim.text : '(claim text unavailable)';
+      const reasons = item.reasons.length > 0 ? ` [${item.reasons.join('; ')}]` : '';
+      return `  - ${item.severity.toUpperCase()} ${item.claimId}: ${text}${reasons}`;
+    })
+    .join('\n');
 }
 
 export function buildFinalizePrompt(draftContent, startDate, endDate) {
