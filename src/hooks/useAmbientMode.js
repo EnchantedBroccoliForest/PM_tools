@@ -47,7 +47,7 @@ export function useAmbientMode() {
     const modeKeys = Object.keys(AMBIENT_MODES);
     const idx = modeKeys.indexOf(mode);
     setMode(modeKeys[(idx + 1) % modeKeys.length]);
-  }, [mode]);
+  }, [mode, setMode]);
 
   return { mode, setMode, cycleMode, config: AMBIENT_MODES[mode] };
 }

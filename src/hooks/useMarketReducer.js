@@ -1,16 +1,6 @@
 import { useReducer } from 'react';
 import { DEFAULT_DRAFT_MODEL, DEFAULT_REVIEW_MODEL } from '../constants/models';
 
-function getInitialTheme() {
-  try {
-    const stored = localStorage.getItem('theme');
-    if (stored === 'light' || stored === 'dark') return stored;
-  } catch {
-    // Ignore storage access errors and use default theme.
-  }
-  return 'dark';
-}
-
 const initialState = {
   // Mode
   mode: 'draft', // 'draft' | 'review' | 'ideating'
@@ -43,10 +33,24 @@ const initialState = {
   finalContent: null,
   hasUpdated: false,
 
+  // Early-resolution gate (runs between Update and Finalize).
+  // HIGH risk blocks Accept until the user explicitly acknowledges.
+  earlyResolutionRisk: null,         // raw analyst text
+  earlyResolutionRiskLevel: null,    // 'low' | 'medium' | 'high' | 'unknown' | null
+  earlyResolutionAcknowledged: false,
+
   // UI
   copiedId: null,
-  theme: getInitialTheme(),
 };
+
+function clearEarlyResolution(state) {
+  return {
+    ...state,
+    earlyResolutionRisk: null,
+    earlyResolutionRiskLevel: null,
+    earlyResolutionAcknowledged: false,
+  };
+}
 
 function reducer(state, action) {
   switch (action.type) {
@@ -97,7 +101,7 @@ function reducer(state, action) {
       return { ...state, loading: null, loadingMeta: null, error: action.error };
 
     case 'SUBMIT_PASTED_DRAFT':
-      return {
+      return clearEarlyResolution({
         ...state,
         draftContent: action.content,
         reviews: [],
@@ -105,10 +109,10 @@ function reducer(state, action) {
         humanReviewInput: '',
         finalContent: null,
         hasUpdated: false,
-      };
+      });
 
     case 'DRAFT_SUCCESS':
-      return {
+      return clearEarlyResolution({
         ...state,
         loading: null,
         loadingMeta: null,
@@ -118,7 +122,7 @@ function reducer(state, action) {
         humanReviewInput: '',
         finalContent: null,
         hasUpdated: false,
-      };
+      });
 
     case 'REVIEW_SUCCESS':
       return {
@@ -130,13 +134,15 @@ function reducer(state, action) {
       };
 
     case 'UPDATE_SUCCESS':
-      return {
+      // Clear stale risk from any previous update; handleUpdate immediately
+      // chains into START_EARLY_RESOLUTION to recompute against the new draft.
+      return clearEarlyResolution({
         ...state,
         loading: null,
         loadingMeta: null,
         draftContent: action.content,
         hasUpdated: true,
-      };
+      });
 
     case 'FINALIZE_SUCCESS':
       return { ...state, loading: null, loadingMeta: null, finalContent: action.content };
@@ -149,6 +155,9 @@ function reducer(state, action) {
         ...state,
         loading: 'early-resolution',
         loadingMeta: { models: action.models || [], startTime: Date.now() },
+        earlyResolutionRisk: null,
+        earlyResolutionRiskLevel: null,
+        earlyResolutionAcknowledged: false,
       };
 
     case 'EARLY_RESOLUTION_SUCCESS':
@@ -156,32 +165,31 @@ function reducer(state, action) {
         ...state,
         loading: null,
         loadingMeta: null,
-        finalContent: { ...state.finalContent, earlyResolutionRisk: action.content },
+        earlyResolutionRisk: action.content,
+        earlyResolutionRiskLevel: action.level,
+        earlyResolutionAcknowledged: false,
       };
 
     case 'EARLY_RESOLUTION_ERROR':
+      // Treat analysis failure as 'unknown' so the gate does NOT block finalize
+      // (we only block on confirmed HIGH risk); surface the error in the UI.
       return {
         ...state,
         loading: null,
         loadingMeta: null,
-        finalContent: { ...state.finalContent, earlyResolutionRisk: `Error: ${action.error}` },
+        earlyResolutionRisk: `Early resolution analysis failed: ${action.error}`,
+        earlyResolutionRiskLevel: 'unknown',
+        earlyResolutionAcknowledged: false,
       };
 
+    case 'ACKNOWLEDGE_EARLY_RESOLUTION':
+      return { ...state, earlyResolutionAcknowledged: true };
+
     case 'RESET':
-      return { ...initialState, theme: state.theme };
+      return initialState;
 
     case 'SET_COPIED':
       return { ...state, copiedId: action.id };
-
-    case 'TOGGLE_THEME': {
-      const next = state.theme === 'dark' ? 'light' : 'dark';
-      try {
-        localStorage.setItem('theme', next);
-      } catch {
-        // Ignore storage write errors; theme still updates in-memory.
-      }
-      return { ...state, theme: next };
-    }
 
     default:
       return state;

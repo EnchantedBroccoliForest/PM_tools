@@ -79,6 +79,16 @@ function formatInline(text) {
   });
 }
 
+// Parse the risk level out of the early-resolution analyst response. The
+// prompt instructs the model to begin with "Risk rating: Low/Medium/High" —
+// anything else falls back to 'unknown', which does NOT block the gate (only
+// confirmed HIGH blocks).
+function parseRiskLevel(text) {
+  if (typeof text !== 'string' || text.length === 0) return 'unknown';
+  const match = text.match(/risk\s*rating\s*[:-]?\s*(low|medium|high)/i);
+  return match ? match[1].toLowerCase() : 'unknown';
+}
+
 function App() {
   const [state, dispatch] = useMarketReducer();
   const { mode: ambientMode, setMode: setAmbientMode, config: ambientConfig } = useAmbientMode();
@@ -111,8 +121,17 @@ function App() {
     deliberatedReview,
     finalContent,
     hasUpdated,
+    earlyResolutionRisk,
+    earlyResolutionRiskLevel,
+    earlyResolutionAcknowledged,
     copiedId,
   } = state;
+
+  // Phase 0 gate: Accept & Finalize is blocked when the early-resolution
+  // analyst has flagged the updated draft as HIGH risk and the user has not
+  // yet acknowledged it. Low / Medium / Unknown do not block.
+  const needsRiskAck =
+    earlyResolutionRiskLevel === 'high' && !earlyResolutionAcknowledged;
 
   const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
   const anyLoading = loading !== null;
@@ -230,27 +249,58 @@ function App() {
     }
   };
 
-  // --- Stage 3: Update draft with review feedback ---
+  // --- Stage 3: Update draft with review feedback, then gate on risk ---
+  //
+  // Phase 0: after a successful update, immediately chain into the
+  // early-resolution analyst. The analyst's verdict gates Stage 4 — HIGH
+  // risk blocks Accept until the user acknowledges. This is intentionally
+  // pre-finalize (not post-finalize as in earlier iterations): if a draft is
+  // going to leave collateral stranded, we want to catch that before the
+  // user commits to a final JSON.
   const handleUpdate = async () => {
     if (!draftContent || reviews.length === 0) return;
     dispatch({ type: 'START_LOADING', phase: 'update', models: [getModelName(selectedModel)] });
 
+    let updatedDraft;
     try {
       // Use the deliberated review if available, otherwise fall back to first review
       const reviewText = deliberatedReview || reviews[0].content;
-      const content = await queryModel(selectedModel, [
+      updatedDraft = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
         { role: 'user', content: buildUpdatePrompt(draftContent, reviewText, humanReviewInput) },
       ]);
-      dispatch({ type: 'UPDATE_SUCCESS', content });
+      dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to update draft' });
+      return;
+    }
+
+    // Chain: early-resolution risk check on the updated draft.
+    dispatch({ type: 'START_EARLY_RESOLUTION', models: [getModelName(selectedModel)] });
+    try {
+      const riskContent = await queryModel(selectedModel, [
+        { role: 'system', content: SYSTEM_PROMPTS.earlyResolutionAnalyst },
+        { role: 'user', content: buildEarlyResolutionPrompt(updatedDraft, startDate, endDate) },
+      ]);
+      dispatch({
+        type: 'EARLY_RESOLUTION_SUCCESS',
+        content: riskContent,
+        level: parseRiskLevel(riskContent),
+      });
+    } catch (riskErr) {
+      dispatch({
+        type: 'EARLY_RESOLUTION_ERROR',
+        error: riskErr.message || 'Failed to analyze early resolution risk',
+      });
     }
   };
 
   // --- Stage 4: Finalize to structured JSON ---
+  // The early-resolution gate (set during handleUpdate) must be cleared
+  // before this runs; the Accept button is disabled when needsRiskAck is true.
   const handleAccept = async () => {
     if (!draftContent) return;
+    if (needsRiskAck) return; // belt-and-braces; button should already be disabled
     dispatch({ type: 'START_LOADING', phase: 'accept', models: [getModelName(selectedModel)] });
 
     try {
@@ -276,20 +326,6 @@ function App() {
       }
 
       dispatch({ type: 'FINALIZE_SUCCESS', content: parsedContent });
-
-      // Auto-run early resolution risk analysis if we got structured output
-      if (!parsedContent.raw) {
-        dispatch({ type: 'START_EARLY_RESOLUTION', models: [getModelName(selectedModel)] });
-        try {
-          const riskContent = await queryModel(selectedModel, [
-            { role: 'system', content: SYSTEM_PROMPTS.earlyResolutionAnalyst },
-            { role: 'user', content: buildEarlyResolutionPrompt(parsedContent) },
-          ]);
-          dispatch({ type: 'EARLY_RESOLUTION_SUCCESS', content: riskContent });
-        } catch (riskErr) {
-          dispatch({ type: 'EARLY_RESOLUTION_ERROR', error: riskErr.message || 'Failed to analyze early resolution risk' });
-        }
-      }
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to finalize market' });
     }
@@ -748,8 +784,9 @@ function App() {
                           <button
                             type="button"
                             className="accept-button"
-                            disabled={anyLoading}
+                            disabled={anyLoading || needsRiskAck}
                             onClick={handleAccept}
+                            title={needsRiskAck ? 'Acknowledge the HIGH early-resolution risk below before finalizing.' : undefined}
                           >
                             {loading === 'accept' ? (
                               <>
@@ -767,6 +804,51 @@ function App() {
                       )}
                     </div>
                   </div>
+
+                  {/* Early-resolution risk gate — runs pre-finalize.
+                      HIGH risk blocks Accept & Finalize until acknowledged. */}
+                  {hasUpdated && (loading === 'early-resolution' || earlyResolutionRiskLevel) && (
+                    <div
+                      className={`risk-gate risk-gate--${earlyResolutionRiskLevel || 'checking'} fade-in`}
+                      role={earlyResolutionRiskLevel === 'high' ? 'alert' : 'status'}
+                    >
+                      <div className="risk-gate__header">
+                        <span className="risk-gate__label">Early-Resolution Risk</span>
+                        {loading === 'early-resolution' ? (
+                          <span className="risk-gate__level risk-gate__level--checking">
+                            <span className="spinner" /> Checking…
+                          </span>
+                        ) : (
+                          <span className={`risk-gate__level risk-gate__level--${earlyResolutionRiskLevel}`}>
+                            {earlyResolutionRiskLevel === 'unknown'
+                              ? 'Unknown'
+                              : (earlyResolutionRiskLevel || '').toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      {loading !== 'early-resolution' && earlyResolutionRisk && (
+                        <div className="risk-gate__body">
+                          {renderContent(earlyResolutionRisk)}
+                        </div>
+                      )}
+                      {needsRiskAck && (
+                        <div className="risk-gate__actions">
+                          <p className="risk-gate__warning">
+                            This market may resolve before its end date. Acknowledge the risk to unlock Finalize,
+                            or revise the draft (e.g. add an explicit early-resolution clause, shorten the window,
+                            or tighten the outcome set).
+                          </p>
+                          <button
+                            type="button"
+                            className="risk-gate__ack-btn"
+                            onClick={() => dispatch({ type: 'ACKNOWLEDGE_EARLY_RESOLUTION' })}
+                          >
+                            Acknowledge HIGH risk & unlock Finalize
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Your Feedback */}
                   <div className="col-panel col-panel--review">
@@ -971,30 +1053,34 @@ function App() {
                         </div>
                       )}
 
-                      {/* Early Resolution Risk */}
-                      <div className="final-doc__section">
-                        <div className="final-doc__section-header">
-                          <h3 className="final-doc__heading">Early Resolution Risk</h3>
-                          {finalContent.earlyResolutionRisk && (
+                      {/* Early-resolution risk — computed pre-finalize during
+                          the Update → Finalize gate; shown here for reference. */}
+                      {earlyResolutionRisk && (
+                        <div className="final-doc__section">
+                          <div className="final-doc__section-header">
+                            <h3 className="final-doc__heading">
+                              Early Resolution Risk
+                              {earlyResolutionRiskLevel && earlyResolutionRiskLevel !== 'unknown' && (
+                                <span className={`risk-gate__level risk-gate__level--${earlyResolutionRiskLevel}`} style={{ marginLeft: '0.5rem' }}>
+                                  {earlyResolutionRiskLevel.toUpperCase()}
+                                </span>
+                              )}
+                            </h3>
                             <div className="col-panel-actions">
                               <span className="model-badge" data-tooltip={getModelName(selectedModel)}>{getModelAbbrev(selectedModel)}</span>
                               <button
                                 className={`copy-btn ${copiedId === 'early-risk' ? 'copy-btn--copied' : ''}`}
-                                onClick={() => handleCopy(finalContent.earlyResolutionRisk, 'early-risk')}
+                                onClick={() => handleCopy(earlyResolutionRisk, 'early-risk')}
                               >
                                 {copiedId === 'early-risk' ? 'Copied!' : 'Copy'}
                               </button>
                             </div>
-                          )}
-                        </div>
-                        {loading === 'early-resolution' ? (
-                          <LLMLoadingState phase="early-resolution" meta={loadingMeta} />
-                        ) : finalContent.earlyResolutionRisk ? (
-                          <div className="final-doc__text final-doc__text--risk fade-in">
-                            {renderContent(finalContent.earlyResolutionRisk)}
                           </div>
-                        ) : null}
-                      </div>
+                          <div className="final-doc__text final-doc__text--risk">
+                            {renderContent(earlyResolutionRisk)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -18,7 +18,7 @@ The user provides a prediction market question, start/end dates, and selects a d
 
 ### Stage 2: Multi-Model Review & Deliberation
 
-Inspired by the [llm-council](https://github.com/llm-council/llm-council) "Structure D" deliberation model, multiple reviewer models critique the draft:
+Inspired by the ["Structure D" deliberation pattern](https://github.com/karpathy/llm-council) from `karpathy/llm-council`, multiple reviewer models critique the draft:
 
 1. **Independent Review** — Up to 4 different models independently review the draft in parallel.
 2. **Deliberation** — If 2+ reviews succeed, the first reviewer acts as "chairman" and synthesizes a consolidated deliberated review incorporating insights from all reviewers.
@@ -109,3 +109,7 @@ npm run preview
 ```bash
 npm run lint
 ```
+
+## Attribution
+
+PM_tools' multi-reviewer deliberation stage is **inspired by** the "Structure D" pattern from [`karpathy/llm-council`](https://github.com/karpathy/llm-council) and has been re-implemented from scratch here. Because `karpathy/llm-council` ships without a licence, no code has been copied from that repository — only the high-level pattern (independent parallel reviews followed by a synthesis pass) has been borrowed. Any resemblance beyond that is coincidental.
