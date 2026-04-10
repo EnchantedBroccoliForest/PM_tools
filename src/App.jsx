@@ -17,6 +17,7 @@ import { queryModel } from './api/openrouter';
 import { extractClaims } from './pipeline/extractClaims';
 import { runStructuredReviewsParallel } from './pipeline/structuredReview';
 import { aggregate } from './pipeline/aggregate';
+import { verifyClaims } from './pipeline/verify';
 import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
 import { parseRun } from './types/run';
 import { useMarketReducer } from './hooks/useMarketReducer';
@@ -207,6 +208,11 @@ function App() {
 
   // Kick off claim extraction in the background for a draft and fold the
   // result (and any log entries) into the current run. Never throws.
+  //
+  // Phase 3: chains into verification automatically. Verification needs
+  // both the freshly extracted claims and the draft text, so piggybacking
+  // on extraction keeps the two in sync — every time claims change,
+  // verifications are refreshed against the same draft snapshot.
   const runClaimExtractorAndRecord = async (draftText) => {
     const result = await extractClaims(selectedModel, draftText);
     dispatch({
@@ -224,6 +230,26 @@ function App() {
         level: result.logEntry.level,
         message: result.logEntry.message,
       });
+    }
+
+    // Chain into verification. If extraction returned no claims (either
+    // because the draft is empty or because the extractor failed twice)
+    // the verifier logs a skip and returns immediately.
+    if (result.claims.length > 0) {
+      const vResult = await verifyClaims(result.claims, draftText, selectedModel);
+      recordCost('verify', vResult);
+      dispatch({
+        type: 'RUN_SET_VERIFICATION',
+        verification: vResult.verifications,
+      });
+      if (vResult.logEntry) {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'verify',
+          level: vResult.logEntry.level,
+          message: vResult.logEntry.message,
+        });
+      }
     }
   };
 
@@ -1555,6 +1581,70 @@ function App() {
                             <div className="run-trace__criticism-text">{c.rationale}</div>
                           </li>
                         ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Phase 3: claim verification. Structural + draft
+                      entailment checks. Each line shows the per-claim
+                      verdict plus a compact rationale pulled from either
+                      the structural tool output or the entailment response. */}
+                  {currentRun.verification.length > 0 && (
+                    <div className="run-trace__section">
+                      <h4 className="run-trace__heading">
+                        Verification ({currentRun.verification.length})
+                        {(() => {
+                          const counts = currentRun.verification.reduce(
+                            (acc, v) => {
+                              acc[v.verdict] = (acc[v.verdict] || 0) + 1;
+                              return acc;
+                            },
+                            {}
+                          );
+                          const parts = [];
+                          if (counts.pass) parts.push(`${counts.pass} pass`);
+                          if (counts.soft_fail) parts.push(`${counts.soft_fail} soft`);
+                          if (counts.hard_fail) parts.push(`${counts.hard_fail} hard`);
+                          return parts.length > 0 ? (
+                            <span className="run-trace__summary">
+                              {' — '}
+                              {parts.join(', ')}
+                            </span>
+                          ) : null;
+                        })()}
+                      </h4>
+                      <ul className="run-trace__list">
+                        {currentRun.verification.map((v) => {
+                          // Choose verdict class: reuse aggregation colors
+                          // (pass→pass, soft_fail→escalate, hard_fail→fail).
+                          const verdictClass =
+                            v.verdict === 'pass'
+                              ? 'pass'
+                              : v.verdict === 'hard_fail'
+                                ? 'fail'
+                                : 'escalate';
+                          return (
+                            <li key={v.claimId} className="run-trace__verification">
+                              <div className="run-trace__verification-header">
+                                <span className={`run-trace__badge run-trace__verdict--${verdictClass}`}>
+                                  {v.verdict}
+                                </span>
+                                <span className="run-trace__badge">{v.entailment}</span>
+                                <code className="run-trace__claim-id">{v.claimId}</code>
+                                {v.citationResolves === false && (
+                                  <span className="run-trace__badge run-trace__verdict--fail">
+                                    url missing
+                                  </span>
+                                )}
+                              </div>
+                              {v.toolOutput && (
+                                <div className="run-trace__verification-detail">
+                                  {v.toolOutput}
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   )}

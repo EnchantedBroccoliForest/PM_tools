@@ -270,6 +270,17 @@ export const JudgeAggregatorResponseSchema = z.object({
   rationale: z.string().default(''),
 });
 
+// Phase 3: batched draft-entailment verifier response. Each entry
+// corresponds to one claim id. Unknown/invented ids are dropped by the
+// verify pipeline with a warn log.
+export const EntailmentVerdictSchema = z.object({
+  id: z.string().min(1),
+  entailment: z.enum(['entailed', 'contradicted', 'not_covered', 'not_applicable']),
+  rationale: z.string().default(''),
+});
+
+export const BatchEntailmentResponseSchema = z.array(EntailmentVerdictSchema);
+
 export const RunSchema = z.object({
   runId: z.string(),
   startedAt: z.number(),

@@ -22,6 +22,9 @@ export const SYSTEM_PROMPTS = {
 
   aggregationJudge:
     'You are the aggregation judge for a prediction market review. You read a rubric and the per-item votes of several independent reviewers and render a single overall verdict. You are not a tiebreaker alone — you may override a majority when reviewers agreed on something obviously wrong. You output strictly valid JSON matching the schema.',
+
+  entailmentVerifier:
+    'You are a precise entailment verifier. Given a prediction market draft and a list of atomic claims extracted from it, you decide for each claim whether the draft entails it, contradicts it, fails to cover it, or is not applicable. You are strict: a claim is only "entailed" when its content is clearly present in the draft, not merely plausible or consistent. You output strictly valid JSON and nothing else.',
 };
 
 export function buildDraftPrompt(question, startDate, endDate, references) {
@@ -310,6 +313,62 @@ export function buildStrictJudgeAggregatorRetryPrompt(rubric, checklist) {
 Output ONLY a JSON object. No prose. No markdown fences. The first character must be "{" and the last character must be "}".
 
 ${buildJudgeAggregatorPrompt(rubric, checklist)}`;
+}
+
+// Batched draft-entailment verifier — Phase 3. One LLM call per run
+// instead of one per claim, which keeps verification affordable for
+// drafts with 20+ claims. The verifier is asked to render, for every
+// claim, whether the draft actually entails it. This catches extractor
+// hallucinations (a claim the extractor invented that does not appear
+// in the draft) before those claims reach downstream features.
+//
+// Phase 4 (evidence) will introduce a richer verifier that also checks
+// against retrieved sources. Phase 3 deliberately only checks against
+// the draft text itself so we can run it without any external calls.
+export function buildBatchEntailmentPrompt(claims, draftContent) {
+  const claimsBlock = claims
+    .map(
+      (c, i) =>
+        `  ${i + 1}. id: ${c.id}\n     category: ${c.category}\n     text: ${c.text}`
+    )
+    .join('\n');
+
+  return `For each atomic claim below, decide whether the draft entails it, contradicts it, fails to cover it, or is not applicable.
+
+Definitions (use these exact strings):
+  - "entailed":       the claim's content is clearly present in the draft, either stated explicitly or as an unambiguous paraphrase.
+  - "contradicted":   the draft contains content that is inconsistent with the claim (e.g., a different end date, an opposing resolution rule).
+  - "not_covered":    the draft does not mention the claim's content at all. This usually indicates an extraction error.
+  - "not_applicable": entailment is not a meaningful check for this claim (e.g., the claim is a bare URL, or the claim repeats the question id rather than content).
+
+DRAFT:
+${draftContent}
+
+CLAIMS:
+${claimsBlock}
+
+Output a strict JSON array with exactly one object per claim, IN THE SAME ORDER. Each object has exactly these fields:
+[
+  {
+    "id": "<claim id>",
+    "entailment": "entailed" | "contradicted" | "not_covered" | "not_applicable",
+    "rationale": "one short sentence explaining your decision"
+  }
+]
+
+RULES:
+  - Output ONLY the JSON array. No prose before or after. No markdown fences.
+  - Be strict: "entailed" requires the content to actually be in the draft. "It sounds reasonable" is not entailment.
+  - If you mark a claim "contradicted", the rationale must quote the specific conflicting passage from the draft.
+  - The first character of your response must be "[" and the last must be "]".`;
+}
+
+export function buildStrictBatchEntailmentRetryPrompt(claims, draftContent) {
+  return `Your previous response was not valid JSON. Try again.
+
+Output ONLY a JSON array. No prose. No markdown fences. The first character must be "[" and the last character must be "]".
+
+${buildBatchEntailmentPrompt(claims, draftContent)}`;
 }
 
 // NOTE: this builder takes the *raw updated draft* (not a finalized JSON
