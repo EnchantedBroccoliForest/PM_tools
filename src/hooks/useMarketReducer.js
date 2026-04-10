@@ -275,6 +275,20 @@ function reducer(state, action) {
       };
     }
 
+    case 'RUN_SET_EVIDENCE': {
+      if (!state.currentRun) return state;
+      // Evidence is replaced wholesale — the harvester is deterministic on
+      // the current references + claims and there is no value in appending
+      // stale URLs from a previous extraction round.
+      return {
+        ...state,
+        currentRun: {
+          ...state.currentRun,
+          evidence: action.evidence || [],
+        },
+      };
+    }
+
     case 'RUN_SET_FINAL': {
       if (!state.currentRun) return state;
       return {

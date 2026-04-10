@@ -18,6 +18,7 @@ import { extractClaims } from './pipeline/extractClaims';
 import { runStructuredReviewsParallel } from './pipeline/structuredReview';
 import { aggregate } from './pipeline/aggregate';
 import { verifyClaims } from './pipeline/verify';
+import { gatherEvidence } from './pipeline/gatherEvidence';
 import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
 import { parseRun } from './types/run';
 import { useMarketReducer } from './hooks/useMarketReducer';
@@ -248,6 +249,44 @@ function App() {
           stage: 'verify',
           level: vResult.logEntry.level,
           message: vResult.logEntry.message,
+        });
+      }
+
+      // Phase 4: evidence gathering. Harvest URLs from the references
+      // block and source claims, resolve them in parallel via no-cors
+      // fetch, and fold the resolve results back into the verification
+      // list. This can only downgrade a source-claim verdict from pass
+      // to soft_fail when all URLs fail; it never upgrades an existing
+      // hard_fail. The evidence record itself (ids, claim linkage, URLs)
+      // is written to currentRun.evidence unconditionally so the Run
+      // trace panel can show the harvested citations.
+      const eResult = await gatherEvidence({
+        references,
+        claims: result.claims,
+        verifications: vResult.verifications,
+      });
+      dispatch({
+        type: 'RUN_COST',
+        stage: 'evidence',
+        tokensIn: 0,
+        tokensOut: 0,
+        wallClockMs: eResult.wallClockMs,
+      });
+      dispatch({ type: 'RUN_SET_EVIDENCE', evidence: eResult.evidence });
+      // Re-dispatch verifications with the citation-resolve overrides
+      // applied. We always overwrite here, even if nothing changed, so
+      // that exporting immediately after gatherEvidence returns reflects
+      // the latest state without a race against a stale setState.
+      dispatch({
+        type: 'RUN_SET_VERIFICATION',
+        verification: eResult.updatedVerifications,
+      });
+      if (eResult.logEntry) {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'evidence',
+          level: eResult.logEntry.level,
+          message: eResult.logEntry.message,
         });
       }
     }
@@ -1642,6 +1681,78 @@ function App() {
                                   {v.toolOutput}
                                 </div>
                               )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Phase 4: harvested evidence with per-URL resolve
+                      status. The resolve flag mirrors the underlying
+                      source claim's Verification.citationResolves (when
+                      linked to a source claim) or defaults to unknown. */}
+                  {currentRun.evidence.length > 0 && (
+                    <div className="run-trace__section">
+                      <h4 className="run-trace__heading">
+                        Evidence ({currentRun.evidence.length})
+                        {(() => {
+                          // Summarise resolve status: look up each evidence's
+                          // owning source-claim verification (if any) and
+                          // count the citationResolves flag. Non-source
+                          // claims have no meaningful resolve signal here.
+                          const verifByClaim = new Map(
+                            currentRun.verification.map((v) => [v.claimId, v])
+                          );
+                          let resolved = 0;
+                          let failed = 0;
+                          for (const e of currentRun.evidence) {
+                            const v = verifByClaim.get(e.claimId);
+                            if (!v) continue;
+                            if (v.citationResolves) resolved += 1;
+                            else failed += 1;
+                          }
+                          if (resolved + failed === 0) return null;
+                          return (
+                            <span className="run-trace__summary">
+                              {' — '}
+                              {resolved} resolved
+                              {failed > 0 ? `, ${failed} failed` : ''}
+                            </span>
+                          );
+                        })()}
+                      </h4>
+                      <ul className="run-trace__list">
+                        {currentRun.evidence.map((e) => {
+                          const verif = currentRun.verification.find(
+                            (v) => v.claimId === e.claimId
+                          );
+                          const resolveState =
+                            verif && verif.citationResolves === false
+                              ? 'failed'
+                              : verif
+                                ? 'resolved'
+                                : 'unchecked';
+                          return (
+                            <li key={e.id} className="run-trace__evidence">
+                              <div className="run-trace__evidence-header">
+                                <span
+                                  className={`run-trace__badge run-trace__evidence--${resolveState}`}
+                                >
+                                  {resolveState}
+                                </span>
+                                <code className="run-trace__claim-id">
+                                  {e.claimId}
+                                </code>
+                              </div>
+                              <a
+                                href={e.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="run-trace__evidence-url"
+                              >
+                                {e.url}
+                              </a>
                             </li>
                           );
                         })}
