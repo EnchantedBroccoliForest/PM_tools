@@ -1997,3 +1997,244 @@ select.input optgroup {
 .App.theme-light .panel-body::-webkit-scrollbar-thumb {
   background: rgba(139, 119, 90, 0.2);
 }
+
+/* --- Run trace panel (Phase 1) ---
+   Collapsible diagnostic panel under the main pipeline. Shows the current
+   Run artifact (drafts, claims, cost, log) and exposes export/import for
+   the raw JSON. Intentionally low-chrome so it reads as a debug drawer. */
+.run-trace {
+  margin-top: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.run-trace__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.run-trace__toggle:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.run-trace__chevron {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.run-trace__summary {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 0.75rem;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-trace__body {
+  padding: 0 1rem 1rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.run-trace__actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+}
+
+.run-trace__button {
+  display: inline-block;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.run-trace__button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.run-trace__button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.run-trace__button--import {
+  cursor: pointer;
+}
+
+.run-trace__section {
+  padding: 0.75rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__heading {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+
+.run-trace__empty {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.run-trace__kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.15rem 0;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-trace__kv > span:first-child {
+  opacity: 0.65;
+}
+
+.run-trace__by-stage {
+  margin-top: 0.25rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.05);
+}
+
+.run-trace__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.run-trace__draft {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__draft-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-bottom: 0.25rem;
+}
+
+.run-trace__draft-preview {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.run-trace__badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+.run-trace__ts {
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+}
+
+.run-trace__claim {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  padding: 0.25rem 0;
+}
+
+.run-trace__claim-id {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.run-trace__claim-text {
+  flex: 1;
+  opacity: 0.85;
+}
+
+.run-trace__log {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.2rem 0;
+}
+
+.run-trace__log--error {
+  color: #e87171;
+}
+
+.run-trace__log--warn {
+  color: #e8c171;
+}
+
+.run-trace__log--info {
+  opacity: 0.75;
+}
+
+/* Light theme overrides for Run trace */
+.App.theme-light .run-trace {
+  border-color: rgba(139, 119, 90, 0.15);
+  background: rgba(139, 119, 90, 0.03);
+}
+
+.App.theme-light .run-trace__body {
+  border-top-color: rgba(139, 119, 90, 0.1);
+}
+
+.App.theme-light .run-trace__section {
+  border-top-color: rgba(139, 119, 90, 0.08);
+}
+
+.App.theme-light .run-trace__button {
+  border-color: rgba(139, 119, 90, 0.2);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.App.theme-light .run-trace__button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.App.theme-light .run-trace__draft {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(139, 119, 90, 0.08);
+}
+
+.App.theme-light .run-trace__badge {
+  background: rgba(139, 119, 90, 0.12);
+}

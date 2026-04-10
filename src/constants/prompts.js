@@ -13,6 +13,9 @@ export const SYSTEM_PROMPTS = {
 
   ideator:
     'You are a creative prediction market ideator. Given vague directions from a user, research the topic area and brainstorm a diverse set of concrete, high-quality prediction market ideas. Draw on current events, upcoming catalysts, policy debates, technology trends, and cultural moments. Favor markets that are objectively resolvable, genuinely uncertain, and interesting to bet on.',
+
+  claimExtractor:
+    'You are a meticulous claim extractor. Your job is to decompose a prediction market draft into a flat list of atomic, verifiable claims — one sentence per claim, no compound statements. You output strictly valid JSON and nothing else. Do not include prose, preamble, explanation, or markdown fences.',
 };
 
 export function buildDraftPrompt(question, startDate, endDate, references) {
@@ -137,6 +140,50 @@ Guidelines:
 - Keep each idea tight — no preamble, no filler
 - Number the ideas 1., 2., 3., ...
 - End with a brief 1–2 sentence note on themes or follow-up directions the user might explore`;
+}
+
+// Claim extractor — decomposes a draft into a flat list of atomic claims.
+// Used by src/pipeline/extractClaims.js, which wraps this in zod validation
+// and a retry loop. Emits stable ids of the form `claim.<category>.<index>`
+// (or `.<subfield>`) so downstream verifiers can hang results off them.
+export function buildClaimExtractorPrompt(draftContent) {
+  return `Extract all atomic claims from the prediction market draft below.
+
+OUTPUT: a strict JSON array. Each element is an object with exactly these fields:
+  - id:         string, unique, of the form "claim.<category>.<index>" or "claim.<category>.<index>.<subfield>"
+  - category:   one of "question" | "outcome_win" | "outcome_criterion" | "edge_case" | "source" | "timestamp" | "threshold" | "other"
+  - text:       one sentence, declarative, verifiable, no compound statements
+  - sourceRefs: always the empty array []  (evidence linking happens later)
+
+WHAT TO EXTRACT (produce one claim per item, in this order):
+  1. The refined question itself                               → category "question", id "claim.question.0"
+  2. The market start time                                     → category "timestamp", id "claim.timestamp.start"
+  3. The market end time                                       → category "timestamp", id "claim.timestamp.end"
+  4. For each outcome in order, the winCondition              → category "outcome_win", id "claim.outcome.<i>.win"
+  5. For each outcome in order, the resolutionCriteria        → category "outcome_criterion", id "claim.outcome.<i>.criterion"
+  6. Every edge case listed in the draft                      → category "edge_case", id "claim.edge.<i>"
+  7. Every cited source URL                                    → category "source", id "claim.source.<i>"    text = the URL exactly as cited
+  8. Every explicit numerical threshold                       → category "threshold", id "claim.threshold.<i>"
+
+RULES:
+  - No prose. No markdown. No explanation. Output ONLY the JSON array.
+  - Do not fabricate claims not present in the draft.
+  - Do not merge claims. If the draft says "X and Y", emit two claims.
+  - Indices start at 0 and are contiguous within a category.
+  - If a field is missing from the draft, OMIT the corresponding claim rather than inventing one.
+
+DRAFT:
+${draftContent}`;
+}
+
+// Stricter retry builder: used only when the first extraction returned
+// invalid JSON. Emphasises the "JSON only" constraint even harder.
+export function buildStrictClaimExtractorRetryPrompt(draftContent) {
+  return `Your previous response was not valid JSON. Try again.
+
+Output ONLY a JSON array. No prose. No markdown fences. No commentary. Nothing before or after the array. The first character of your response must be "[" and the last character must be "]".
+
+${buildClaimExtractorPrompt(draftContent)}`;
 }
 
 // NOTE: this builder takes the *raw updated draft* (not a finalized JSON
