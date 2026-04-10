@@ -16,6 +16,11 @@ const initialState = {
   humanReviewInput: '',
   pastedDraft: '',
 
+  // Phase 2: aggregation protocol used when rolling up per-item reviewer
+  // votes into Aggregation.overall. 'majority' | 'unanimity' | 'judge'.
+  // 'judge' makes one extra LLM call using the first review model.
+  aggregationProtocol: 'majority',
+
   // Ideating
   ideatingInput: '',
   ideatingModel: DEFAULT_DRAFT_MODEL,
