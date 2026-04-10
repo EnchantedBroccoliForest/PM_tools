@@ -108,6 +108,23 @@ import { z } from 'zod';
  */
 
 /**
+ * @typedef {Object} ClaimRouting
+ * @property {string} claimId
+ * @property {'ok'|'targeted_review'|'blocking'} severity
+ * @property {number} uncertainty          0..1, higher = more uncertain
+ * @property {string[]} reasons            human-readable contributing factors
+ */
+
+/**
+ * @typedef {Object} Routing
+ * @property {ClaimRouting[]} items
+ * @property {'clean'|'needs_update'|'blocked'} overall
+ * @property {boolean} hasBlocking
+ * @property {boolean} hasTargetedReview
+ * @property {string[]} focusClaimIds      ids to surface in the next update prompt (blocking + targeted_review)
+ */
+
+/**
  * @typedef {Object} Run
  * @property {string} runId
  * @property {number} startedAt
@@ -117,6 +134,7 @@ import { z } from 'zod';
  * @property {Claim[]} claims
  * @property {Evidence[]} evidence
  * @property {Verification[]} verification
+ * @property {Routing|null} routing
  * @property {Aggregation|null} aggregation
  * @property {Object|null} finalJson
  * @property {RunCost} cost
@@ -200,6 +218,23 @@ export const EvidenceSchema = z.object({
   excerpt: z.string(),
   fetchedAt: z.number(),
   rank: z.number(),
+});
+
+// Phase 5: per-claim routing record. Produced deterministically from
+// verification + criticism + evidence; no LLM calls are involved.
+export const ClaimRoutingSchema = z.object({
+  claimId: z.string(),
+  severity: z.enum(['ok', 'targeted_review', 'blocking']),
+  uncertainty: z.number().min(0).max(1),
+  reasons: z.array(z.string()).default([]),
+});
+
+export const RoutingSchema = z.object({
+  items: z.array(ClaimRoutingSchema),
+  overall: z.enum(['clean', 'needs_update', 'blocked']),
+  hasBlocking: z.boolean(),
+  hasTargetedReview: z.boolean(),
+  focusClaimIds: z.array(z.string()).default([]),
 });
 
 export const RunCostSchema = z.object({
@@ -295,6 +330,9 @@ export const RunSchema = z.object({
   claims: z.array(ClaimSchema),
   evidence: z.array(EvidenceSchema),
   verification: z.array(VerificationSchema),
+  // routing is defaulted to null so runs exported before Phase 5 can
+  // still be imported without failing schema validation.
+  routing: RoutingSchema.nullable().default(null),
   aggregation: AggregationSchema.nullable(),
   finalJson: z.record(z.string(), z.unknown()).nullable(),
   cost: RunCostSchema,
@@ -347,6 +385,7 @@ export function createRun(input) {
     claims: [],
     evidence: [],
     verification: [],
+    routing: null,
     aggregation: null,
     finalJson: null,
     cost: createEmptyCost(),

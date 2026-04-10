@@ -2348,6 +2348,74 @@ select.input optgroup {
   word-break: break-word;
 }
 
+/* Phase 5: routing entries */
+.run-trace__routing {
+  padding: 0.4rem 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__routing-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.run-trace__routing-reasons {
+  margin-top: 0.25rem;
+  padding-left: 0.25rem;
+  font-size: 0.72rem;
+  opacity: 0.7;
+  font-style: italic;
+  word-break: break-word;
+}
+
+.run-trace__routing--ok,
+.run-trace__routing--clean {
+  background: rgba(74, 222, 128, 0.15);
+  color: rgb(134, 239, 172);
+}
+
+.run-trace__routing--targeted_review,
+.run-trace__routing--needs_update {
+  background: rgba(250, 204, 21, 0.18);
+  color: rgb(253, 224, 71);
+}
+
+.run-trace__routing--blocking,
+.run-trace__routing--blocked {
+  background: rgba(248, 113, 113, 0.18);
+  color: rgb(252, 165, 165);
+}
+
+/* Phase 5: routing gate extras (rendered inside the generic risk-gate
+   wrapper so it inherits spacing and border styling automatically). */
+.risk-gate__subheading {
+  margin: 0.5rem 0 0.25rem 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.risk-gate__list {
+  margin: 0 0 0.5rem 1rem;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.risk-gate__list li {
+  margin: 0.2rem 0;
+  word-break: break-word;
+}
+
+.risk-gate__reasons {
+  opacity: 0.7;
+  font-style: italic;
+  font-size: 0.72rem;
+}
+
 /* Phase 4: harvested evidence entries */
 .run-trace__evidence {
   padding: 0.4rem 0.5rem;
@@ -2447,4 +2515,27 @@ select.input optgroup {
 
 .App.theme-light .run-trace__evidence-url {
   text-decoration-color: rgba(139, 119, 90, 0.35);
+}
+
+.App.theme-light .run-trace__routing {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(139, 119, 90, 0.08);
+}
+
+.App.theme-light .run-trace__routing--ok,
+.App.theme-light .run-trace__routing--clean {
+  background: rgba(74, 158, 87, 0.2);
+  color: rgb(46, 107, 56);
+}
+
+.App.theme-light .run-trace__routing--targeted_review,
+.App.theme-light .run-trace__routing--needs_update {
+  background: rgba(200, 160, 40, 0.22);
+  color: rgb(130, 95, 15);
+}
+
+.App.theme-light .run-trace__routing--blocking,
+.App.theme-light .run-trace__routing--blocked {
+  background: rgba(200, 68, 68, 0.18);
+  color: rgb(155, 44, 44);
 }

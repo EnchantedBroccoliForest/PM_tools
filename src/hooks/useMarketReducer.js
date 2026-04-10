@@ -45,6 +45,12 @@ const initialState = {
   earlyResolutionRiskLevel: null,    // 'low' | 'medium' | 'high' | 'unknown' | null
   earlyResolutionAcknowledged: false,
 
+  // Phase 5: routing-based Accept gate. Any `blocking` routing item (or
+  // global blocker criticism) blocks finalize until the user explicitly
+  // acknowledges that they accept the risk. Re-running the pipeline with
+  // a fresh draft resets this to false.
+  routingAcknowledged: false,
+
   // Phase 1: canonical Run artifact. Every handler that performs an LLM call
   // appends to this in parallel with the legacy view-state fields. The
   // view-state fields (draftContent, reviews, deliberatedReview, finalContent)
@@ -64,6 +70,9 @@ function clearEarlyResolution(state) {
     earlyResolutionRisk: null,
     earlyResolutionRiskLevel: null,
     earlyResolutionAcknowledged: false,
+    // Phase 5: a new draft always resets the routing acknowledgement so
+    // the user has to re-confirm any surviving blocking claims.
+    routingAcknowledged: false,
   };
 }
 
@@ -288,6 +297,26 @@ function reducer(state, action) {
         },
       };
     }
+
+    case 'RUN_SET_ROUTING': {
+      if (!state.currentRun) return state;
+      // Routing is fully derived from claims + verification + criticisms,
+      // so we replace it wholesale every time any of those inputs change.
+      // Recomputing routing also resets any prior acknowledgement — if the
+      // user had acked a blocking set and then ran review/update again,
+      // the fresh routing might have new blockers they haven't seen.
+      return {
+        ...state,
+        currentRun: {
+          ...state.currentRun,
+          routing: action.routing || null,
+        },
+        routingAcknowledged: false,
+      };
+    }
+
+    case 'ACKNOWLEDGE_ROUTING':
+      return { ...state, routingAcknowledged: true };
 
     case 'RUN_SET_FINAL': {
       if (!state.currentRun) return state;
