@@ -3,11 +3,39 @@ const MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff
 
+// The documented env var is VITE_OPENROUTER_API_KEY. We accept the legacy
+// VITE_OPENAI_API_KEY as a fallback so existing deployments keep working,
+// but warn loudly at module load if neither is set.
+const API_KEY_ENV = 'VITE_OPENROUTER_API_KEY';
+const LEGACY_API_KEY_ENV = 'VITE_OPENAI_API_KEY';
+
+function readConfiguredApiKey() {
+  const primary = import.meta.env[API_KEY_ENV];
+  if (primary && primary !== 'YOUR_API_KEY_HERE') return primary;
+  const legacy = import.meta.env[LEGACY_API_KEY_ENV];
+  if (legacy && legacy !== 'YOUR_API_KEY_HERE') {
+    console.warn(
+      `[pm_tools] ${LEGACY_API_KEY_ENV} is deprecated; set ${API_KEY_ENV} instead.`
+    );
+    return legacy;
+  }
+  return null;
+}
+
+// Runtime warning if neither variable is configured. This runs once at module
+// load so the developer sees it in the browser console immediately, without
+// waiting for the first LLM call to fail.
+if (typeof window !== 'undefined' && readConfiguredApiKey() === null) {
+  console.warn(
+    `[pm_tools] No OpenRouter API key configured. Set ${API_KEY_ENV} in your environment (a .env file at the repo root works for local dev).`
+  );
+}
+
 function getApiKey() {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
+  const apiKey = readConfiguredApiKey();
+  if (!apiKey) {
     throw new Error(
-      'OpenRouter API key not configured. Please add VITE_OPENAI_API_KEY to your environment.'
+      `OpenRouter API key not configured. Please set ${API_KEY_ENV} in your environment.`
     );
   }
   return apiKey;

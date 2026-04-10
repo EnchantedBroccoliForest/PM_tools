@@ -1623,6 +1623,132 @@ select.input optgroup {
 }
 
 /* ================================================
+   Early-Resolution Risk Gate (pre-finalize)
+   ================================================ */
+.risk-gate {
+  margin: 1rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  font-size: 0.9rem;
+}
+
+.risk-gate__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.risk-gate__label {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.risk-gate__level {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--r-sm);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.risk-gate__level--checking {
+  background: var(--surface-3);
+  color: var(--text-2);
+  border-color: var(--border);
+}
+
+.risk-gate__level--low {
+  background: var(--teal-glow);
+  color: var(--teal);
+  border-color: var(--teal);
+}
+
+.risk-gate__level--medium {
+  background: rgba(255, 234, 0, 0.12);
+  color: var(--neon-yellow);
+  border-color: rgba(255, 234, 0, 0.5);
+}
+
+.risk-gate__level--high {
+  background: var(--red-bg);
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.risk-gate__level--unknown {
+  background: var(--surface-3);
+  color: var(--text-2);
+  border-color: var(--border);
+}
+
+.risk-gate--low { border-left-color: var(--teal); }
+.risk-gate--medium { border-left-color: var(--neon-yellow); }
+.risk-gate--high {
+  border-left-color: var(--red);
+  background: var(--red-bg);
+  border-color: var(--red-border);
+}
+.risk-gate--unknown,
+.risk-gate--checking { border-left-color: var(--border-hover); }
+
+.risk-gate__body {
+  color: var(--text-1);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.risk-gate__body p { margin: 0.25rem 0; }
+
+.risk-gate__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--red-border);
+}
+
+.risk-gate__warning {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.risk-gate__ack-btn {
+  align-self: flex-start;
+  padding: 0.55rem 1rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--red);
+  background: transparent;
+  color: var(--red);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.risk-gate__ack-btn:hover {
+  background: var(--red);
+  color: var(--bg-dark);
+}
+
+/* ================================================
    Light Theme
    ================================================ */
 .App.theme-light {

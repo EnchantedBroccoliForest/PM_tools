@@ -139,26 +139,23 @@ Guidelines:
 - End with a brief 1–2 sentence note on themes or follow-up directions the user might explore`;
 }
 
-export function buildEarlyResolutionPrompt(finalContent) {
-  const outcomes = finalContent.outcomes
-    ?.map((o, i) => `  ${i + 1}. ${o.name}${o.winCondition ? `\n     Wins if: ${o.winCondition}` : ''}\n     Resolution Criteria: ${o.resolutionCriteria}`)
-    .join('\n') || 'N/A';
+// NOTE: this builder takes the *raw updated draft* (not a finalized JSON
+// object). The risk check now gates Stage 4 — HIGH risk must be acknowledged
+// before the user can Accept & Finalize.
+export function buildEarlyResolutionPrompt(draftContent, startDate, endDate) {
+  return `Review the prediction market draft below. Based on its outcomes and resolution rules, determine whether the market's outcome could become effectively certain *before* the stated End Date — a scenario that would strand collateral and require an explicit early-resolution clause.
 
-  return `Review the market details below. Based on the list of outcomes and the resolution rules, identify if there is a possibility that this market's outcome becomes certain prior to the stated End Date.
+DRAFT:
+${draftContent}
 
-MARKET QUESTION:
-${finalContent.refinedQuestion || 'N/A'}
+USER-PROVIDED DATES:
+Start Date: ${startDate}
+End Date: ${endDate}
 
-OUTCOMES:
-${outcomes}
+Respond concisely (max 4-6 sentences total). The FIRST line of your response must be exactly one of:
+Risk rating: Low
+Risk rating: Medium
+Risk rating: High
 
-RESOLUTION RULES:
-${finalContent.fullResolutionRules || 'N/A'}
-
-MARKET END DATE: ${finalContent.marketEndTimeUTC || 'N/A'}
-
-Respond concisely (max 4-6 sentences total). State:
-1. Risk rating: Low / Medium / High
-2. Key scenarios (if any) that could cause early certainty
-Keep it brief — no preamble, no restating the question.`;
+Then on following lines, list the key scenarios (if any) that could cause early certainty. Keep it brief — no preamble, no restating the question.`;
 }
