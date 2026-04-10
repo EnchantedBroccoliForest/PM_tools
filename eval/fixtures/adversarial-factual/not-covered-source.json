@@ -1,0 +1,40 @@
+{
+  "id": "advf-not-covered-source",
+  "bucket": "adversarial-factual",
+  "description": "The extractor invented a source URL that does not appear in the draft. The entailment verifier returns not_covered which degrades the verdict to soft_fail and targets the claim for review.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "mockResponses": {
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the referenced event occur by 2027-12-31?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "Market starts 2027-01-01T00:00:00Z.", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "Market ends 2027-12-31T23:59:59Z.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins if event occurs before cutoff.", "sourceRefs": [] },
+      { "id": "claim.source.0", "category": "source", "text": "https://example.com/feed", "sourceRefs": [] },
+      { "id": "claim.source.1", "category": "source", "text": "https://fabricated-source.invalid/nonexistent", "sourceRefs": [] }
+    ],
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.1", "entailment": "not_covered", "rationale": "URL does not appear anywhere in the draft — extractor hallucination." }
+    ],
+    "urlResolves": {
+      "https://fabricated-source.invalid/nonexistent": false
+    }
+  },
+  "expectedProperties": {
+    "expected_has_soft_fail": true,
+    "expected_has_hard_fail": false,
+    "expected_routing_overall": "needs_update",
+    "expected_finalize_allowed": true,
+    "expected_blocked_by_verification": false,
+    "expected_targeted_count": "gte-1"
+  }
+}

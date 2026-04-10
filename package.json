@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "eval": "node eval/run.js",
+    "eval:baseline": "node eval/run.js --baseline --quiet",
+    "eval:check": "node eval/run.js --check-regression --quiet"
   },
   "dependencies": {
     "react": "^19.2.0",

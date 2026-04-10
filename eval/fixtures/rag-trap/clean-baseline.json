@@ -1,0 +1,16 @@
+{
+  "id": "rag-clean-baseline",
+  "bucket": "rag-trap",
+  "description": "Baseline: default cited URL resolves via the mock fetch, citation coverage is 100%.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "expectedProperties": {
+    "expected_finalize_allowed": true,
+    "expected_citation_resolves_all": true,
+    "expected_routing_overall": "clean"
+  }
+}

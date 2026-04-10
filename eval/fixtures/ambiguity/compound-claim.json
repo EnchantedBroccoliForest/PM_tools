@@ -1,0 +1,35 @@
+{
+  "id": "ambig-compound-claim",
+  "bucket": "ambiguity",
+  "description": "Outcome is \"X and Y\" — compound and unverifiable as a unit. Reviewers fail atomic_claims.",
+  "input": {
+    "question": "Will the Fed cut rates AND CPI stay above 3%?",
+    "startDate": "2027-07-01",
+    "endDate": "2027-12-31",
+    "references": "https://www.federalreserve.gov"
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "The Yes outcome conflates two independent propositions (Fed rate action and CPI level). Each should be a separate market; otherwise a Yes can mean many different things.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "unsure", "rationale": "Depends on how the compound is decomposed." },
+          { "ruleId": "objective_source", "verdict": "yes", "rationale": "Fed + BLS are canonical." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "Window is explicit." },
+          { "ruleId": "manipulation_resistant", "verdict": "yes", "rationale": "Both sources are neutral." },
+          { "ruleId": "atomic_claims", "verdict": "no", "rationale": "Single outcome stapling two events together." },
+          { "ruleId": "edge_cases_covered", "verdict": "unsure", "rationale": "No handling for one-but-not-both." }
+        ],
+        "criticisms": [
+          { "claimId": "claim.outcome.0.win", "severity": "blocker", "category": "atomicity", "rationale": "Split into two separate markets, or introduce all four compound outcomes (++, +-, -+, --) as explicit named outcomes." }
+        ]
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "blocked",
+    "expected_aggregation_overall": "fail",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_routing": true
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "description": "Shared default mockResponses merged into every fixture. Individual fixtures override only the fields their scenario tests; everything else falls back to this canonical clean run so fixture files stay small and focused on the behaviour under test.",
+  "mockResponses": {
+    "draft": "# Prediction Market Draft (canonical baseline)\n\n## Refined Question\nWill the referenced event occur by 2027-12-31?\n\n## Window\nStart: 2027-01-01T00:00:00Z\nEnd:   2027-12-31T23:59:59Z\n\n## Outcomes\n1. Yes — the referenced event occurs before 2027-12-31T23:59:59Z UTC. Verified via https://example.com/feed.\n2. No  — the referenced event does not occur before 2027-12-31T23:59:59Z UTC. Verified via https://example.com/feed.\n\n## Full Resolution Rules\n1. Source: https://example.com/feed (public, timestamped, mechanical).\n2. Cutoff: 2027-12-31T23:59:59Z.\n3. Threshold: 1 confirmed event.\n4. Timezone: all timestamps are UTC.\n\n## Edge Cases\n1. Source unavailable at cutoff → defer 48h, then void.\n2. Event postponed past cutoff → No wins.\n3. Ambiguous reporting → resolver discretion with public log.\n\n## Sources\n- https://example.com/feed",
+    "updatedDraft": "# Prediction Market Draft (canonical baseline, updated)\n\nThis is the canonical updated draft. Content is identical to the initial draft — the harness always runs an update pass so the downstream claim/verify/route pipeline fires twice, but for clean fixtures the update is a no-op.\n\n## Refined Question\nWill the referenced event occur by 2027-12-31?\n\n## Window\nStart: 2027-01-01T00:00:00Z\nEnd:   2027-12-31T23:59:59Z\n\n## Outcomes\n1. Yes — the referenced event occurs before 2027-12-31T23:59:59Z UTC. Verified via https://example.com/feed.\n2. No  — the referenced event does not occur before 2027-12-31T23:59:59Z UTC. Verified via https://example.com/feed.\n\n## Full Resolution Rules\n1. Source: https://example.com/feed.\n2. Cutoff: 2027-12-31T23:59:59Z.\n3. Threshold: 1 confirmed event.\n4. Timezone: all timestamps are UTC.\n\n## Edge Cases\n1. Source unavailable at cutoff → defer 48h, then void.\n2. Event postponed past cutoff → No wins.\n3. Ambiguous reporting → resolver discretion with public log.\n\n## Sources\n- https://example.com/feed",
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the referenced event occur by 2027-12-31?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "Market starts 2027-01-01T00:00:00Z.", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "Market ends 2027-12-31T23:59:59Z.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins if the referenced event occurs before 2027-12-31T23:59:59Z UTC.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.criterion", "category": "outcome_criterion", "text": "Verified via https://example.com/feed.", "sourceRefs": [] },
+      { "id": "claim.outcome.1.win", "category": "outcome_win", "text": "No wins if the referenced event does not occur before 2027-12-31T23:59:59Z UTC.", "sourceRefs": [] },
+      { "id": "claim.outcome.1.criterion", "category": "outcome_criterion", "text": "Verified via https://example.com/feed.", "sourceRefs": [] },
+      { "id": "claim.source.0", "category": "source", "text": "https://example.com/feed", "sourceRefs": [] },
+      { "id": "claim.threshold.0", "category": "threshold", "text": "Threshold: 1 confirmed event.", "sourceRefs": [] }
+    ],
+    "reviews": [
+      {
+        "reviewProse": "Baseline clean review: outcomes are MECE, source is public and objective, timestamps are UTC-anchored, no obvious manipulation surface.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "yes", "rationale": "Yes and No partition the event space with an explicit void for source unavailability." },
+          { "ruleId": "objective_source", "verdict": "yes", "rationale": "Single public URL source that is timestamped and mechanical." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "All times are explicit ISO-8601 in UTC with a hard cutoff." },
+          { "ruleId": "manipulation_resistant", "verdict": "yes", "rationale": "Source is a neutral third party with no stake in outcome." },
+          { "ruleId": "atomic_claims", "verdict": "yes", "rationale": "Each resolution rule states exactly one proposition." },
+          { "ruleId": "edge_cases_covered", "verdict": "yes", "rationale": "Source unavailable, postponement, and ambiguous reporting all have named resolutions." }
+        ],
+        "criticisms": []
+      }
+    ],
+    "judgeDecision": {
+      "perItemDecisions": [
+        { "id": "mece", "decision": "pass" },
+        { "id": "objective_source", "decision": "pass" },
+        { "id": "timing_unambiguous", "decision": "pass" },
+        { "id": "manipulation_resistant", "decision": "pass" },
+        { "id": "atomic_claims", "decision": "pass" },
+        { "id": "edge_cases_covered", "decision": "pass" }
+      ],
+      "overall": "pass",
+      "rationale": "Baseline clean run; all reviewers agreed on every rubric item."
+    },
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "The refined question appears verbatim in the draft." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "2027-01-01T00:00:00Z is in the draft." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "2027-12-31T23:59:59Z is in the draft." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Yes win condition is in the outcomes block." },
+      { "id": "claim.outcome.0.criterion", "entailment": "entailed", "rationale": "Feed URL and cutoff appear in outcome 1." },
+      { "id": "claim.outcome.1.win", "entailment": "entailed", "rationale": "No win condition is in the outcomes block." },
+      { "id": "claim.outcome.1.criterion", "entailment": "entailed", "rationale": "Feed URL and cutoff appear in outcome 2." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Feed URL is explicitly listed under Sources." },
+      { "id": "claim.threshold.0", "entailment": "entailed", "rationale": "Threshold rule appears in Full Resolution Rules." }
+    ],
+    "risk": "Low",
+    "finalJson": {
+      "refinedQuestion": "Will the referenced event occur by 2027-12-31?",
+      "outcomes": [
+        { "name": "Yes", "winCondition": "Event occurs before 2027-12-31T23:59:59Z UTC.", "resolutionCriteria": "Checked against https://example.com/feed at cutoff." },
+        { "name": "No", "winCondition": "Event does not occur before cutoff.", "resolutionCriteria": "Checked against https://example.com/feed at cutoff." }
+      ],
+      "marketStartTimeUTC": "2027-01-01T00:00:00Z",
+      "marketEndTimeUTC": "2027-12-31T23:59:59Z",
+      "shortDescription": "Canonical clean test market for the eval harness.",
+      "fullResolutionRules": "1. Check feed at cutoff. 2. Apply threshold of 1.",
+      "edgeCases": "1. Source unavailable → defer 48h then void. 2. Postponement → No wins."
+    },
+    "urlResolves": {
+      "https://example.com/feed": true
+    }
+  }
+}

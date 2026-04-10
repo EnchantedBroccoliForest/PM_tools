@@ -1,0 +1,37 @@
+{
+  "id": "ambig-multi-interpretation",
+  "bucket": "ambiguity",
+  "description": "\"Best performer\" is meaningful in several different frames (absolute return, risk-adjusted, longest active). Reviewers fail MECE and objective_source, blocking finalize.",
+  "input": {
+    "question": "Which ETF will be the best performer of 2027?",
+    "startDate": "2027-01-02",
+    "endDate": "2027-12-31",
+    "references": "https://www.bloomberg.com/markets"
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "\"Best performer\" can mean absolute return, risk-adjusted return, or Sharpe ratio. Each of those can resolve to a different winner; without a single chosen metric the market is effectively three markets overlaid.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "no", "rationale": "Multiple metrics can select different winners so outcomes are not mutually exclusive." },
+          { "ruleId": "objective_source", "verdict": "no", "rationale": "Bloomberg Markets has no single canonical \"best performer\" ranking." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "Dates are UTC." },
+          { "ruleId": "manipulation_resistant", "verdict": "unsure", "rationale": "Depends on metric." },
+          { "ruleId": "atomic_claims", "verdict": "no", "rationale": "Each outcome conflates metric and rank." },
+          { "ruleId": "edge_cases_covered", "verdict": "no", "rationale": "No tiebreak rule." }
+        ],
+        "criticisms": [
+          { "claimId": "claim.outcome.0.criterion", "severity": "blocker", "category": "mece", "rationale": "Pick exactly one metric and state its exact computation." },
+          { "claimId": "global", "severity": "major", "category": "objectivity", "rationale": "Cite a specific Bloomberg page or Morningstar rank, not a homepage." }
+        ]
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "blocked",
+    "expected_aggregation_overall": "fail",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_routing": true,
+    "expected_blocking_count": "gte-1"
+  }
+}

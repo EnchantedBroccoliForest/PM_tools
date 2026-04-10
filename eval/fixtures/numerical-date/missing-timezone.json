@@ -1,0 +1,33 @@
+{
+  "id": "num-missing-timezone",
+  "bucket": "numerical-date",
+  "description": "Timestamp claim is a bare English phrase (\"end of 2027\") with neither ISO date nor HH:MM. Structural check hard_fails the claim.",
+  "input": {
+    "question": "Will the referenced event occur by the end of 2027?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "mockResponses": {
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the referenced event occur by the end of 2027?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "Market starts at the beginning of 2027.", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "Market ends at the end of 2027.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins.", "sourceRefs": [] },
+      { "id": "claim.source.0", "category": "source", "text": "https://example.com/feed", "sourceRefs": [] }
+    ],
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Present." }
+    ]
+  },
+  "expectedProperties": {
+    "expected_has_hard_fail": true,
+    "expected_routing_overall": "blocked",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_verification": true
+  }
+}

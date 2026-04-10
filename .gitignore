@@ -13,3 +13,8 @@ pnpm-debug.log*
 *.pem
 .vscode/*
 !.vscode/extensions.json
+
+# Per-run artifacts from the Phase 6 regression eval harness. The
+# committed baseline lives at eval/baseline.json and is NOT ignored;
+# only the ephemeral per-run dumps under eval/out/ are excluded.
+eval/out/

@@ -1,0 +1,20 @@
+{
+  "id": "advf-clean-baseline",
+  "bucket": "adversarial-factual",
+  "description": "Sanity baseline: a canonical draft with every claim entailed. Used to bound the bucket at 100% pass rate under the happy path.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "expectedProperties": {
+    "expected_risk": "low",
+    "expected_routing_overall": "clean",
+    "expected_aggregation_overall": "pass",
+    "expected_finalize_allowed": true,
+    "expected_has_hard_fail": false,
+    "expected_has_contradicted": false,
+    "expected_citation_resolves_all": true
+  }
+}

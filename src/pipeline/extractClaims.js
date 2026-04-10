@@ -14,13 +14,13 @@
  * dropped at zod validation time.
  */
 
-import { queryModel } from '../api/openrouter';
+import { queryModel } from '../api/openrouter.js';
 import {
   SYSTEM_PROMPTS,
   buildClaimExtractorPrompt,
   buildStrictClaimExtractorRetryPrompt,
-} from '../constants/prompts';
-import { ClaimArraySchema } from '../types/run';
+} from '../constants/prompts.js';
+import { ClaimArraySchema } from '../types/run.js';
 
 /**
  * Best-effort parse of an LLM response to JSON. Models sometimes wrap JSON

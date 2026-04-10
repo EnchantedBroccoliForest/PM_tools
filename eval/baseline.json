@@ -1,0 +1,22 @@
+{
+  "ablation": {
+    "aggregation": "majority",
+    "escalation": "always",
+    "evidence": "retrieval",
+    "verifiers": "full"
+  },
+  "fixtureCount": 35,
+  "accuracy": 1,
+  "perBucketAccuracy": {
+    "adversarial-factual": 1,
+    "ambiguity": 1,
+    "numerical-date": 1,
+    "rag-trap": 1
+  },
+  "citationCoverage": 0.8529411764705882,
+  "verifierPassRate": 0.9433962264150944,
+  "overrideRate": 0,
+  "tokenSpendTotal": 373538,
+  "tokenSpendMean": 10672.514285714286,
+  "failingFixtures": 0
+}

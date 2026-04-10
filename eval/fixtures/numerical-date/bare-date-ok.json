@@ -1,0 +1,33 @@
+{
+  "id": "num-bare-date-ok",
+  "bucket": "numerical-date",
+  "description": "Bare YYYY-MM-DD timestamps without HH:MM are acceptable to the structural verifier (the regex allows either an ISO date OR a time). This fixture is a positive test that the verifier doesn't over-reject.",
+  "input": {
+    "question": "Will the referenced event occur on 2027-12-31?",
+    "startDate": "2027-12-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "mockResponses": {
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the referenced event occur on 2027-12-31?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "2027-12-01", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "2027-12-31", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins if event occurs.", "sourceRefs": [] },
+      { "id": "claim.source.0", "category": "source", "text": "https://example.com/feed", "sourceRefs": [] }
+    ],
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Present." }
+    ]
+  },
+  "expectedProperties": {
+    "expected_has_hard_fail": false,
+    "expected_has_soft_fail": false,
+    "expected_routing_overall": "clean",
+    "expected_finalize_allowed": true
+  }
+}
