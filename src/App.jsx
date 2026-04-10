@@ -15,6 +15,8 @@ import {
   buildIdeatePrompt,
 } from './constants/prompts';
 import { queryModel, queryModelsParallel } from './api/openrouter';
+import { extractClaims } from './pipeline/extractClaims';
+import { parseRun } from './types/run';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
@@ -124,6 +126,8 @@ function App() {
     earlyResolutionRisk,
     earlyResolutionRiskLevel,
     earlyResolutionAcknowledged,
+    currentRun,
+    runTraceOpen,
     copiedId,
   } = state;
 
@@ -185,25 +189,77 @@ function App() {
     dispatch({ type: 'SET_DATE', field, value, dateError: validateDates(newStart, newEnd) });
   };
 
+  // Small helper: dispatch a RUN_COST entry for a single LLM call result.
+  // Accepts the `{usage, wallClockMs}` subset returned by queryModel.
+  const recordCost = (stage, result) => {
+    if (!result || !result.usage) return;
+    dispatch({
+      type: 'RUN_COST',
+      stage,
+      tokensIn: result.usage.promptTokens,
+      tokensOut: result.usage.completionTokens,
+      wallClockMs: result.wallClockMs || 0,
+    });
+  };
+
+  // Kick off claim extraction in the background for a draft and fold the
+  // result (and any log entries) into the current run. Never throws.
+  const runClaimExtractorAndRecord = async (draftText) => {
+    const result = await extractClaims(selectedModel, draftText);
+    dispatch({
+      type: 'RUN_COST',
+      stage: 'claims',
+      tokensIn: result.usage.promptTokens,
+      tokensOut: result.usage.completionTokens,
+      wallClockMs: result.wallClockMs,
+    });
+    dispatch({ type: 'RUN_SET_CLAIMS', claims: result.claims });
+    if (result.logEntry) {
+      dispatch({
+        type: 'RUN_LOG',
+        stage: 'claims',
+        level: result.logEntry.level,
+        message: result.logEntry.message,
+      });
+    }
+  };
+
   // --- Stage 1: Draft (single model) ---
   const handleDraft = async () => {
     dispatch({ type: 'START_LOADING', phase: 'draft', models: [getModelName(selectedModel)] });
+    // Start a fresh Run artifact; previous run (if any) is discarded.
+    dispatch({
+      type: 'RUN_START',
+      input: { question, startDate, endDate, references },
+    });
     try {
-      const content = await queryModel(selectedModel, [
+      const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
         { role: 'user', content: buildDraftPrompt(question, startDate, endDate, references) },
       ]);
-      dispatch({ type: 'DRAFT_SUCCESS', content });
+      dispatch({ type: 'DRAFT_SUCCESS', content: result.content });
+      recordCost('draft', result);
+      dispatch({
+        type: 'RUN_APPEND_DRAFT',
+        model: selectedModel,
+        content: result.content,
+        kind: 'initial',
+      });
+      // Claim extraction runs in the background so the UI isn't blocked
+      // on a second LLM round-trip; failures are logged, not thrown.
+      runClaimExtractorAndRecord(result.content);
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate draft' });
+      dispatch({ type: 'RUN_LOG', stage: 'draft', level: 'error', message: err.message || 'Draft failed' });
     }
   };
 
   // --- Stage 2: Multi-reviewer deliberation (inspired by llm-council Structure D) ---
   //
-  // Phase 1: All selected review models review independently in parallel
-  // Phase 2: If multiple reviewers, each sees the others' critiques and produces
-  //          a consolidated deliberated review (like deliberate_synthesize.py)
+  // Phase 1: All selected review models review independently in parallel. The
+  //          successful reviews are projected into Criticism objects on the
+  //          Run artifact with synthetic ids; Phase 2 will replace this with
+  //          structured per-claim voting.
   const handleReview = async () => {
     if (!draftContent) return;
     dispatch({ type: 'START_LOADING', phase: 'review', models: reviewModels.map((id) => getModelName(id)) });
@@ -221,6 +277,13 @@ function App() {
       ];
       const independentReviews = await queryModelsParallel(reviewerModels, messages);
 
+      // Accumulate per-reviewer cost into the run artifact.
+      for (const r of independentReviews) {
+        if (r.content !== null && r.usage) {
+          recordCost('review', { usage: r.usage, wallClockMs: r.wallClockMs });
+        }
+      }
+
       const successfulReviews = independentReviews.filter((r) => r.content !== null);
 
       if (successfulReviews.length === 0) {
@@ -228,15 +291,20 @@ function App() {
       }
 
       // Phase 2: Deliberation — if we have multiple successful reviews,
-      // use the first reviewer as "chairman" to synthesize a consolidated critique
+      // use the first reviewer as "chairman" to synthesize a consolidated critique.
+      // This chairman pattern is the brief's canonical single-point-of-failure
+      // aggregator and will be replaced by a pluggable decision protocol in
+      // Phase 2. For now we keep it so existing UI behaviour is preserved.
       let deliberatedReview = null;
 
       if (successfulReviews.length > 1) {
         const deliberationPrompt = buildDeliberationPrompt(draftContent, successfulReviews);
-        deliberatedReview = await queryModel(successfulReviews[0].model, [
+        const delibResult = await queryModel(successfulReviews[0].model, [
           { role: 'system', content: SYSTEM_PROMPTS.reviewer },
           { role: 'user', content: deliberationPrompt },
         ]);
+        deliberatedReview = delibResult.content;
+        recordCost('deliberation', delibResult);
       }
 
       dispatch({
@@ -244,8 +312,36 @@ function App() {
         reviews: successfulReviews,
         deliberatedReview,
       });
+
+      // Run artifact: append a Criticism per successful reviewer. This is a
+      // deliberately thin projection — Phase 2 will replace this with real
+      // structured per-claim voting rooted in the Answer Contract.
+      const now = Date.now();
+      const criticisms = successfulReviews.map((r, i) => ({
+        id: `criticism.${now}.${i}`,
+        reviewerModel: r.model,
+        claimId: 'global',
+        severity: 'minor',
+        category: 'other',
+        rationale: (r.content || '').slice(0, 1000),
+      }));
+      dispatch({ type: 'RUN_APPEND_CRITICISMS', criticisms });
+
+      // Trivial Phase-1 Aggregation: records that the aggregation stage ran
+      // and nothing was escalated. Phase 2 replaces this with checklist-level
+      // majority / unanimity / judge protocols.
+      dispatch({
+        type: 'RUN_SET_AGGREGATION',
+        aggregation: {
+          protocol: 'majority',
+          checklist: [],
+          judgeRationale: null,
+          overall: 'pass',
+        },
+      });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate review' });
+      dispatch({ type: 'RUN_LOG', stage: 'review', level: 'error', message: err.message || 'Review failed' });
     }
   };
 
@@ -265,32 +361,51 @@ function App() {
     try {
       // Use the deliberated review if available, otherwise fall back to first review
       const reviewText = deliberatedReview || reviews[0].content;
-      updatedDraft = await queryModel(selectedModel, [
+      const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
         { role: 'user', content: buildUpdatePrompt(draftContent, reviewText, humanReviewInput) },
       ]);
+      updatedDraft = result.content;
       dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });
+      recordCost('update', result);
+      dispatch({
+        type: 'RUN_APPEND_DRAFT',
+        model: selectedModel,
+        content: updatedDraft,
+        kind: 'updated',
+      });
+      // Re-extract claims from the updated draft — the latest extraction
+      // is always the canonical one for downstream verifiers.
+      runClaimExtractorAndRecord(updatedDraft);
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to update draft' });
+      dispatch({ type: 'RUN_LOG', stage: 'update', level: 'error', message: err.message || 'Update failed' });
       return;
     }
 
     // Chain: early-resolution risk check on the updated draft.
     dispatch({ type: 'START_EARLY_RESOLUTION', models: [getModelName(selectedModel)] });
     try {
-      const riskContent = await queryModel(selectedModel, [
+      const riskResult = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.earlyResolutionAnalyst },
         { role: 'user', content: buildEarlyResolutionPrompt(updatedDraft, startDate, endDate) },
       ]);
+      recordCost('early_resolution', riskResult);
       dispatch({
         type: 'EARLY_RESOLUTION_SUCCESS',
-        content: riskContent,
-        level: parseRiskLevel(riskContent),
+        content: riskResult.content,
+        level: parseRiskLevel(riskResult.content),
       });
     } catch (riskErr) {
       dispatch({
         type: 'EARLY_RESOLUTION_ERROR',
         error: riskErr.message || 'Failed to analyze early resolution risk',
+      });
+      dispatch({
+        type: 'RUN_LOG',
+        stage: 'early_resolution',
+        level: 'error',
+        message: riskErr.message || 'Early resolution check failed',
       });
     }
   };
@@ -304,7 +419,7 @@ function App() {
     dispatch({ type: 'START_LOADING', phase: 'accept', models: [getModelName(selectedModel)] });
 
     try {
-      const content = await queryModel(
+      const result = await queryModel(
         selectedModel,
         [
           { role: 'system', content: SYSTEM_PROMPTS.finalizer },
@@ -312,45 +427,115 @@ function App() {
         ],
         { temperature: 0.3 }
       );
+      recordCost('accept', result);
 
       let parsedContent;
       try {
-        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+        const jsonMatch = result.content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
         if (jsonMatch) {
           parsedContent = JSON.parse(jsonMatch[1]);
         } else {
-          parsedContent = JSON.parse(content);
+          parsedContent = JSON.parse(result.content);
         }
       } catch {
-        parsedContent = { raw: content };
+        parsedContent = { raw: result.content };
       }
 
       dispatch({ type: 'FINALIZE_SUCCESS', content: parsedContent });
+      dispatch({ type: 'RUN_SET_FINAL', finalJson: parsedContent });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to finalize market' });
+      dispatch({ type: 'RUN_LOG', stage: 'accept', level: 'error', message: err.message || 'Finalize failed' });
     }
   };
 
   const handleSubmitPastedDraft = () => {
-    if (!pastedDraft.trim()) return;
-    dispatch({ type: 'SUBMIT_PASTED_DRAFT', content: pastedDraft.trim() });
+    const trimmed = pastedDraft.trim();
+    if (!trimmed) return;
+    dispatch({ type: 'SUBMIT_PASTED_DRAFT', content: trimmed });
+    // Start a Run artifact so imported drafts participate in the same
+    // claim-extraction → review → verify pipeline.
+    dispatch({
+      type: 'RUN_START',
+      input: { question, startDate, endDate, references },
+    });
+    dispatch({
+      type: 'RUN_APPEND_DRAFT',
+      model: 'pasted',
+      content: trimmed,
+      kind: 'initial',
+    });
+    runClaimExtractorAndRecord(trimmed);
   };
 
   // --- Ideating: generate market ideas from vague user direction ---
   const handleIdeate = async () => {
     dispatch({ type: 'START_LOADING', phase: 'ideate', models: [getModelName(ideatingModel)] });
     try {
-      const content = await queryModel(ideatingModel, [
+      const result = await queryModel(ideatingModel, [
         { role: 'system', content: SYSTEM_PROMPTS.ideator },
         { role: 'user', content: buildIdeatePrompt(ideatingInput) },
       ]);
-      dispatch({ type: 'IDEATE_SUCCESS', content });
+      dispatch({ type: 'IDEATE_SUCCESS', content: result.content });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate market ideas' });
     }
   };
 
   const handleReset = () => dispatch({ type: 'RESET' });
+
+  // --- Run trace: export current run as JSON download ---
+  // Client-side only; no server involved. The download filename carries the
+  // runId so multiple exports from the same session are distinguishable.
+  const handleExportRun = () => {
+    if (!currentRun) return;
+    try {
+      const json = JSON.stringify(currentRun, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentRun.runId || 'run'}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      dispatch({ type: 'RUN_EXPORT' });
+    } catch (err) {
+      dispatch({ type: 'SET_ERROR', error: `Failed to export run: ${err.message || err}` });
+    }
+  };
+
+  // --- Run trace: import a previously exported run ---
+  // Validates with zod via parseRun; on failure the file is ignored and an
+  // error is surfaced to the user. On success the reducer rehydrates the
+  // legacy view-state fields so the main UI re-renders the imported run.
+  const handleImportRun = (event) => {
+    const file = event.target.files && event.target.files[0];
+    // Reset the input so the same file can be re-imported without a page reload.
+    event.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const raw = JSON.parse(reader.result);
+        const run = parseRun(raw);
+        if (!run) {
+          dispatch({ type: 'SET_ERROR', error: 'Import failed: file is not a valid Run JSON.' });
+          return;
+        }
+        dispatch({ type: 'RUN_IMPORT', run });
+      } catch (err) {
+        dispatch({ type: 'SET_ERROR', error: `Import failed: ${err.message || err}` });
+      }
+    };
+    reader.onerror = () => {
+      dispatch({ type: 'SET_ERROR', error: 'Failed to read import file.' });
+    };
+    reader.readAsText(file);
+  };
+
+  const handleToggleRunTrace = () => dispatch({ type: 'TOGGLE_RUN_TRACE' });
 
   return (
     <div className={`App ${ambientConfig.classes.join(' ')}`}>
@@ -1094,6 +1279,176 @@ function App() {
           </div>
 
         </div>
+
+        {/* Run trace panel — Phase 1. Collapsible, shows the current Run
+            artifact (drafts, claims, cost) and provides export/import of
+            the raw JSON for bug reports and round-trip verification. */}
+        <section className="run-trace" aria-labelledby="run-trace-heading">
+          <button
+            type="button"
+            className="run-trace__toggle"
+            onClick={handleToggleRunTrace}
+            aria-expanded={runTraceOpen}
+          >
+            <span id="run-trace-heading">Run trace</span>
+            <span className="run-trace__chevron" aria-hidden="true">
+              {runTraceOpen ? '▾' : '▸'}
+            </span>
+            {currentRun && (
+              <span className="run-trace__summary">
+                {currentRun.drafts.length} draft{currentRun.drafts.length === 1 ? '' : 's'}
+                {' · '}
+                {currentRun.claims.length} claim{currentRun.claims.length === 1 ? '' : 's'}
+                {' · '}
+                {currentRun.cost.totalTokensIn + currentRun.cost.totalTokensOut} tok
+              </span>
+            )}
+          </button>
+
+          {runTraceOpen && (
+            <div className="run-trace__body">
+              <div className="run-trace__actions">
+                <button
+                  type="button"
+                  className="run-trace__button"
+                  onClick={handleExportRun}
+                  disabled={!currentRun}
+                >
+                  Export run as JSON
+                </button>
+                <label className="run-trace__button run-trace__button--import">
+                  Import run
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={handleImportRun}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </div>
+
+              {!currentRun && (
+                <p className="run-trace__empty">
+                  No run yet. Generate or submit a draft to start a run.
+                </p>
+              )}
+
+              {currentRun && (
+                <>
+                  <div className="run-trace__section">
+                    <h4 className="run-trace__heading">
+                      Run {currentRun.runId}
+                    </h4>
+                    <div className="run-trace__kv">
+                      <span>Started</span>
+                      <span>{new Date(currentRun.startedAt).toLocaleString()}</span>
+                    </div>
+                    <div className="run-trace__kv">
+                      <span>Question</span>
+                      <span>{currentRun.input?.question || '(none)'}</span>
+                    </div>
+                  </div>
+
+                  <div className="run-trace__section">
+                    <h4 className="run-trace__heading">
+                      Drafts ({currentRun.drafts.length})
+                    </h4>
+                    {currentRun.drafts.length === 0 ? (
+                      <p className="run-trace__empty">No drafts yet.</p>
+                    ) : (
+                      <ol className="run-trace__list">
+                        {currentRun.drafts.map((d, i) => (
+                          <li key={i} className="run-trace__draft">
+                            <div className="run-trace__draft-meta">
+                              <span className="run-trace__badge">{d.kind}</span>
+                              <span>{getModelName(d.model)}</span>
+                              <span className="run-trace__ts">
+                                {new Date(d.timestamp).toLocaleTimeString()}
+                              </span>
+                            </div>
+                            <div className="run-trace__draft-preview">
+                              {(d.content || '').slice(0, 200)}
+                              {(d.content || '').length > 200 ? '…' : ''}
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+
+                  <div className="run-trace__section">
+                    <h4 className="run-trace__heading">
+                      Claims ({currentRun.claims.length})
+                    </h4>
+                    {currentRun.claims.length === 0 ? (
+                      <p className="run-trace__empty">
+                        No claims extracted yet.
+                      </p>
+                    ) : (
+                      <ul className="run-trace__list">
+                        {currentRun.claims.map((c) => (
+                          <li key={c.id} className="run-trace__claim">
+                            <code className="run-trace__claim-id">{c.id}</code>
+                            <span className="run-trace__badge">{c.category}</span>
+                            <span className="run-trace__claim-text">{c.text}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="run-trace__section">
+                    <h4 className="run-trace__heading">Cost</h4>
+                    <div className="run-trace__kv">
+                      <span>Tokens in</span>
+                      <span>{currentRun.cost.totalTokensIn}</span>
+                    </div>
+                    <div className="run-trace__kv">
+                      <span>Tokens out</span>
+                      <span>{currentRun.cost.totalTokensOut}</span>
+                    </div>
+                    <div className="run-trace__kv">
+                      <span>Wall clock</span>
+                      <span>{(currentRun.cost.wallClockMs / 1000).toFixed(1)}s</span>
+                    </div>
+                    {Object.keys(currentRun.cost.byStage).length > 0 && (
+                      <div className="run-trace__by-stage">
+                        {Object.entries(currentRun.cost.byStage).map(([stage, tokens]) => (
+                          <div key={stage} className="run-trace__kv">
+                            <span>↳ {stage}</span>
+                            <span>{tokens} tok</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {currentRun.log.length > 0 && (
+                    <div className="run-trace__section">
+                      <h4 className="run-trace__heading">
+                        Log ({currentRun.log.length})
+                      </h4>
+                      <ul className="run-trace__list">
+                        {currentRun.log.map((entry, i) => (
+                          <li
+                            key={i}
+                            className={`run-trace__log run-trace__log--${entry.level}`}
+                          >
+                            <span className="run-trace__ts">
+                              {new Date(entry.ts).toLocaleTimeString()}
+                            </span>
+                            <span className="run-trace__badge">{entry.stage}</span>
+                            <span>{entry.message}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
