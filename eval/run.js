@@ -8,7 +8,7 @@
  *
  * Ablation flags (the four non-negotiable knobs from the work order):
  *   --aggregation=majority|unanimity|judge       (default: majority)
- *   --escalation=always|selective                (default: selective)
+ *   --escalation=always|selective                (default: always)
  *   --evidence=none|retrieval|retrieval+debate   (default: retrieval)
  *   --verifiers=off|partial|full                 (default: full)
  *

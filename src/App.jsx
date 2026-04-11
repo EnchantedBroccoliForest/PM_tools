@@ -362,7 +362,14 @@ function App() {
       });
       // Claim extraction runs in the background so the UI isn't blocked
       // on a second LLM round-trip; failures are logged, not thrown.
-      runClaimExtractorAndRecord(result.content);
+      runClaimExtractorAndRecord(result.content).catch((bgErr) => {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'claims',
+          level: 'error',
+          message: `Background claim extraction crashed: ${bgErr?.message || bgErr}`,
+        });
+      });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate draft' });
       dispatch({ type: 'RUN_LOG', stage: 'draft', level: 'error', message: err.message || 'Draft failed' });
@@ -553,7 +560,14 @@ function App() {
       });
       // Re-extract claims from the updated draft — the latest extraction
       // is always the canonical one for downstream verifiers.
-      runClaimExtractorAndRecord(updatedDraft);
+      runClaimExtractorAndRecord(updatedDraft).catch((bgErr) => {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'claims',
+          level: 'error',
+          message: `Background claim extraction crashed: ${bgErr?.message || bgErr}`,
+        });
+      });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to update draft' });
       dispatch({ type: 'RUN_LOG', stage: 'update', level: 'error', message: err.message || 'Update failed' });
@@ -643,7 +657,14 @@ function App() {
       content: trimmed,
       kind: 'initial',
     });
-    runClaimExtractorAndRecord(trimmed);
+    runClaimExtractorAndRecord(trimmed).catch((bgErr) => {
+      dispatch({
+        type: 'RUN_LOG',
+        stage: 'claims',
+        level: 'error',
+        message: `Background claim extraction crashed: ${bgErr?.message || bgErr}`,
+      });
+    });
   };
 
   // --- Ideating: generate market ideas from vague user direction ---

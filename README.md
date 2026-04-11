@@ -62,7 +62,7 @@ src/
 - **State management** uses React's `useReducer` (via the `useMarketReducer` custom hook) rather than an external state library, keeping the dependency footprint minimal.
 - **Prompt engineering** is centralized in `src/constants/prompts.js` with distinct system prompts for the drafter, reviewer, and finalizer roles, plus builder functions for each stage's user prompt.
 - **API resilience** — The OpenRouter client (`src/api/openrouter.js`) implements automatic retries with exponential backoff (3 retries at 1s/2s/4s intervals).
-- **Model flexibility** — 20+ models are available across 6 providers (OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral). Default drafting model is GPT-5.1; default reviewer is Claude 3.5 Haiku.
+- **Model flexibility** — 20+ models are available across 6 providers (OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral). The default drafting and review models are declared in `src/constants/models.js` as `DEFAULT_DRAFT_MODEL` and `DEFAULT_REVIEW_MODEL`; these are revised in lock-step with OpenRouter model availability, so this README intentionally does not pin specific ids.
 
 ## Tech Stack
 
@@ -155,3 +155,7 @@ coverage, or verifier pass rate by more than 10%) fails CI.
 ## Attribution
 
 PM_tools' multi-reviewer deliberation stage is **inspired by** the "Structure D" pattern from [`karpathy/llm-council`](https://github.com/karpathy/llm-council) and has been re-implemented from scratch here. Because `karpathy/llm-council` ships without a licence, no code has been copied from that repository — only the high-level pattern (independent parallel reviews followed by a synthesis pass) has been borrowed. Any resemblance beyond that is coincidental.
+
+## Licence
+
+PM_tools is released under the [MIT License](LICENSE).
