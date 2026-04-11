@@ -87,6 +87,145 @@ function formatInline(text) {
   });
 }
 
+// Parse the Ideate stage output into discrete ideas. The prompt asks the
+// model to number ideas `1.`, `2.`, ... and include a `**Title**` field for
+// each, so we split on top-level numbered starts and best-effort extract the
+// title from each block. The trailing "themes / follow-up" note (if any) is
+// captured as a postamble so it isn't absorbed into the last idea.
+function parseIdeateContent(rawText) {
+  if (!rawText || typeof rawText !== 'string') {
+    return { preamble: '', ideas: [], postamble: '' };
+  }
+  const lines = rawText.split('\n');
+  const preambleLines = [];
+  const ideas = [];
+  let current = null;
+
+  for (const line of lines) {
+    const startMatch = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
+    if (startMatch) {
+      if (current) ideas.push(current);
+      current = { number: Number(startMatch[1]), lines: [line] };
+      continue;
+    }
+    if (current) {
+      current.lines.push(line);
+    } else {
+      preambleLines.push(line);
+    }
+  }
+  if (current) ideas.push(current);
+
+  // Detach a trailing "themes / follow-up" paragraph from the last idea if
+  // it looks like a standalone note (separated by a blank line, not indented,
+  // and not one of the known Idea sub-fields). This keeps the button
+  // association clean when the LLM ends with a summary sentence.
+  let postamble = '';
+  if (ideas.length > 0) {
+    const last = ideas[ideas.length - 1];
+    let splitAt = -1;
+    for (let i = last.lines.length - 1; i > 0; i--) {
+      const prev = last.lines[i - 1];
+      const curr = last.lines[i];
+      const isBlank = prev.trim() === '';
+      const isTopLevelProse =
+        curr.trim() !== '' &&
+        !/^\s/.test(curr) &&
+        !/^\s*[-*]\s/.test(curr) &&
+        !/\*\*(Title|Outcome Set|Why|Resolvability|Suggested timeframe)/i.test(curr);
+      if (isBlank && isTopLevelProse) {
+        splitAt = i;
+        break;
+      }
+    }
+    if (splitAt > 0) {
+      const tail = last.lines.slice(splitAt);
+      last.lines = last.lines.slice(0, splitAt);
+      postamble = tail.join('\n').trim();
+    }
+  }
+
+  const parsedIdeas = ideas.map((idea) => {
+    const rawText = idea.lines.join('\n');
+    const { title, rest } = extractIdeaTitleAndRest(rawText, idea.number);
+    return {
+      number: idea.number,
+      rawText,
+      title,
+      rest,
+    };
+  });
+
+  return {
+    preamble: preambleLines.join('\n').trim(),
+    ideas: parsedIdeas,
+    postamble,
+  };
+}
+
+// Extract a clean title string and the "rest" of the idea body (everything
+// except the title line), for populating Draft Market's Reference field.
+function extractIdeaTitleAndRest(ideaText, number) {
+  const lines = ideaText.split('\n');
+
+  // Strategy 1: find an explicit "**Title**" label anywhere in the idea.
+  let titleLineIdx = -1;
+  let title = '';
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/\*\*\s*Title\s*\*\*\s*[—:-]*\s*(.+)$/i);
+    if (m) {
+      titleLineIdx = i;
+      title = m[1];
+      break;
+    }
+  }
+
+  // Strategy 2: fall back to the first line after the "N." prefix.
+  if (titleLineIdx === -1 && lines.length > 0) {
+    const firstLineMatch = lines[0].match(/^\s*\d+[.)]\s+(.+)$/);
+    if (firstLineMatch) {
+      titleLineIdx = 0;
+      title = firstLineMatch[1];
+    }
+  }
+
+  // Clean up the title: strip markdown bold, leading label prefixes, and
+  // surrounding quotes.
+  title = (title || '')
+    .replace(/\*\*/g, '')
+    .replace(/^\s*Title\s*[:—-]\s*/i, '')
+    .replace(/^["'`\u201C\u2018]+|["'`\u201D\u2019]+$/g, '')
+    .trim();
+
+  // Build the "rest" by removing just the title line (or the title segment
+  // from the first line if the title came from strategy 2).
+  let rest;
+  if (titleLineIdx === 0) {
+    // The title was on the first line, possibly preceded by "N.".
+    // Drop the whole first line so we don't duplicate the title in the
+    // Reference field.
+    rest = lines.slice(1).join('\n');
+  } else if (titleLineIdx > 0) {
+    // Preserve everything except the dedicated title line.
+    rest = [...lines.slice(0, titleLineIdx), ...lines.slice(titleLineIdx + 1)]
+      .join('\n');
+  } else {
+    // Could not find a title at all — keep the body as-is (minus the
+    // leading number so it reads cleanly).
+    rest = ideaText.replace(/^\s*\d+[.)]\s*/, '');
+  }
+
+  return { title: title || `Idea ${number}`, rest: rest.trim() };
+}
+
+// Build the text that goes into the Draft Market "References" field when an
+// idea's arrow button is clicked. Includes the idea's context (Outcome Set,
+// Why it's interesting, Resolvability, Suggested timeframe) so the drafting
+// model has the same framing the ideator used.
+function buildReferenceFromIdea(idea) {
+  return (idea.rest || idea.rawText || '').trim();
+}
+
 // Parse the risk level out of the early-resolution analyst response. The
 // prompt instructs the model to begin with "Risk rating: Low/Medium/High" —
 // anything else falls back to 'unknown', which does NOT block the gate (only
@@ -712,6 +851,17 @@ function App() {
     }
   };
 
+  // Handoff from Ideate → Draft Market: switch modes and prefill the
+  // Question and References fields from the chosen idea. The user can then
+  // pick dates / tweak the question and hit Draft Market.
+  const handleUseIdeaForDraft = (idea) => {
+    dispatch({
+      type: 'USE_IDEA_FOR_DRAFT',
+      question: idea.title || '',
+      references: buildReferenceFromIdea(idea),
+    });
+  };
+
   const handleReset = () => dispatch({ type: 'RESET' });
 
   // --- Run trace: export current run as JSON download ---
@@ -1039,7 +1189,51 @@ function App() {
                         </div>
                       </div>
                       <div className="content-box content-box--rich">
-                        {renderContent(ideatingContent)}
+                        {(() => {
+                          const { preamble, ideas, postamble } = parseIdeateContent(ideatingContent);
+                          if (ideas.length === 0) {
+                            // Fallback: the LLM didn't number its output, so
+                            // render the raw content without per-idea buttons.
+                            return renderContent(ideatingContent);
+                          }
+                          return (
+                            <>
+                              {preamble && (
+                                <div className="ideate-preamble">{renderContent(preamble)}</div>
+                              )}
+                              <div className="ideate-ideas">
+                                {ideas.map((idea, idx) => (
+                                  <div
+                                    key={`idea-${idx}-${idea.number}`}
+                                    className="ideate-idea"
+                                  >
+                                    <div className="ideate-idea__header">
+                                      <span className="ideate-idea__number">{idea.number}.</span>
+                                      <span className="ideate-idea__title">{idea.title}</span>
+                                      <button
+                                        type="button"
+                                        className="ideate-idea__use-btn"
+                                        onClick={() => handleUseIdeaForDraft(idea)}
+                                        title="Use this idea in Draft Market"
+                                        aria-label={`Use idea ${idea.number} in Draft Market`}
+                                      >
+                                        &rarr;
+                                      </button>
+                                    </div>
+                                    {idea.rest && (
+                                      <div className="ideate-idea__body">
+                                        {renderContent(idea.rest)}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              {postamble && (
+                                <div className="ideate-postamble">{renderContent(postamble)}</div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
