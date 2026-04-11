@@ -1326,6 +1326,138 @@ select.input optgroup {
 }
 
 /* ================================================
+   Draft Version Badge, Switcher, Update Flash
+   ================================================ */
+.draft-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.version-badge {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 0.12rem 0.45rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--neon-magenta);
+  background: rgba(255, 0, 110, 0.1);
+  border: 1px solid rgba(255, 0, 110, 0.35);
+  border-radius: var(--r-xs);
+  text-transform: uppercase;
+}
+
+.version-badge__total {
+  font-size: 0.58rem;
+  font-weight: 500;
+  opacity: 0.7;
+  margin-left: 1px;
+}
+
+.version-timestamp {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+}
+
+.version-switcher {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--r-xs);
+  overflow: hidden;
+}
+
+.version-switcher__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-3);
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.version-switcher__btn + .version-switcher__btn {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.version-switcher__btn:hover:not(:disabled) {
+  background: rgba(255, 0, 110, 0.15);
+  color: var(--neon-magenta);
+}
+
+.version-switcher__btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.version-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  background: rgba(255, 234, 0, 0.08);
+  border: 1px solid rgba(255, 234, 0, 0.3);
+  border-radius: var(--r-xs);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--neon-yellow);
+  letter-spacing: 0.02em;
+}
+
+.version-banner__btn {
+  background: transparent;
+  border: 1px solid rgba(255, 234, 0, 0.5);
+  color: var(--neon-yellow);
+  padding: 0.2rem 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: background var(--transition);
+  flex-shrink: 0;
+}
+
+.version-banner__btn:hover {
+  background: rgba(255, 234, 0, 0.15);
+}
+
+/* Pulse the draft panel briefly after an update so the user notices */
+.col-panel--just-updated .content-box {
+  animation: draft-update-pulse 1.6s ease-out;
+}
+
+@keyframes draft-update-pulse {
+  0% {
+    border-color: rgba(255, 0, 110, 0.9);
+    box-shadow: 0 0 0 2px rgba(255, 0, 110, 0.35), 0 0 24px rgba(255, 0, 110, 0.35);
+  }
+  50% {
+    border-color: rgba(255, 0, 110, 0.55);
+    box-shadow: 0 0 0 1px rgba(255, 0, 110, 0.2), 0 0 14px rgba(255, 0, 110, 0.2);
+  }
+  100% {
+    border-color: rgba(255, 200, 100, 0.06);
+    box-shadow: none;
+  }
+}
+
+/* ================================================
    LLM Loading State
    ================================================ */
 .llm-loading {
@@ -1845,6 +1977,44 @@ select.input optgroup {
 
 .App.theme-light .copy-btn:hover {
   background: rgba(42, 125, 140, 0.12);
+}
+
+/* Draft version badge & switcher */
+.App.theme-light .version-badge {
+  color: var(--neon-magenta);
+  background: rgba(192, 83, 58, 0.08);
+  border-color: rgba(192, 83, 58, 0.25);
+}
+
+.App.theme-light .version-switcher {
+  border-color: rgba(139, 119, 90, 0.2);
+}
+
+.App.theme-light .version-switcher__btn {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.App.theme-light .version-switcher__btn + .version-switcher__btn {
+  border-left-color: rgba(139, 119, 90, 0.2);
+}
+
+.App.theme-light .version-switcher__btn:hover:not(:disabled) {
+  background: rgba(192, 83, 58, 0.12);
+}
+
+.App.theme-light .version-banner {
+  background: rgba(180, 140, 20, 0.1);
+  border-color: rgba(180, 140, 20, 0.35);
+  color: #8a6b00;
+}
+
+.App.theme-light .version-banner__btn {
+  border-color: rgba(138, 107, 0, 0.45);
+  color: #8a6b00;
+}
+
+.App.theme-light .version-banner__btn:hover {
+  background: rgba(180, 140, 20, 0.15);
 }
 
 /* Skeleton shimmer */
