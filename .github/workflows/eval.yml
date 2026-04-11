@@ -45,6 +45,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests (vitest)
+        run: npm test
+
       - name: Build (sanity check that the Vite bundle still compiles)
         run: npm run build
 
