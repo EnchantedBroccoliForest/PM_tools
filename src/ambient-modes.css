@@ -1,7 +1,7 @@
 @property --bg-dark { syntax: '<color>'; inherits: true; initial-value: #0a0a0f; }
-@property --text-1 { syntax: '<color>'; inherits: true; initial-value: #e0f7fa; }
-@property --text-2 { syntax: '<color>'; inherits: true; initial-value: #80cbc4; }
-@property --text-3 { syntax: '<color>'; inherits: true; initial-value: #4db6ac; }
+@property --text-1 { syntax: '<color>'; inherits: true; initial-value: #f0f6ff; }
+@property --text-2 { syntax: '<color>'; inherits: true; initial-value: #c1cee0; }
+@property --text-3 { syntax: '<color>'; inherits: true; initial-value: #8a98b0; }
 @property --neon-cyan { syntax: '<color>'; inherits: true; initial-value: #00e5ff; }
 @property --neon-magenta { syntax: '<color>'; inherits: true; initial-value: #ff006e; }
 @property --neon-green { syntax: '<color>'; inherits: true; initial-value: #39ff14; }
@@ -29,10 +29,10 @@
   --border: rgba(139, 119, 90, 0.25);
   --border-hover: rgba(139, 119, 90, 0.4);
   --border-focus: rgba(180, 80, 50, 0.5);
-  --text-1: #2c2416;
-  --text-2: #5a4d3a;
-  --text-3: #8a7d6b;
-  --accent: #c0533a;
+  --text-1: #1a1408;
+  --text-2: #3d3120;
+  --text-3: #6b5d48;
+  --accent: #a8442e;
   --accent-light: #d4745e;
   --accent-glow: rgba(192, 83, 58, 0.15);
   --blue: #2a7d8c;
@@ -69,7 +69,10 @@
 .App.ambient-light .input::placeholder { color: var(--text-3); }
 .App.ambient-light .panel { background: rgba(255, 252, 245, 0.6); border-color: var(--border); }
 .App.ambient-light .panel--active { border-color: rgba(42, 125, 140, 0.4); box-shadow: 0 0 20px rgba(42, 125, 140, 0.06); }
-.App.ambient-light .content-box { background: rgba(255, 252, 245, 0.5); border-color: rgba(139, 119, 90, 0.2); }
+.App.ambient-light .content-box { background: rgba(255, 252, 245, 0.7); border-color: rgba(139, 119, 90, 0.22); color: var(--text-1); }
+.App.ambient-light .content-box--rich .md-heading,
+.App.ambient-light .content-box--rich strong { color: #120a02; }
+.App.ambient-light .panel-placeholder p { color: var(--text-2); }
 .App.ambient-light .action-toolbar { background: rgba(245, 240, 232, 0.8); border-color: var(--border); }
 .App.ambient-light .toolbar-select { background: rgba(255, 252, 245, 0.65); color: var(--text-1); }
 .App.ambient-light .toolbar-select option, .App.ambient-light select.input option { background: #f5f0e8; color: var(--text-1); }
@@ -101,9 +104,9 @@
   --border: rgba(140, 160, 200, 0.12);
   --border-hover: rgba(140, 160, 200, 0.22);
   --border-focus: rgba(160, 180, 220, 0.5);
-  --text-1: #c4cde0;
-  --text-2: #8a96b0;
-  --text-3: #5a6580;
+  --text-1: #eaf0fa;
+  --text-2: #b8c3d8;
+  --text-3: #8591ab;
   --accent: #7080c0;
   --accent-light: #8a9ad4;
   --accent-glow: rgba(112, 128, 192, 0.2);
@@ -131,5 +134,8 @@
   background: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 10, 0.5) 100%);
 }
 .App.ambient-dark .panel { background: rgba(8, 12, 24, 0.85); }
-.App.ambient-dark .input { background: rgba(8, 12, 24, 0.4); }
+.App.ambient-dark .input { background: rgba(8, 12, 24, 0.4); color: var(--text-1); }
+.App.ambient-dark .content-box { color: var(--text-1); }
+.App.ambient-dark .content-box--rich .md-heading,
+.App.ambient-dark .content-box--rich strong { color: #ffffff; }
 .App.ambient-dark .wordmark-dot { background: #7090cc; box-shadow: 0 0 12px rgba(112, 144, 204, 0.5); }
