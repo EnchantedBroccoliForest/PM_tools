@@ -21,7 +21,7 @@ export const PROTOCOL_CONTEXT = `42.space PROTOCOL — every market is an Events
 2. PARIMUTUEL SETTLEMENT: at the deadline trading halts (mint/redeem/transfers disabled), ONE winner is declared by predefined objective rules, and ALL losing collateral is pooled and redistributed PRO-RATA to the winning OT holders. No partial wins, no probabilistic payouts, no scalar payouts, no residual/LP liquidity.
 3. MECE IS HARD-REQUIRED: outcomes must be mutually exclusive AND collectively exhaustive. Overlap breaks pro-rata math; gaps PERMANENTLY STRAND real collateral. A catch-all "Other / None" is REQUIRED unless the outcome space is provably closed.
 4. MULTI-OUTCOME PREFERRED: 42 is built for n-way categorical races (3–10 OTs). Binary YES/NO is a degenerate fallback only — prefer multi-outcome whenever the question permits.
-5. CATEGORICAL ONLY: no scalar/range markets. Any scalar question (price, count, %, viewership) MUST be discretized into clean partitioning named buckets.
+5. NO RAW SCALAR PAYOUT MECHANICS: 42 settles to a single winning Outcome Token, so it cannot pay out a continuous range. Scalar questions (price, count, %, viewership) are still valid market topics, but they MUST be discretized into clean partitioning named buckets BEFORE launch (e.g. "<$10M", "$10M–$25M", "$25M–$50M", "$50M+"). Each bucket is its own OT.
 6. OBJECTIVE MACHINE-READABLE ORACLE (APRO is 42's primary data partner): official scoreboards, awards-body announcements, exchange/government feeds, on-chain data, official APIs. Editorial / paywalled / interpretive / self-referential ("if users vote X") sources are forbidden.
 7. FIXED OUTCOME SET AT LAUNCH — cannot add outcomes mid-flight. Enumerate every plausible result up front.
 8. HARD UTC DEADLINE — single unambiguous timestamp. Postponement, source-unavailable, ambiguous reporting, ties, and "no listed outcome occurred" MUST be addressed in edge cases with NAMED outcomes they map to (no "resolver discretion" without a named fallback).
@@ -31,78 +31,68 @@ export const PROTOCOL_CONTEXT = `42.space PROTOCOL — every market is an Events
 
 Do NOT import CTF/Polymarket/Kalshi/Manifold assumptions — those are different protocols with different settlement mechanics.`;
 
+// All drafter / reviewer / finalizer / ideator / structured-reviewer / judge
+// system prompts share the same PROTOCOL_CONTEXT block — that is the SINGLE
+// source of truth for 42's hard mechanism rules. Per-role preambles below
+// only set role identity and role-specific output discipline; they do NOT
+// restate the protocol rules. Per-step user prompts (buildDraftPrompt etc.)
+// likewise stay focused on the step-specific task and omit restatements.
 export const SYSTEM_PROMPTS = {
   drafter:
-    `You are an expert at drafting prediction-market proposals for 42.space, the Events Futures asset-issuance protocol. You design markets whose outcome set, resolution rules, and edge cases are correctly shaped for 42's parimutuel-on-bonding-curve mechanism — multi-outcome categorical races with MECE outcomes, an objective oracle source, a deterministic deadline, and no path to stranded collateral. You do NOT draft Polymarket-style binary CTF markets unless the question is genuinely binary.\n\n${PROTOCOL_CONTEXT}`,
+    `You are an expert at drafting market proposals for 42.space. You design proposals that satisfy the protocol rules below; you do not draft Polymarket-style binary CTF markets unless the question is genuinely binary.\n\n${PROTOCOL_CONTEXT}`,
 
   reviewer:
-    `You are a critical reviewer of prediction-market drafts for 42.space. You are a very well trained contract reviewer. Your job is to find flaws, ambiguities, and 42-specific design failures: non-MECE outcome sets that would strand collateral on settlement, missing catch-all "Other" outcomes, scalar questions that were not discretized, subjective or non-machine-readable resolution sources, fixed-outcome-set assumptions that the draft violates, deadline ambiguity, and any imported assumptions from CTF/LMSR markets that do not apply on 42.\n\n${PROTOCOL_CONTEXT}`,
+    `You are a critical reviewer of 42.space market drafts and a very well trained contract reviewer. You audit drafts against the protocol rules below.\n\n${PROTOCOL_CONTEXT}`,
 
   finalizer:
-    `You are an expert at finalizing prediction-market proposals for 42.space. Extract and format the final market details from the draft into a structured format suitable for spawning Outcome Tokens on 42. Be extremely concise — use terse, direct language. No filler, no hedging, no redundancy. Prefer fragments over full sentences where clarity is preserved. Every word must earn its place. The outcomes array you emit will become real Outcome Tokens with real collateral attached, so it must be MECE and complete.\n\n${PROTOCOL_CONTEXT}`,
+    `You are an expert at finalizing 42.space market proposals into structured JSON for Outcome Token spawning. Be extremely concise — terse, direct language, fragments over full sentences, no filler or hedging. The outcomes array you emit becomes real Outcome Tokens with real collateral attached, so it must respect the protocol rules below.\n\n${PROTOCOL_CONTEXT}`,
 
   earlyResolutionAnalyst:
-    `You are an expert analyst evaluating whether a 42.space market could resolve early — whether its outcome becomes effectively certain before the end date. On 42 this is doubly important: early certainty kills the trade phase the bonding curve is built around AND can permanently transition the market into settlement, so the reward for early conviction collapses. Be extremely concise. Give a risk rating and brief justification only.\n\n${PROTOCOL_CONTEXT}`,
+    `You are an expert analyst evaluating whether a 42.space market could resolve early — i.e. its outcome becomes effectively certain before the end date. Be extremely concise: give a risk rating and brief justification only.\n\n${PROTOCOL_CONTEXT}`,
 
   ideator:
-    `You are a creative prediction-market ideator for 42.space. Given vague directions from a user, research the topic area and brainstorm a diverse set of concrete, 42-shaped market ideas. Strongly favor multi-outcome categorical races (3–8+ named contenders) over binary YES/NO. Strongly favor cultural moments, esports brackets, music/award races, fan-culture rivalries, viral memes, crypto narratives, sports finals, election fields, and trending events — 42's declared wheelhouse. Every idea must be objectively resolvable via a machine-readable source, MECE, and have a meaningful trade window (not collapse to certainty in 24h).\n\n${PROTOCOL_CONTEXT}`,
+    `You are a creative ideator for 42.space markets. Given a vague user direction, brainstorm concrete market ideas that satisfy the protocol rules below.\n\n${PROTOCOL_CONTEXT}`,
 
   claimExtractor:
-    'You are a meticulous claim extractor for 42.space prediction-market drafts. Your job is to decompose a draft into a flat list of atomic, verifiable claims — one sentence per claim, no compound statements. You output strictly valid JSON and nothing else. Do not include prose, preamble, explanation, or markdown fences.',
+    'You are a meticulous claim extractor for 42.space market drafts. Decompose a draft into a flat list of atomic, verifiable claims — one sentence per claim, no compound statements. Output strictly valid JSON and nothing else. No prose, preamble, explanation, or markdown fences.',
 
   structuredReviewer:
-    `You are a rigorous reviewer of 42.space prediction-market drafts. You produce TWO outputs in a single JSON response: (1) a prose critique of the draft, and (2) a rubric vote answering each checklist item as yes / no / unsure with a short rationale. You evaluate the draft against 42's parimutuel-on-bonding-curve mechanism — not against generic CTF prediction-market norms. You must output strictly valid JSON matching the schema — no prose before or after, no markdown fences.\n\n${PROTOCOL_CONTEXT}`,
+    `You are a rigorous reviewer of 42.space market drafts. You produce TWO outputs in a single JSON response: (1) a prose critique of the draft, and (2) a rubric vote answering each checklist item as yes / no / unsure with a short rationale. Output strictly valid JSON matching the schema — no prose before or after, no markdown fences.\n\n${PROTOCOL_CONTEXT}`,
 
   aggregationJudge:
-    `You are the aggregation judge for a 42.space prediction-market review. You read a rubric and the per-item votes of several independent reviewers and render a single overall verdict. You are not a tiebreaker alone — you may override a majority when reviewers agreed on something obviously wrong, ESPECIALLY when reviewers missed a 42-specific failure mode (non-MECE outcome set, stranded collateral path, scalar question that was not discretized, subjective oracle source). You output strictly valid JSON matching the schema.\n\n${PROTOCOL_CONTEXT}`,
+    `You are the aggregation judge for a 42.space market review. You read a rubric and the per-item votes of several independent reviewers and render a single overall verdict. You may override a majority when reviewers collectively missed a protocol-rule violation. Output strictly valid JSON matching the schema.\n\n${PROTOCOL_CONTEXT}`,
 
   entailmentVerifier:
-    'You are a precise entailment verifier for 42.space prediction-market drafts. Given a draft and a list of atomic claims extracted from it, you decide for each claim whether the draft entails it, contradicts it, fails to cover it, or is not applicable. You are strict: a claim is only "entailed" when its content is clearly present in the draft, not merely plausible or consistent. You output strictly valid JSON and nothing else.',
+    'You are a precise entailment verifier for 42.space market drafts. Given a draft and a list of atomic claims extracted from it, decide for each claim whether the draft entails it, contradicts it, fails to cover it, or is not applicable. Be strict: a claim is only "entailed" when its content is clearly present in the draft, not merely plausible or consistent. Output strictly valid JSON and nothing else.',
 };
 
 export function buildDraftPrompt(question, startDate, endDate, references) {
   const referencesSection = references && references.trim()
     ? `\nReference Links:\n${references.trim()}\n`
     : '';
-  return `Draft a 42.space market proposal based on the user inputs below. The proposal will spawn one Outcome Token per outcome at launch, each with its own bonding curve and collateral pool, and will settle parimutuel pro-rata to the winning OT holders — so the outcome set, resolution rules, and edge cases must be designed for THAT mechanism, not for a Polymarket-style binary CTF market.
+  // Per-step prompt is intentionally lean: the protocol rules already live in
+  // PROTOCOL_CONTEXT (injected into the drafter system prompt). This prompt
+  // only specifies the step's output structure.
+  return `Draft a 42.space market proposal for the user inputs below, following the protocol rules from your system prompt.
 
 User's Question: "${question}"
 Start Date: ${startDate}
 End Date: ${endDate}${referencesSection}
 
-REQUIREMENTS specific to 42.space (every draft MUST satisfy these):
-- The outcome set MUST be MECE (mutually exclusive AND collectively exhaustive). Overlapping outcomes break parimutuel pro-rata math; missing outcomes permanently strand collateral.
-- Prefer a multi-outcome categorical structure (3–8+ named outcomes) over a binary YES/NO whenever the question naturally permits multiple competing answers. 42 is built for n-way races.
-- Include an explicit catch-all outcome (e.g. "Other / None of the above" or "None of the listed outcomes occur by the deadline") UNLESS the outcome space is provably closed (a finite enumerated bracket where every entrant is named).
-- If the user's question is scalar / continuous (price, count, percentage, viewership), you MUST discretize it into named buckets that partition the real line cleanly (e.g. "<$10M", "$10M–$25M", "$25M–$50M", "$50M+").
-- Resolution source MUST be objective and machine-readable (official scoreboard, awards-body announcement, government or exchange feed, on-chain data, official API). NO editorial / paywalled / interpretive / "majority of users vote" sources. NO self-referential resolution.
-- Resolution deadline MUST be a specific UTC timestamp.
-- Edge cases MUST cover: postponement past the deadline, source unavailable at the deadline, ambiguous reporting, ties, and any "no enumerated outcome occurred" scenario — each with a NAMED resolution that maps cleanly onto an outcome (or "Other").
-- The trade phase must remain genuinely uncertain across most of the window — flag and avoid markets that would collapse to certainty within 24 hours of launch (that defeats 42's bonding-curve trade dynamic).
-
 Provide a comprehensive draft that includes:
 1. A refined, unambiguous version of the question, framed as a 42 Events Future
-2. The full Outcome Set — every Outcome Token to spawn at launch, each with a one-sentence win condition. Include the catch-all if applicable.
-3. Detailed resolution rules (the objective oracle source, how the source maps onto exactly one outcome, the UTC deadline)
-4. All possible edge cases and the named outcome each one resolves to (no "resolver discretion" without an explicit named fallback)
-5. Potential sources for resolution (must be machine-readable; list URLs)
+2. The full Outcome Set — every Outcome Token to spawn at launch, each with a one-sentence win condition (include a catch-all entry unless the field is provably closed)
+3. Detailed resolution rules — the objective oracle source, how it maps onto exactly one outcome, and the UTC deadline
+4. All possible edge cases, each terminating in a named outcome from the Outcome Set
+5. Potential sources for resolution (machine-readable URLs)
 6. Any assumptions that need to be made explicit`;
 }
 
 export function buildReviewPrompt(draftContent) {
-  return `Review this draft for a 42.space market. Challenge the resolution rules rigorously and surface every flaw a 42-specific reviewer would catch — not just generic prediction-market hygiene.
-
-In particular, audit the draft against 42's parimutuel-on-bonding-curve mechanism. A draft FAILS if any of these are true:
-- The outcome set is not MECE (two outcomes can both be true, or some plausible result fits no outcome). On 42 this strands real collateral — it is a blocker, not a nit.
-- A catch-all "Other / None" outcome is missing on a non-binary market whose space is not provably closed.
-- The question is scalar/continuous and was not discretized into clean named buckets.
-- The resolution source is editorial, paywalled, interpretive, self-referential, or otherwise not machine-readable by an objective oracle (APRO-compatible).
-- The resolution deadline is not a single unambiguous UTC timestamp.
-- An edge case (postponement, source-unavailable, tie, ambiguous reporting, "no listed outcome occurred") lacks a named outcome it resolves to.
-- The market would collapse to certainty within ~24h of launch (kills the trade phase).
-- The draft assumes CTF / Polymarket-style binary share mechanics (1 YES + 1 NO = $1, prices = probability, LP residual liquidity, scalar payout) — these do not apply on 42.
-
-Surface every issue, prioritize blockers, and suggest concrete edits.
+  // Per-step prompt is intentionally lean: the failure modes to look for are
+  // already enumerated in PROTOCOL_CONTEXT (system prompt). This prompt only
+  // tells the reviewer what to do with the draft.
+  return `Review this 42.space market draft against the protocol rules in your system prompt. Challenge the resolution rules rigorously, surface every violation, prioritize blockers, and suggest concrete edits.
 
 DRAFT TO REVIEW:
 ${draftContent}`;
@@ -116,9 +106,10 @@ export function buildDeliberationPrompt(draftContent, reviews) {
     )
     .join('\n\n');
 
-  return `You previously reviewed a 42.space market draft. Below are critiques from other independent reviewers. Consider their reasoning: do you agree, disagree, or have additional concerns? Provide your updated review incorporating any valid points from other reviewers that you missed.
-
-Pay particular attention to 42-specific failure modes that any reviewer may have overlooked: non-MECE outcome sets that would strand collateral on settlement, missing catch-all outcomes, scalar questions that were not discretized, subjective or non-machine-readable resolution sources, deadline ambiguity, and any imported assumptions from CTF/LMSR/Polymarket-style markets that do not apply on 42's parimutuel-on-bonding-curve mechanism.
+  // Per-step prompt is intentionally lean: the protocol failure modes are
+  // already in PROTOCOL_CONTEXT (system prompt). This prompt only orchestrates
+  // the deliberation step.
+  return `You previously reviewed a 42.space market draft. Below are critiques from other independent reviewers. Consider their reasoning: do you agree, disagree, or have additional concerns? Provide your updated review incorporating any valid points from other reviewers that you missed, and flag any protocol-rule violations they overlooked.
 
 ORIGINAL DRAFT:
 ${draftContent}
@@ -129,7 +120,7 @@ ${reviewsText}
 Provide your consolidated review, noting:
 1. Points of agreement across reviewers
 2. Points of disagreement and your position
-3. Any new issues raised that are valid (especially 42-specific blockers other reviewers missed)
+3. Any new issues raised that are valid (especially blockers other reviewers missed)
 4. Your final prioritized list of recommended changes — blockers first`;
 }
 
@@ -143,11 +134,12 @@ export function buildUpdatePrompt(draftContent, reviewContent, humanReviewInput,
     ? `\n\nROUTING FOCUS (address these FIRST — blocking claims must be fixed before this draft can be finalized):\n${focusBlock}`
     : '';
 
-  return `This is a critical review of a 42.space market draft. Review and first determine if the critiques make logical sense for 42's parimutuel-on-bonding-curve mechanism (NOT a CTF/Polymarket-style market). Incorporate the suggestions or criticisms from the Reviewer that are correct and generate a new draft.
+  // Per-step prompt is intentionally lean: protocol rules live in
+  // PROTOCOL_CONTEXT (system prompt). This prompt only orchestrates the
+  // update step.
+  return `This is a critical review of a 42.space market draft. First determine whether each critique is consistent with the protocol rules in your system prompt. Incorporate the correct suggestions and generate a new draft. If a reviewer suggestion would violate a protocol rule, push back on it instead of incorporating it.
 
-The updated draft must continue to satisfy 42's hard requirements: MECE outcome set with explicit catch-all, multi-outcome categorical structure preferred over binary, scalar questions discretized into named buckets, machine-readable objective oracle source, single UTC deadline, every edge case mapped onto a named outcome, and no path that could strand collateral. If a reviewer suggestion would violate any of these, push back on it instead of incorporating it.
-
-IMPORTANT: When human reviewer feedback is provided, treat it with higher priority than the AI-generated critical review. Weight human feedback approximately 25% more heavily — if the human's suggestions conflict with or differ from the AI review, lean toward the human's perspective. The human reviewer has domain-specific context and intent that should take precedence. (Exception: if the human's suggestion would VIOLATE one of 42's hard mechanism requirements above, surface the conflict in your draft notes rather than silently breaking the market.)
+IMPORTANT: When human reviewer feedback is provided, treat it with higher priority than the AI-generated critical review. Weight human feedback approximately 25% more heavily — if the human's suggestions conflict with or differ from the AI review, lean toward the human's perspective. The human reviewer has domain-specific context and intent that should take precedence. (Exception: if the human's suggestion would violate a protocol rule, surface the conflict in your draft notes rather than silently breaking the market.)
 
 ORIGINAL DRAFT:
 ${draftContent}
@@ -192,23 +184,19 @@ export function buildRoutingFocusBlock(routing, claims) {
 }
 
 export function buildFinalizePrompt(draftContent, startDate, endDate) {
-  return `Based on the following 42.space market draft, generate the final market details in a structured JSON format. Each entry in the "outcomes" array will become an Outcome Token (OT) spawned at launch on 42, with its own bonding curve and collateral pool, settled parimutuel pro-rata at the deadline.
+  // Per-step prompt is intentionally lean: protocol rules live in
+  // PROTOCOL_CONTEXT (system prompt). This prompt only specifies the JSON
+  // schema and the conciseness discipline.
+  return `Based on the following 42.space market draft, generate the final market details in a structured JSON format. Each entry in the "outcomes" array will become an Outcome Token spawned at launch and must respect the protocol rules in your system prompt.
 
-42 MECHANISM CONSTRAINTS — the JSON you emit must satisfy ALL of these:
-- The "outcomes" array MUST be MECE. Every plausible result of the underlying event must map to exactly one entry. If the outcome space is not provably closed, the LAST entry MUST be an explicit catch-all (e.g. "Other / None of the above") so collateral cannot be stranded at settlement.
-- Prefer multi-outcome (3+ entries) over binary YES/NO whenever the draft permits — 42 is built for n-way races.
-- If the underlying question is scalar/continuous, the entries MUST be named buckets that partition the real line cleanly with no gaps and no overlaps.
-- Resolution sources must be machine-readable and objective (no editorial / interpretive / self-referential sources).
-- "marketEndTimeUTC" is the hard parimutuel cutoff at which trading halts and settlement begins — it must be a single unambiguous UTC timestamp.
-
-IMPORTANT — CONCISENESS RULES:
+CONCISENESS RULES:
 - Cut all output text by at least 50% compared to the draft. Be terse and direct.
 - Use fragments and short declarative sentences. No filler, hedging, qualifiers, or redundant phrasing.
 - Do NOT repeat information across fields — each field must contain unique content only.
 - winCondition: max 1 sentence stating WHAT must be true for this OT to be the winning outcome. resolutionCriteria: max 1 sentence stating HOW it is verified (source, method, threshold). Zero overlap between them.
 - shortDescription: max 15 words.
 - fullResolutionRules: compact numbered list, max 1 line per rule. No prose.
-- edgeCases: compact numbered list, format "scenario → named outcome it resolves to", max 1 line each. Every edge case must terminate in a named outcome from the array above (or the catch-all).
+- edgeCases: compact numbered list, format "scenario → named outcome it resolves to", max 1 line each. Every edge case must terminate in a named outcome from the outcomes array above (or its catch-all).
 
 DRAFT:
 ${draftContent}
@@ -222,8 +210,8 @@ Generate a JSON response with exactly these fields:
   "refinedQuestion": "Concise, unambiguous market question",
   "outcomes": [
     {
-      "name": "Outcome name (will become an Outcome Token on 42)",
-      "winCondition": "One sentence: what must be true for this Outcome Token to be declared the winner",
+      "name": "Outcome name (becomes an Outcome Token on 42)",
+      "winCondition": "One sentence: what must be true for this Outcome Token to win",
       "resolutionCriteria": "Verification method and source — no overlap with winCondition"
     }
   ],
@@ -241,7 +229,10 @@ export function buildIdeatePrompt(direction) {
     ? `USER DIRECTION:\n${trimmed}`
     : 'USER DIRECTION:\n(no specific direction — surprise the user with broadly interesting ideas in 42.space\'s wheelhouse)';
 
-  return `Generate a diverse set of 42.space market ideas based on the vague direction below. Research the topic area using your own knowledge of current events, upcoming catalysts, narrative trends, and pop/cultural moments. Brainstorm freely — it's fine to propose unexpected angles the user may not have considered.
+  // Per-step prompt is intentionally lean: the protocol rules and 42's
+  // wheelhouse already live in PROTOCOL_CONTEXT (system prompt). This prompt
+  // only specifies the ideation output structure.
+  return `Generate a diverse set of 42.space market ideas based on the vague direction below, following the protocol rules in your system prompt. Brainstorm freely — it's fine to propose unexpected angles the user may not have considered. Prefer ideas where at least one underdog outcome is plausible but underloved (42's structural feature is uncapped upside on minority conviction).
 
 ${directionSection}
 
@@ -249,16 +240,9 @@ Produce 6–10 distinct market ideas. For each idea, provide:
 1. **Title** — a concise, specific market question framed as a 42 Events Future
 2. **Outcome Set** — the named Outcome Tokens to spawn at launch (3–8 entries preferred; include a catch-all "Other / None" unless the field is provably closed). One line.
 3. **Why it's interesting** — 1 sentence on the narrative tension, catalyst, or uncertainty that gives the market a meaningful trade phase across competing OTs
-4. **Resolvability** — 1 sentence naming the OBJECTIVE machine-readable source the oracle will read (official scoreboard, awards body, exchange feed, on-chain data, official API). Editorial / paywalled / interpretive sources are disqualifying.
+4. **Resolvability** — 1 sentence naming the objective machine-readable source the oracle will read
 5. **Suggested timeframe** — a rough end date or window
 
-42-FIT GUIDELINES (strong preferences — follow them unless the user direction explicitly overrides):
-- STRONGLY favor multi-outcome categorical races (n-way brackets, award fields, election fields, esports finals, "which X wins / trends most / hits #1") over binary YES/NO. 42 is built for n-way races and binary is the degenerate case.
-- STRONGLY favor cultural moments, esports brackets, music/awards races, fan-culture rivalries, viral memes, crypto narratives, headlines, and pop events — 42's declared wheelhouse since the rebrand from Alkimiya.
-- Each idea must be MECE — overlapping or missing outcomes would strand collateral on settlement.
-- If the natural question is scalar (price, count, percentage, viewership), discretize it into clean named buckets in the Outcome Set line.
-- Each idea must have meaningful uncertainty across most of the trade window — avoid markets that would collapse to certainty within 24h of launch (kills the bonding-curve trade phase).
-- Prefer ideas where at least one underdog outcome is plausible but underloved (42's structural feature is uncapped upside on minority conviction).
 - Avoid duplicates — spread across subtopics, timeframes, and angles.
 - Keep each idea tight — no preamble, no filler.
 - Number the ideas 1., 2., 3., ...
@@ -325,10 +309,13 @@ export function buildStructuredReviewPrompt(draftContent, rubric) {
     )
     .join('\n');
 
-  return `Review the 42.space market draft below. Evaluate it against 42's parimutuel-on-bonding-curve mechanism — NOT against generic CTF / Polymarket-style binary-share norms. Produce a single JSON object (no prose before or after) with exactly these fields:
+  // Per-step prompt is intentionally lean: the protocol rules and the
+  // failure-mode list live in PROTOCOL_CONTEXT (system prompt) and the
+  // rubric. This prompt only specifies the JSON output schema.
+  return `Review the 42.space market draft below against the protocol rules in your system prompt. Produce a single JSON object (no prose before or after) with exactly these fields:
 
 {
-  "reviewProse": "A paragraph-length critique of the draft in plain text. Flag ambiguities, missing edge cases, resolution risk, 42-specific failure modes (non-MECE outcome set, missing catch-all, scalar question not discretized, subjective oracle source, deadline ambiguity, paths that strand collateral), and concrete edits. This is shown to the human user verbatim.",
+  "reviewProse": "A paragraph-length critique of the draft in plain text. Flag ambiguities, missing edge cases, resolution risk, protocol-rule violations, and concrete edits. This is shown to the human user verbatim.",
   "rubricVotes": [
     {
       "ruleId": "<one of the rubric ids below>",
@@ -341,7 +328,7 @@ export function buildStructuredReviewPrompt(draftContent, rubric) {
       "claimId": "<a claim id from the draft, or 'global' if this critique applies to the whole draft>",
       "severity": "blocker" | "major" | "minor" | "nit",
       "category": "mece" | "objectivity" | "source" | "timing" | "ambiguity" | "manipulation" | "atomicity" | "other",
-      "rationale": "One or two sentences stating the problem and the suggested fix. Any non-MECE outcome set, any path that strands collateral, any scalar question that was not discretized, and any subjective / non-machine-readable resolution source MUST be marked 'blocker'."
+      "rationale": "One or two sentences stating the problem and the suggested fix. Anything that would strand collateral on settlement is a blocker."
     }
   ]
 }
@@ -396,7 +383,10 @@ export function buildJudgeAggregatorPrompt(rubric, checklist) {
     })
     .join('\n\n');
 
-  return `You are the judge for a rubric-based review of a 42.space market draft. 42 is an Events Futures protocol where each outcome spawns its own Outcome Token on a bonding curve and settles parimutuel pro-rata to winners — so a "yes" verdict on every rubric item is necessary but NOT sufficient. If reviewers collectively missed a 42-specific failure mode (non-MECE outcome set, missing catch-all, scalar question not discretized, subjective oracle source, path that strands collateral on settlement), you may override a clean majority with an "escalate" or "fail". Below is each rubric item with the votes cast by independent reviewers.
+  // Per-step prompt is intentionally lean: the protocol rules and override
+  // criteria live in the system prompt. This prompt only orchestrates the
+  // judge step.
+  return `You are judging a rubric-based review of a 42.space market draft. Below is each rubric item with the votes cast by independent reviewers. A "yes" on every rubric item is necessary but not sufficient — if the reviewers collectively missed a protocol-rule violation, override the majority.
 
 REVIEWS:
 ${itemsBlock}
@@ -489,9 +479,10 @@ ${buildBatchEntailmentPrompt(claims, draftContent)}`;
 // object). The risk check now gates Stage 4 — HIGH risk must be acknowledged
 // before the user can Accept & Finalize.
 export function buildEarlyResolutionPrompt(draftContent, startDate, endDate) {
-  return `Review the 42.space market draft below. Based on its outcomes and resolution rules, determine whether the market's outcome could become effectively certain *before* the stated End Date.
-
-On 42, early certainty is doubly damaging: (1) it kills the bonding-curve trade phase the protocol is built around — once everyone knows the answer, there is no reason to mint, redeem, or rotate between Outcome Tokens, so the "reward early conviction" mechanism collapses; (2) under the lifecycle, a market that becomes deterministic before deadline either strands traders in a frozen pool or forces a deliberate early settlement that pre-empts the trade window. Both outcomes are bad — flag them.
+  // Per-step prompt is intentionally lean: the protocol context (why early
+  // certainty is bad on 42) lives in the system prompt. This prompt only
+  // orchestrates the risk check.
+  return `Review the 42.space market draft below. Based on its outcomes and resolution rules, determine whether the market's outcome could become effectively certain *before* the stated End Date — a scenario that collapses 42's bonding-curve trade phase.
 
 DRAFT:
 ${draftContent}
