@@ -26,13 +26,13 @@
  * blocked by the judge being flaky.
  */
 
-import { queryModel } from '../api/openrouter';
+import { queryModel } from '../api/openrouter.js';
 import {
   SYSTEM_PROMPTS,
   buildJudgeAggregatorPrompt,
   buildStrictJudgeAggregatorRetryPrompt,
-} from '../constants/prompts';
-import { JudgeAggregatorResponseSchema } from '../types/run';
+} from '../constants/prompts.js';
+import { JudgeAggregatorResponseSchema } from '../types/run.js';
 
 /** Best-effort JSON extraction; same helper as other pipelines. */
 function tryParseJson(text) {

@@ -1,0 +1,36 @@
+{
+  "id": "ambig-unhandled-edge",
+  "bucket": "ambiguity",
+  "description": "Cancellation and postponement aren't covered in the draft. Reviewer returns an 'unsure' for edge_cases_covered which under majority rules escalates.",
+  "input": {
+    "question": "Will the 2027 World Cup final be won by a European team?",
+    "startDate": "2027-06-01",
+    "endDate": "2027-07-31",
+    "references": "https://www.fifa.com"
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "The draft doesn't say what happens if the final is cancelled, postponed past the window, or decided on penalty kicks. These are common sports-market dispute sources.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "yes", "rationale": "European/non-European is a clean partition modulo cancellation." },
+          { "ruleId": "objective_source", "verdict": "yes", "rationale": "FIFA website is canonical." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "Window is explicit." },
+          { "ruleId": "manipulation_resistant", "verdict": "yes", "rationale": "FIFA is neutral." },
+          { "ruleId": "atomic_claims", "verdict": "yes", "rationale": "Outcomes are atomic." },
+          { "ruleId": "edge_cases_covered", "verdict": "unsure", "rationale": "Cancellation and postponement aren't covered in the draft." }
+        ],
+        "criticisms": [
+          { "claimId": "claim.outcome.0.criterion", "severity": "major", "category": "other", "rationale": "Add explicit edge-case rules for cancellation, postponement past 2027-07-31, and walkover decisions." }
+        ]
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "needs_update",
+    "expected_aggregation_overall": "needs_escalation",
+    "expected_finalize_allowed": true,
+    "expected_blocked_by_routing": false,
+    "expected_targeted_count": "gte-1"
+  }
+}

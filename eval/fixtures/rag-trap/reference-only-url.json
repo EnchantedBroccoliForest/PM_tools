@@ -1,0 +1,21 @@
+{
+  "id": "rag-reference-only-url",
+  "bucket": "rag-trap",
+  "description": "User pasted a URL into the references block but the source claim doesn't cite it. The reference URL is harvested and linked to 'global' in the evidence store, and fixture verifies that citationCoverage still counts this as a citation-bearing fixture.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://user-pasted.example/ref"
+  },
+  "mockResponses": {
+    "urlResolves": {
+      "https://user-pasted.example": true
+    }
+  },
+  "expectedProperties": {
+    "expected_citation_resolves_all": true,
+    "expected_finalize_allowed": true,
+    "expected_routing_overall": "clean"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "id": "rag-dead-url",
+  "bucket": "rag-trap",
+  "description": "Cited source URL does not resolve. gatherEvidence degrades the source claim's verdict from pass to soft_fail, which routes the claim to targeted_review but does not block finalize on its own.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://fake.invalid/does-not-exist"
+  },
+  "mockResponses": {
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the referenced event occur by 2027-12-31?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "Market starts 2027-01-01T00:00:00Z.", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "Market ends 2027-12-31T23:59:59Z.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins.", "sourceRefs": [] },
+      { "id": "claim.source.0", "category": "source", "text": "https://fake.invalid/does-not-exist", "sourceRefs": [] }
+    ],
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Present." }
+    ],
+    "urlResolves": {
+      "https://fake.invalid": false
+    }
+  },
+  "expectedProperties": {
+    "expected_citation_resolves_all": false,
+    "expected_has_soft_fail": true,
+    "expected_routing_overall": "needs_update",
+    "expected_finalize_allowed": true,
+    "expected_targeted_count": "gte-1"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "id": "ambig-interpretive-source",
+  "bucket": "ambiguity",
+  "description": "Source is a subjective review site; resolution would depend on editor opinion. Reviewers fail objective_source with a needs_escalation result so routing goes to needs_update, not blocked.",
+  "input": {
+    "question": "Will the film be 'well received' by critics in 2027?",
+    "startDate": "2027-05-01",
+    "endDate": "2027-12-31",
+    "references": "https://www.rottentomatoes.com"
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "'Well received' needs a specific numerical cutoff (e.g. Rotten Tomatoes critic score >= 75 at a stated timestamp). The current wording is interpretive.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "unsure", "rationale": "Depends on chosen cutoff." },
+          { "ruleId": "objective_source", "verdict": "unsure", "rationale": "RT score is numeric but the page aggregates editorial opinions." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "Window is explicit." },
+          { "ruleId": "manipulation_resistant", "verdict": "yes", "rationale": "RT aggregates many reviewers." },
+          { "ruleId": "atomic_claims", "verdict": "unsure", "rationale": "'Well received' is compound without a threshold." },
+          { "ruleId": "edge_cases_covered", "verdict": "unsure", "rationale": "Edge cases for score changes are partially listed — unsure if the list is complete." }
+        ],
+        "criticisms": [
+          { "claimId": "claim.outcome.0.criterion", "severity": "major", "category": "objectivity", "rationale": "Specify an explicit numeric threshold and a fixed evaluation timestamp." }
+        ]
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "needs_update",
+    "expected_aggregation_overall": "needs_escalation",
+    "expected_finalize_allowed": true,
+    "expected_blocked_by_routing": false,
+    "expected_targeted_count": "gte-1"
+  }
+}

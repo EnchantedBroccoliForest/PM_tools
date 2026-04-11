@@ -1,0 +1,31 @@
+{
+  "id": "num-off-by-one-cutoff",
+  "bucket": "numerical-date",
+  "description": "Cutoff timestamp in the extractor's claim disagrees with the draft by one day — entailment=contradicted and the verifier correctly promotes to hard_fail. This is the classic off-by-one date bug the brief warns about.",
+  "input": {
+    "question": "Will the event occur by 2027-12-31T23:59:59Z?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "mockResponses": {
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "contradicted", "rationale": "Extractor emitted 2028-01-01T00:00:00Z — one day past the draft's 2027-12-31 cutoff." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.criterion", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.1.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.1.criterion", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.threshold.0", "entailment": "entailed", "rationale": "Present." }
+    ]
+  },
+  "expectedProperties": {
+    "expected_has_hard_fail": true,
+    "expected_has_contradicted": true,
+    "expected_routing_overall": "blocked",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_verification": true
+  }
+}

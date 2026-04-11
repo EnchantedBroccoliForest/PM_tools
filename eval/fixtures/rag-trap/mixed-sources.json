@@ -1,0 +1,36 @@
+{
+  "id": "rag-mixed-sources",
+  "bucket": "rag-trap",
+  "description": "One source URL is dead but the other resolves. gatherEvidence treats the claim as resolvable — any working URL counts — and the pipeline finalizes cleanly.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed https://also-fake.invalid/backup"
+  },
+  "mockResponses": {
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the referenced event occur by 2027-12-31?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "Market starts 2027-01-01T00:00:00Z.", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "Market ends 2027-12-31T23:59:59Z.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins.", "sourceRefs": [] },
+      { "id": "claim.source.0", "category": "source", "text": "Primary: https://example.com/feed Backup: https://also-fake.invalid/backup", "sourceRefs": [] }
+    ],
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Both URLs present in draft." }
+    ],
+    "urlResolves": {
+      "https://example.com/feed": true,
+      "https://also-fake.invalid": false
+    }
+  },
+  "expectedProperties": {
+    "expected_citation_resolves_all": true,
+    "expected_finalize_allowed": true,
+    "expected_routing_overall": "clean"
+  }
+}

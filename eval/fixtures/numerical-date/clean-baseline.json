@@ -1,0 +1,17 @@
+{
+  "id": "num-clean-baseline",
+  "bucket": "numerical-date",
+  "description": "Baseline: every timestamp has ISO-8601 format, every threshold has a numeric value, the structural verifier is fully satisfied.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "expectedProperties": {
+    "expected_finalize_allowed": true,
+    "expected_has_hard_fail": false,
+    "expected_has_soft_fail": false,
+    "expected_routing_overall": "clean"
+  }
+}

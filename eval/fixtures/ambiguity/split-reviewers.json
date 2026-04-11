@@ -1,0 +1,60 @@
+{
+  "id": "ambig-split-reviewers",
+  "bucket": "ambiguity",
+  "description": "Three reviewers disagree on every rubric item (A passes, B fails, C is unsure). Under majority the rubric escalates (yes/no tie); under unanimity it would fail. Used to verify that the decision-protocol ablation materially changes outcomes.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "Reviewer A: everything looks fine.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "yes", "rationale": "Outcomes partition." },
+          { "ruleId": "objective_source", "verdict": "yes", "rationale": "Source is objective." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "UTC cutoff." },
+          { "ruleId": "manipulation_resistant", "verdict": "yes", "rationale": "Neutral source." },
+          { "ruleId": "atomic_claims", "verdict": "yes", "rationale": "Single claims." },
+          { "ruleId": "edge_cases_covered", "verdict": "yes", "rationale": "Edge cases covered." }
+        ],
+        "criticisms": []
+      },
+      {
+        "reviewProse": "Reviewer B: every rubric item has real problems.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "no", "rationale": "Missing void outcome." },
+          { "ruleId": "objective_source", "verdict": "no", "rationale": "URL doesn't actually exist." },
+          { "ruleId": "timing_unambiguous", "verdict": "no", "rationale": "No tiebreak rule." },
+          { "ruleId": "manipulation_resistant", "verdict": "no", "rationale": "Source is reviewer-run." },
+          { "ruleId": "atomic_claims", "verdict": "no", "rationale": "Rules are compound." },
+          { "ruleId": "edge_cases_covered", "verdict": "no", "rationale": "Postponement not handled." }
+        ],
+        "criticisms": [
+          { "claimId": "global", "severity": "major", "category": "other", "rationale": "Reviewer B dissent." }
+        ]
+      },
+      {
+        "reviewProse": "Reviewer C: I'd need more context.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "unsure", "rationale": "Can't tell from draft." },
+          { "ruleId": "objective_source", "verdict": "unsure", "rationale": "Need to inspect URL." },
+          { "ruleId": "timing_unambiguous", "verdict": "unsure", "rationale": "Ambiguous phrasing." },
+          { "ruleId": "manipulation_resistant", "verdict": "unsure", "rationale": "Unclear source relationship." },
+          { "ruleId": "atomic_claims", "verdict": "unsure", "rationale": "Partial information." },
+          { "ruleId": "edge_cases_covered", "verdict": "unsure", "rationale": "Edge case list seems incomplete." }
+        ],
+        "criticisms": []
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_aggregation_overall": "needs_escalation",
+    "expected_aggregation_protocol": "majority",
+    "expected_routing_overall": "needs_update",
+    "expected_finalize_allowed": true,
+    "expected_blocked_by_routing": false
+  }
+}

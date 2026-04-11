@@ -1,0 +1,35 @@
+{
+  "id": "advf-blocker-criticism",
+  "bucket": "adversarial-factual",
+  "description": "Reviewer flags a blocker criticism targeting a specific claim. Routing must promote that claim to 'blocking' severity regardless of its verification verdict.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "Single blocker — claim about the resolving source needs a specific timestamp field on the feed URL, without which the market can be manipulated by editorial choice.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "yes", "rationale": "Outcomes partition." },
+          { "ruleId": "objective_source", "verdict": "no", "rationale": "Feed needs a timestamped publication field." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "UTC dates present." },
+          { "ruleId": "manipulation_resistant", "verdict": "yes", "rationale": "Neutral third party." },
+          { "ruleId": "atomic_claims", "verdict": "yes", "rationale": "Atomic." },
+          { "ruleId": "edge_cases_covered", "verdict": "yes", "rationale": "Edge cases listed." }
+        ],
+        "criticisms": [
+          { "claimId": "claim.source.0", "severity": "blocker", "category": "source", "rationale": "Feed URL is homepage-level; pin to a specific endpoint with a canonical timestamp." }
+        ]
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "blocked",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_routing": true,
+    "expected_blocking_count": "gte-1"
+  }
+}

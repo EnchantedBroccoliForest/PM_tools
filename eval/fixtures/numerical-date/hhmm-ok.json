@@ -1,0 +1,33 @@
+{
+  "id": "num-hhmm-ok",
+  "bucket": "numerical-date",
+  "description": "Timestamp claim uses only HH:MM without an ISO date (e.g. cut-off time of day for a recurring event). Positive test that the verifier accepts time-of-day patterns.",
+  "input": {
+    "question": "Will the event begin before 13:30 UTC on the scheduled day?",
+    "startDate": "2027-05-01",
+    "endDate": "2027-05-02",
+    "references": "https://example.com/feed"
+  },
+  "mockResponses": {
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the event begin before 13:30 UTC on the scheduled day?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "Start: 08:00 local.", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "Cutoff: 13:30 UTC.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins.", "sourceRefs": [] },
+      { "id": "claim.source.0", "category": "source", "text": "https://example.com/feed", "sourceRefs": [] }
+    ],
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Present." }
+    ]
+  },
+  "expectedProperties": {
+    "expected_has_hard_fail": false,
+    "expected_has_soft_fail": false,
+    "expected_routing_overall": "clean",
+    "expected_finalize_allowed": true
+  }
+}

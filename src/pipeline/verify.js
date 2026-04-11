@@ -35,13 +35,13 @@
  * RUN_LOG so the failure is visible in the run trace.
  */
 
-import { queryModel } from '../api/openrouter';
+import { queryModel } from '../api/openrouter.js';
 import {
   SYSTEM_PROMPTS,
   buildBatchEntailmentPrompt,
   buildStrictBatchEntailmentRetryPrompt,
-} from '../constants/prompts';
-import { BatchEntailmentResponseSchema } from '../types/run';
+} from '../constants/prompts.js';
+import { BatchEntailmentResponseSchema } from '../types/run.js';
 
 /** Shared JSON salvage helper — same logic as other pipelines. */
 function tryParseJson(text) {

@@ -1,0 +1,19 @@
+{
+  "id": "advf-stale-fact",
+  "bucket": "adversarial-factual",
+  "description": "Draft references an event that has already happened (training-data staleness). The early-resolution analyst must return HIGH risk, which blocks Accept until the user acknowledges.",
+  "input": {
+    "question": "Will the 2024 US presidential election have taken place by the end of 2027?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://www.fec.gov"
+  },
+  "mockResponses": {
+    "risk": "High\nThe referenced election already occurred in November 2024 — the market resolves with certainty on day one and would strand every counterparty's stake."
+  },
+  "expectedProperties": {
+    "expected_risk": "high",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_risk": true
+  }
+}

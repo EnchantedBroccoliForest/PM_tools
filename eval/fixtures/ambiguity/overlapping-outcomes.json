@@ -1,0 +1,36 @@
+{
+  "id": "ambig-overlapping-outcomes",
+  "bucket": "ambiguity",
+  "description": "Two outcomes can both trigger simultaneously — a MECE violation. Majority review returns fail; a single-winner parimutuel market cannot ship with overlapping outcomes.",
+  "input": {
+    "question": "Will the bill pass the Senate or the House first?",
+    "startDate": "2027-02-01",
+    "endDate": "2027-09-30",
+    "references": "https://www.congress.gov/bill"
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "The 'Senate first' and 'House first' outcomes do not cover simultaneous-passage scenarios, and a same-day passage in both chambers would trigger both Yes conditions. This is a MECE violation.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "no", "rationale": "Same-day passage would satisfy both named outcomes." },
+          { "ruleId": "objective_source", "verdict": "yes", "rationale": "Congress.gov is public and mechanical." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "Dates are explicit." },
+          { "ruleId": "manipulation_resistant", "verdict": "yes", "rationale": "Official record." },
+          { "ruleId": "atomic_claims", "verdict": "yes", "rationale": "Each outcome is single-clause." },
+          { "ruleId": "edge_cases_covered", "verdict": "no", "rationale": "No tiebreak for simultaneous passage." }
+        ],
+        "criticisms": [
+          { "claimId": "claim.outcome.0.win", "severity": "blocker", "category": "mece", "rationale": "Add an explicit tie outcome for same-timestamp passage." }
+        ]
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "blocked",
+    "expected_aggregation_overall": "fail",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_routing": true,
+    "expected_blocking_count": "gte-1"
+  }
+}

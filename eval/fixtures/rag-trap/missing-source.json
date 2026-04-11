@@ -1,0 +1,49 @@
+{
+  "id": "rag-missing-source",
+  "bucket": "rag-trap",
+  "description": "No source claim at all. Reviewer fails objective_source; aggregation returns fail and routing blocks.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": ""
+  },
+  "mockResponses": {
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the referenced event occur by 2027-12-31?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "Market starts 2027-01-01T00:00:00Z.", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "Market ends 2027-12-31T23:59:59Z.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins.", "sourceRefs": [] },
+      { "id": "claim.outcome.1.win", "category": "outcome_win", "text": "No wins.", "sourceRefs": [] }
+    ],
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.1.win", "entailment": "entailed", "rationale": "Present." }
+    ],
+    "reviews": [
+      {
+        "reviewProse": "No source is named in the draft — the market has no objective resolution path.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "yes", "rationale": "Yes/No partitions." },
+          { "ruleId": "objective_source", "verdict": "no", "rationale": "No source mentioned." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "Dates are UTC." },
+          { "ruleId": "manipulation_resistant", "verdict": "yes", "rationale": "Nothing to manipulate until a source exists." },
+          { "ruleId": "atomic_claims", "verdict": "yes", "rationale": "Atomic." },
+          { "ruleId": "edge_cases_covered", "verdict": "no", "rationale": "Impossible without a source." }
+        ],
+        "criticisms": [
+          { "claimId": "global", "severity": "blocker", "category": "source", "rationale": "Add an explicit public source URL before finalizing." }
+        ]
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "blocked",
+    "expected_aggregation_overall": "fail",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_routing": true
+  }
+}

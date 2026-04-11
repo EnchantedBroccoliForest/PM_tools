@@ -1,0 +1,32 @@
+{
+  "id": "advf-contradicted-outcome",
+  "bucket": "adversarial-factual",
+  "description": "Extractor emitted an outcome win condition that the draft explicitly rules out. Entailment=contradicted must promote the verdict to hard_fail and block finalize.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "mockResponses": {
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "contradicted", "rationale": "Extractor said 'Yes wins if event does NOT occur' — draft says the opposite." },
+      { "id": "claim.outcome.0.criterion", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.1.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.1.criterion", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.threshold.0", "entailment": "entailed", "rationale": "Present." }
+    ]
+  },
+  "expectedProperties": {
+    "expected_has_hard_fail": true,
+    "expected_has_contradicted": true,
+    "expected_routing_overall": "blocked",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_verification": true,
+    "expected_blocking_count": "gte-1"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "id": "ambig-missing-outcome",
+  "bucket": "ambiguity",
+  "description": "Outcome set has a gap — no void / neither-of-the-above outcome — so an actual \"neither\" scenario would strand collateral. Majority fails MECE and edge_cases_covered.",
+  "input": {
+    "question": "Will the merger be approved by the European Commission or the FTC?",
+    "startDate": "2027-03-01",
+    "endDate": "2027-12-31",
+    "references": "https://ec.europa.eu/competition"
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "The outcome set is 'EC approves' vs 'FTC approves' but omits the 'neither approves' and 'both approve' cases, and there is no void fallback for an abandoned deal. Parimutuel settlement would strand collateral.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "no", "rationale": "Neither, both, and abandonment are uncovered." },
+          { "ruleId": "objective_source", "verdict": "yes", "rationale": "Regulator pages are authoritative." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "Dates are explicit." },
+          { "ruleId": "manipulation_resistant", "verdict": "yes", "rationale": "Regulators are neutral." },
+          { "ruleId": "atomic_claims", "verdict": "yes", "rationale": "Outcomes are atomic." },
+          { "ruleId": "edge_cases_covered", "verdict": "no", "rationale": "No void for deal abandonment." }
+        ],
+        "criticisms": [
+          { "claimId": "global", "severity": "blocker", "category": "mece", "rationale": "Add explicit 'Neither', 'Both', and 'Abandoned' outcomes, or a void fallback." }
+        ]
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "blocked",
+    "expected_aggregation_overall": "fail",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_routing": true
+  }
+}

@@ -1,0 +1,60 @@
+name: eval
+
+# Runs the Phase 6 regression harness on every PR that touches a file the
+# harness actually exercises. Pushes to main re-run the baseline so the
+# committed eval/baseline.json and the live pipeline always stay in sync.
+#
+# The eval is deterministic (mocked LLM + mocked fetch) — no API keys
+# required, and every run should reproduce byte-for-byte identical
+# metrics up to small wall-clock jitter. The baseline file excludes
+# wall-clock so CI comparisons are stable.
+
+on:
+  pull_request:
+    paths:
+      - 'src/constants/prompts.js'
+      - 'src/constants/rubric.js'
+      - 'src/pipeline/**'
+      - 'src/api/openrouter.js'
+      - 'src/types/run.js'
+      - 'eval/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/eval.yml'
+  push:
+    branches:
+      - main
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (sanity check that the Vite bundle still compiles)
+        run: npm run build
+
+      - name: Run eval harness against committed baseline
+        run: npm run eval:check
+
+      - name: Upload eval run artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-run-output
+          path: eval/out/
+          retention-days: 14
