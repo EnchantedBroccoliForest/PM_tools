@@ -16,9 +16,9 @@
   --border-hover: rgba(0, 255, 255, 0.25);
   --border-focus: rgba(255, 0, 110, 0.6);
 
-  --text-1: #e0f7fa;
-  --text-2: #80cbc4;
-  --text-3: #4db6ac;
+  --text-1: #f0f6ff;
+  --text-2: #c1cee0;
+  --text-3: #8a98b0;
 
   --accent: #ff006e;
   --accent-light: #ff4d94;
@@ -46,6 +46,7 @@
 
   --font-mono: 'Share Tech Mono', 'Courier New', monospace;
   --font-display: 'Orbitron', 'Share Tech Mono', sans-serif;
+  --font-body: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
   /* Cyberpunk neon colors */
   --neon-cyan: #00e5ff;
@@ -274,8 +275,8 @@
 }
 
 .panel-placeholder p {
-  color: var(--text-3);
-  font-size: 0.85rem;
+  color: var(--text-2);
+  font-size: 0.9rem;
   text-align: center;
   font-style: italic;
 }
@@ -457,11 +458,10 @@
   color: var(--neon-cyan);
   margin-bottom: 0.45rem;
   font-family: var(--font-display);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
 }
 
 .form-row {
@@ -807,12 +807,11 @@ select.input optgroup {
 
 .toolbar-group label {
   font-family: var(--font-display);
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   color: var(--neon-cyan);
-  text-shadow: 0 0 6px rgba(0, 229, 255, 0.3);
 }
 
 .toolbar-hint {
@@ -949,9 +948,11 @@ select.input optgroup {
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   padding: 1.5rem;
-  color: #b8c5d8;
-  font-size: 0.9rem;
-  line-height: 1.9;
+  color: #e6edf8;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.7;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
@@ -1381,7 +1382,6 @@ select.input optgroup {
   color: var(--neon-cyan);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
 }
 
 .llm-loading__models {
@@ -1511,17 +1511,17 @@ select.input optgroup {
 }
 
 .content-box--rich .md-paragraph {
-  margin: 0.3rem 0;
-  line-height: 1.75;
+  margin: 0.4rem 0;
+  line-height: 1.7;
 }
 
 .content-box--rich .md-list {
-  margin: 0.4rem 0;
+  margin: 0.5rem 0;
   padding-left: 1.4rem;
 }
 
 .content-box--rich .md-list li {
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.35rem;
   line-height: 1.65;
 }
 
