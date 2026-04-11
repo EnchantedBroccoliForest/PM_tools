@@ -1,22 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 
 /**
- * Ambient mode definitions
+ * Theme mode definitions
  */
 export const AMBIENT_MODES = {
-  sunny: { label: 'Sunny', shortcut: 'S', icon: '☀️', classes: ['ambient-day', 'ambient-sunny'], overlay: 'leaves', description: 'Golden sunlight' },
-  moonlight: { label: 'Moonlight', shortcut: 'M', icon: '🌕', classes: ['ambient-moonlight'], overlay: 'moon', description: 'Lunar glow' },
-  rainy: { label: 'Rainy', shortcut: 'R', icon: '🌧️', classes: ['ambient-day', 'ambient-rainy'], overlay: 'rain', description: 'Cool storm' },
+  light: { label: 'Light', shortcut: 'L', icon: '☀️', classes: ['ambient-light'], description: 'Light theme' },
+  dark: { label: 'Dark', shortcut: 'D', icon: '🌙', classes: ['ambient-dark'], description: 'Dark theme' },
 };
 
-const ALL_AMBIENT_CLASSES = ['ambient-day', 'ambient-sunny', 'ambient-moonlight', 'ambient-rainy'];
+const ALL_AMBIENT_CLASSES = ['ambient-light', 'ambient-dark'];
 
 function getStoredMode() {
   try {
     const stored = localStorage.getItem('ambientMode');
     if (stored && AMBIENT_MODES[stored]) return stored;
   } catch { /* ignore */ }
-  return 'moonlight';
+  return 'dark';
 }
 
 export function useAmbientMode() {
@@ -36,7 +35,7 @@ export function useAmbientMode() {
   useEffect(() => {
     const handler = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-      const keyMap = { s: 'sunny', m: 'moonlight', r: 'rainy' };
+      const keyMap = { l: 'light', d: 'dark' };
       const newMode = keyMap[e.key.toLowerCase()];
       if (newMode && newMode !== mode) setMode(newMode);
     };
@@ -48,7 +47,7 @@ export function useAmbientMode() {
     const modeKeys = Object.keys(AMBIENT_MODES);
     const idx = modeKeys.indexOf(mode);
     setMode(modeKeys[(idx + 1) % modeKeys.length]);
-  }, [mode]);
+  }, [mode, setMode]);
 
   return { mode, setMode, cycleMode, config: AMBIENT_MODES[mode] };
 }

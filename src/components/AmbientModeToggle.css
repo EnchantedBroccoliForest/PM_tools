@@ -69,39 +69,18 @@
 
 .ambient-btn--active { border-color: rgba(255, 255, 255, 0.1); }
 
-.ambient-btn--night.ambient-btn--active {
-  background: rgba(0, 229, 255, 0.1);
-  color: #00e5ff;
-  border-color: rgba(0, 229, 255, 0.25);
-  box-shadow: 0 0 12px rgba(0, 229, 255, 0.15), inset 0 0 8px rgba(0, 229, 255, 0.05);
-}
-
-.ambient-btn--day.ambient-btn--active {
+.ambient-btn--light.ambient-btn--active {
   background: rgba(200, 160, 80, 0.12);
   color: #c8a050;
   border-color: rgba(200, 160, 80, 0.3);
   box-shadow: 0 0 12px rgba(200, 160, 80, 0.12);
 }
 
-.ambient-btn--sunny.ambient-btn--active {
-  background: rgba(180, 200, 50, 0.1);
-  color: #8ab030;
-  border-color: rgba(140, 180, 40, 0.3);
-  box-shadow: 0 0 12px rgba(140, 180, 40, 0.12);
-}
-
-.ambient-btn--moonlight.ambient-btn--active {
+.ambient-btn--dark.ambient-btn--active {
   background: rgba(160, 180, 220, 0.1);
   color: #a0b4dc;
   border-color: rgba(160, 180, 220, 0.3);
   box-shadow: 0 0 12px rgba(160, 180, 220, 0.15);
-}
-
-.ambient-btn--rainy.ambient-btn--active {
-  background: rgba(100, 140, 180, 0.1);
-  color: #648cb4;
-  border-color: rgba(100, 140, 180, 0.3);
-  box-shadow: 0 0 12px rgba(100, 140, 180, 0.12);
 }
 
 @media (max-width: 600px) {

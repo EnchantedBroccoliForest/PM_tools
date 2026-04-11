@@ -1755,6 +1755,132 @@ select.input optgroup {
 }
 
 /* ================================================
+   Early-Resolution Risk Gate (pre-finalize)
+   ================================================ */
+.risk-gate {
+  margin: 1rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  font-size: 0.9rem;
+}
+
+.risk-gate__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.risk-gate__label {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.risk-gate__level {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--r-sm);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.risk-gate__level--checking {
+  background: var(--surface-3);
+  color: var(--text-2);
+  border-color: var(--border);
+}
+
+.risk-gate__level--low {
+  background: var(--teal-glow);
+  color: var(--teal);
+  border-color: var(--teal);
+}
+
+.risk-gate__level--medium {
+  background: rgba(255, 234, 0, 0.12);
+  color: var(--neon-yellow);
+  border-color: rgba(255, 234, 0, 0.5);
+}
+
+.risk-gate__level--high {
+  background: var(--red-bg);
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.risk-gate__level--unknown {
+  background: var(--surface-3);
+  color: var(--text-2);
+  border-color: var(--border);
+}
+
+.risk-gate--low { border-left-color: var(--teal); }
+.risk-gate--medium { border-left-color: var(--neon-yellow); }
+.risk-gate--high {
+  border-left-color: var(--red);
+  background: var(--red-bg);
+  border-color: var(--red-border);
+}
+.risk-gate--unknown,
+.risk-gate--checking { border-left-color: var(--border-hover); }
+
+.risk-gate__body {
+  color: var(--text-1);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.risk-gate__body p { margin: 0.25rem 0; }
+
+.risk-gate__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--red-border);
+}
+
+.risk-gate__warning {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.risk-gate__ack-btn {
+  align-self: flex-start;
+  padding: 0.55rem 1rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--red);
+  background: transparent;
+  color: var(--red);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.risk-gate__ack-btn:hover {
+  background: var(--red);
+  color: var(--bg-dark);
+}
+
+/* ================================================
    Light Theme
    ================================================ */
 .App.theme-light {
@@ -2040,4 +2166,546 @@ select.input optgroup {
 
 .App.theme-light .panel-body::-webkit-scrollbar-thumb {
   background: rgba(139, 119, 90, 0.2);
+}
+
+/* --- Run trace panel (Phase 1) ---
+   Collapsible diagnostic panel under the main pipeline. Shows the current
+   Run artifact (drafts, claims, cost, log) and exposes export/import for
+   the raw JSON. Intentionally low-chrome so it reads as a debug drawer. */
+.run-trace {
+  margin-top: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.run-trace__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.run-trace__toggle:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.run-trace__chevron {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.run-trace__summary {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 0.75rem;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-trace__body {
+  padding: 0 1rem 1rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.run-trace__actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+}
+
+.run-trace__button {
+  display: inline-block;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.run-trace__button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.run-trace__button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.run-trace__button--import {
+  cursor: pointer;
+}
+
+.run-trace__section {
+  padding: 0.75rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__heading {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+
+.run-trace__empty {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.run-trace__kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.15rem 0;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-trace__kv > span:first-child {
+  opacity: 0.65;
+}
+
+.run-trace__by-stage {
+  margin-top: 0.25rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.05);
+}
+
+.run-trace__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.run-trace__draft {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__draft-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-bottom: 0.25rem;
+}
+
+.run-trace__draft-preview {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.run-trace__badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+.run-trace__ts {
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+}
+
+.run-trace__claim {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  padding: 0.25rem 0;
+}
+
+.run-trace__claim-id {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.run-trace__claim-text {
+  flex: 1;
+  opacity: 0.85;
+}
+
+.run-trace__log {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.2rem 0;
+}
+
+.run-trace__log--error {
+  color: #e87171;
+}
+
+.run-trace__log--warn {
+  color: #e8c171;
+}
+
+.run-trace__log--info {
+  opacity: 0.75;
+}
+
+/* --- Phase 2: aggregation checklist, verdicts, criticisms --- */
+
+.run-trace__verdict {
+  display: inline-block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.run-trace__verdict--pass {
+  color: #78c77a;
+}
+
+.run-trace__verdict--fail {
+  color: #e87171;
+}
+
+.run-trace__verdict--escalate,
+.run-trace__verdict--needs_escalation {
+  color: #e8c171;
+}
+
+.run-trace__judge-rationale {
+  margin: 0.25rem 0 0.5rem 0;
+  font-size: 0.75rem;
+  font-style: italic;
+  opacity: 0.75;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border-left: 2px solid rgba(232, 193, 113, 0.4);
+}
+
+.run-trace__checklist-item {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__checklist-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.run-trace__checklist-question {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.run-trace__vote-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.run-trace__vote {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.73rem;
+}
+
+.run-trace__vote-rationale {
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.run-trace__criticism {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__criticism-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.run-trace__criticism-text {
+  font-size: 0.78rem;
+  opacity: 0.85;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.run-trace__severity--blocker {
+  background: rgba(232, 113, 113, 0.2);
+  color: #e87171;
+}
+
+.run-trace__severity--major {
+  background: rgba(232, 150, 113, 0.18);
+  color: #e89671;
+}
+
+.run-trace__severity--minor {
+  background: rgba(232, 193, 113, 0.15);
+  color: #e8c171;
+}
+
+.run-trace__severity--nit {
+  background: rgba(120, 199, 122, 0.12);
+  color: #78c77a;
+}
+
+/* Phase 3: verification list entries */
+.run-trace__verification {
+  padding: 0.4rem 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__verification-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.run-trace__verification-detail {
+  margin-top: 0.25rem;
+  padding-left: 0.25rem;
+  font-size: 0.72rem;
+  opacity: 0.7;
+  font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Phase 5: routing entries */
+.run-trace__routing {
+  padding: 0.4rem 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__routing-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.run-trace__routing-reasons {
+  margin-top: 0.25rem;
+  padding-left: 0.25rem;
+  font-size: 0.72rem;
+  opacity: 0.7;
+  font-style: italic;
+  word-break: break-word;
+}
+
+.run-trace__routing--ok,
+.run-trace__routing--clean {
+  background: rgba(74, 222, 128, 0.15);
+  color: rgb(134, 239, 172);
+}
+
+.run-trace__routing--targeted_review,
+.run-trace__routing--needs_update {
+  background: rgba(250, 204, 21, 0.18);
+  color: rgb(253, 224, 71);
+}
+
+.run-trace__routing--blocking,
+.run-trace__routing--blocked {
+  background: rgba(248, 113, 113, 0.18);
+  color: rgb(252, 165, 165);
+}
+
+/* Phase 5: routing gate extras (rendered inside the generic risk-gate
+   wrapper so it inherits spacing and border styling automatically). */
+.risk-gate__subheading {
+  margin: 0.5rem 0 0.25rem 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.risk-gate__list {
+  margin: 0 0 0.5rem 1rem;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.risk-gate__list li {
+  margin: 0.2rem 0;
+  word-break: break-word;
+}
+
+.risk-gate__reasons {
+  opacity: 0.7;
+  font-style: italic;
+  font-size: 0.72rem;
+}
+
+/* Phase 4: harvested evidence entries */
+.run-trace__evidence {
+  padding: 0.4rem 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.run-trace__evidence-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.run-trace__evidence-url {
+  display: block;
+  font-size: 0.72rem;
+  color: inherit;
+  opacity: 0.85;
+  word-break: break-all;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.2);
+}
+
+.run-trace__evidence-url:hover {
+  opacity: 1;
+  text-decoration-color: currentColor;
+}
+
+.run-trace__evidence--resolved {
+  background: rgba(74, 222, 128, 0.15);
+  color: rgb(134, 239, 172);
+}
+
+.run-trace__evidence--failed {
+  background: rgba(248, 113, 113, 0.15);
+  color: rgb(252, 165, 165);
+}
+
+.run-trace__evidence--unchecked {
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 0.85;
+}
+
+/* Light theme overrides for Run trace */
+.App.theme-light .run-trace {
+  border-color: rgba(139, 119, 90, 0.15);
+  background: rgba(139, 119, 90, 0.03);
+}
+
+.App.theme-light .run-trace__body {
+  border-top-color: rgba(139, 119, 90, 0.1);
+}
+
+.App.theme-light .run-trace__section {
+  border-top-color: rgba(139, 119, 90, 0.08);
+}
+
+.App.theme-light .run-trace__button {
+  border-color: rgba(139, 119, 90, 0.2);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.App.theme-light .run-trace__button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.App.theme-light .run-trace__draft {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(139, 119, 90, 0.08);
+}
+
+.App.theme-light .run-trace__badge {
+  background: rgba(139, 119, 90, 0.12);
+}
+
+.App.theme-light .run-trace__evidence {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(139, 119, 90, 0.08);
+}
+
+.App.theme-light .run-trace__evidence--resolved {
+  background: rgba(74, 158, 87, 0.2);
+  color: rgb(46, 107, 56);
+}
+
+.App.theme-light .run-trace__evidence--failed {
+  background: rgba(200, 68, 68, 0.18);
+  color: rgb(155, 44, 44);
+}
+
+.App.theme-light .run-trace__evidence--unchecked {
+  background: rgba(139, 119, 90, 0.12);
+}
+
+.App.theme-light .run-trace__evidence-url {
+  text-decoration-color: rgba(139, 119, 90, 0.35);
+}
+
+.App.theme-light .run-trace__routing {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(139, 119, 90, 0.08);
+}
+
+.App.theme-light .run-trace__routing--ok,
+.App.theme-light .run-trace__routing--clean {
+  background: rgba(74, 158, 87, 0.2);
+  color: rgb(46, 107, 56);
+}
+
+.App.theme-light .run-trace__routing--targeted_review,
+.App.theme-light .run-trace__routing--needs_update {
+  background: rgba(200, 160, 40, 0.22);
+  color: rgb(130, 95, 15);
+}
+
+.App.theme-light .run-trace__routing--blocking,
+.App.theme-light .run-trace__routing--blocked {
+  background: rgba(200, 68, 68, 0.18);
+  color: rgb(155, 44, 44);
 }
