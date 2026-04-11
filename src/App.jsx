@@ -21,6 +21,7 @@ import { aggregate } from './pipeline/aggregate';
 import { verifyClaims } from './pipeline/verify';
 import { gatherEvidence } from './pipeline/gatherEvidence';
 import { routeClaims, groupRoutingBySeverity } from './pipeline/route';
+import { checkResolutionSources } from './pipeline/checkSources';
 import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
 import { parseRun } from './types/run';
 import { useMarketReducer } from './hooks/useMarketReducer';
@@ -309,6 +310,8 @@ function App() {
     earlyResolutionRiskLevel,
     earlyResolutionAcknowledged,
     routingAcknowledged,
+    sourceAccessibility,
+    sourceAccessibilityAcknowledged,
     currentRun,
     runTraceOpen,
     copiedId,
@@ -327,6 +330,17 @@ function App() {
   // block — it's surfaced as a warning in the Run trace panel only.
   const routingOverall = currentRun?.routing?.overall || 'clean';
   const needsRoutingAck = routingOverall === 'blocked' && !routingAcknowledged;
+
+  // Pre-finalize source-accessibility gate. Runs after early-resolution in
+  // handleUpdate. Any confirmed-unreachable source URL blocks Accept until
+  // the user either re-runs Update with better sources or explicitly
+  // acknowledges. Gate statuses:
+  //   - 'ok' / 'no_sources' / 'error' / null → do not block
+  //   - 'some_unreachable' / 'all_unreachable' → block until ack
+  const sourceAccessStatus = sourceAccessibility?.status || null;
+  const sourceAccessHasUnreachable =
+    sourceAccessStatus === 'some_unreachable' || sourceAccessStatus === 'all_unreachable';
+  const needsSourceAck = sourceAccessHasUnreachable && !sourceAccessibilityAcknowledged;
 
   const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
   const anyLoading = loading !== null;
@@ -769,6 +783,50 @@ function App() {
         message: riskErr.message || 'Early resolution check failed',
       });
     }
+
+    // Chain: data-source accessibility check. Runs against the updated
+    // draft, the user references, and whatever claims have already been
+    // extracted (claim extraction happens in the background, so this may
+    // run before or after it completes — it degrades gracefully when
+    // claims aren't yet available by scanning the draft text directly).
+    dispatch({ type: 'START_SOURCE_ACCESSIBILITY' });
+    try {
+      const checkResult = await checkResolutionSources({
+        draftContent: updatedDraft,
+        references,
+        claims: currentRunRef.current?.claims || [],
+      });
+      dispatch({
+        type: 'RUN_COST',
+        stage: 'source_accessibility',
+        tokensIn: 0,
+        tokensOut: 0,
+        wallClockMs: checkResult.wallClockMs || 0,
+      });
+      dispatch({
+        type: 'SOURCE_ACCESSIBILITY_SUCCESS',
+        result: checkResult,
+      });
+      if (checkResult.logEntry) {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'source_accessibility',
+          level: checkResult.logEntry.level,
+          message: checkResult.logEntry.message,
+        });
+      }
+    } catch (srcErr) {
+      dispatch({
+        type: 'SOURCE_ACCESSIBILITY_ERROR',
+        error: srcErr.message || 'Failed to check source accessibility',
+      });
+      dispatch({
+        type: 'RUN_LOG',
+        stage: 'source_accessibility',
+        level: 'error',
+        message: srcErr.message || 'Source accessibility check failed',
+      });
+    }
   };
 
   // --- Stage 4: Finalize to structured JSON ---
@@ -778,6 +836,7 @@ function App() {
     if (!draftContent) return;
     if (needsRiskAck) return; // belt-and-braces; button should already be disabled
     if (needsRoutingAck) return; // Phase 5: block on un-acknowledged blocking claims
+    if (needsSourceAck) return; // block until unreachable data sources are addressed or acknowledged
     dispatch({ type: 'START_LOADING', phase: 'accept', models: [getModelName(selectedModel)] });
 
     try {
@@ -1429,14 +1488,16 @@ function App() {
                           <button
                             type="button"
                             className="accept-button"
-                            disabled={anyLoading || needsRiskAck || needsRoutingAck}
+                            disabled={anyLoading || needsRiskAck || needsRoutingAck || needsSourceAck}
                             onClick={handleAccept}
                             title={
                               needsRiskAck
                                 ? 'Acknowledge the HIGH early-resolution risk below before finalizing.'
                                 : needsRoutingAck
                                   ? 'Resolve or acknowledge the blocking claims flagged by the rigor pipeline before finalizing.'
-                                  : undefined
+                                  : needsSourceAck
+                                    ? 'One or more data sources in the resolution rule are unreachable. Fix the sources and re-run Update, or acknowledge to finalize anyway.'
+                                    : undefined
                             }
                           >
                             {loading === 'accept' ? (
@@ -1582,6 +1643,137 @@ function App() {
                       )}
                     </div>
                   )}
+
+                  {/* Data-source accessibility gate — runs pre-finalize after
+                      early-resolution. Confirmed-unreachable source URLs
+                      block Accept until the user explicitly acknowledges. */}
+                  {hasUpdated && (loading === 'source-accessibility' || sourceAccessibility) && (() => {
+                    const status = sourceAccessibility?.status || null;
+                    const isChecking = loading === 'source-accessibility';
+                    const gateLevel =
+                      status === 'ok'
+                        ? 'low'
+                        : status === 'all_unreachable'
+                          ? 'high'
+                          : status === 'some_unreachable'
+                            ? 'medium'
+                            : status === 'error' || status === 'no_sources'
+                              ? 'unknown'
+                              : 'checking';
+                    const levelLabel = isChecking
+                      ? null
+                      : status === 'ok'
+                        ? 'REACHABLE'
+                        : status === 'all_unreachable'
+                          ? 'ALL UNREACHABLE'
+                          : status === 'some_unreachable'
+                            ? 'PARTIAL'
+                            : status === 'no_sources'
+                              ? 'NO SOURCES'
+                              : status === 'error'
+                                ? 'ERROR'
+                                : 'UNKNOWN';
+                    const originLabel = (origin) => {
+                      if (origin === 'source_claim') return 'source claim';
+                      if (origin === 'resolution_section') return 'resolution section';
+                      if (origin === 'references') return 'references block';
+                      if (origin === 'draft_body') return 'draft body';
+                      return origin;
+                    };
+                    const sources = sourceAccessibility?.sources || [];
+                    const unreachable = sources.filter((s) => !s.accessible);
+                    const reachable = sources.filter((s) => s.accessible);
+                    return (
+                      <div
+                        className={`risk-gate risk-gate--${gateLevel} fade-in`}
+                        role={needsSourceAck ? 'alert' : 'status'}
+                      >
+                        <div className="risk-gate__header">
+                          <span className="risk-gate__label">Data Source Accessibility</span>
+                          {isChecking ? (
+                            <span className="risk-gate__level risk-gate__level--checking">
+                              <span className="spinner" /> Checking…
+                            </span>
+                          ) : (
+                            <span className={`risk-gate__level risk-gate__level--${gateLevel}`}>
+                              {levelLabel}
+                            </span>
+                          )}
+                        </div>
+                        {!isChecking && sourceAccessibility && (
+                          <div className="risk-gate__body">
+                            <p className="risk-gate__hint">
+                              Probes each data source in the resolution rule to confirm the oracle will actually be
+                              able to read it at settlement time. Unreachable sources risk a market that cannot
+                              resolve — fix them before finalizing.
+                            </p>
+                            {status === 'no_sources' && (
+                              <p>
+                                No machine-readable URLs were found in the draft, its resolution section, references,
+                                or source claims. Add explicit source URLs to the resolution rules before finalizing.
+                              </p>
+                            )}
+                            {status === 'error' && (
+                              <p>
+                                Accessibility check failed: {sourceAccessibility.error || 'unknown error'}.
+                                This does not block Finalize, but you should verify the sources manually.
+                              </p>
+                            )}
+                            {unreachable.length > 0 && (
+                              <>
+                                <p className="risk-gate__subheading">
+                                  Unreachable ({unreachable.length}):
+                                </p>
+                                <ul className="risk-gate__list">
+                                  {unreachable.slice(0, 10).map((s) => (
+                                    <li key={s.url}>
+                                      <code>{s.url}</code>
+                                      <span className="risk-gate__reasons">
+                                        {' '}({originLabel(s.origin)})
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+                            {reachable.length > 0 && (
+                              <>
+                                <p className="risk-gate__subheading">
+                                  Reachable ({reachable.length}):
+                                </p>
+                                <ul className="risk-gate__list">
+                                  {reachable.slice(0, 10).map((s) => (
+                                    <li key={s.url}>
+                                      <code>{s.url}</code>
+                                      <span className="risk-gate__reasons">
+                                        {' '}({originLabel(s.origin)})
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {needsSourceAck && (
+                          <div className="risk-gate__actions">
+                            <p className="risk-gate__warning">
+                              {status === 'all_unreachable'
+                                ? 'None of the cited data sources resolved from the browser. The oracle cannot read a source it cannot reach — revise the draft with working URLs before finalizing, or acknowledge to finalize anyway.'
+                                : 'Some cited data sources did not resolve from the browser. Revise the draft with working URLs, or acknowledge to finalize anyway.'}
+                            </p>
+                            <button
+                              type="button"
+                              className="risk-gate__ack-btn"
+                              onClick={() => dispatch({ type: 'ACKNOWLEDGE_SOURCE_ACCESSIBILITY' })}
+                            >
+                              Acknowledge unreachable sources & unlock Finalize
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Your Feedback */}
                   <div className="col-panel col-panel--review">
