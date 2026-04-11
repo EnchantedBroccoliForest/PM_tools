@@ -1531,6 +1531,102 @@ select.input optgroup {
 }
 
 /* ================================================
+   Ideate stage: per-idea cards with "use in draft" button
+   ================================================ */
+.ideate-preamble,
+.ideate-postamble {
+  margin: 0.25rem 0 0.5rem;
+  color: var(--text-2);
+}
+
+.ideate-ideas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin: 0.5rem 0;
+}
+
+.ideate-idea {
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: var(--r-xs, 4px);
+  padding: 0.75rem 0.9rem;
+  background: rgba(0, 229, 255, 0.04);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ideate-idea:hover {
+  border-color: rgba(0, 229, 255, 0.45);
+  background: rgba(0, 229, 255, 0.07);
+}
+
+.ideate-idea__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-bottom: 0.4rem;
+}
+
+.ideate-idea__number {
+  color: var(--text-3);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.ideate-idea__title {
+  flex: 1;
+  color: var(--text-1);
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.ideate-idea__use-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid var(--neon-cyan);
+  border-radius: var(--r-xs, 4px);
+  background: rgba(0, 229, 255, 0.12);
+  color: var(--neon-cyan);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.ideate-idea__use-btn:hover {
+  background: rgba(0, 229, 255, 0.25);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+  transform: translateX(1px);
+}
+
+.ideate-idea__use-btn:focus-visible {
+  outline: 2px solid var(--neon-cyan);
+  outline-offset: 2px;
+}
+
+.ideate-idea__body {
+  margin-left: 1.4rem;
+  color: var(--text-2);
+}
+
+.ideate-idea__body .md-paragraph:first-child {
+  margin-top: 0;
+}
+
+.ideate-idea__body .md-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+/* ================================================
    Time Arrow
    ================================================ */
 .time-row {
@@ -1867,6 +1963,27 @@ select.input optgroup {
 .App.theme-light .col-panel--draft .content-box {
   background: rgba(192, 83, 58, 0.06);
   border-color: rgba(192, 83, 58, 0.15);
+}
+
+.App.theme-light .ideate-idea {
+  background: rgba(42, 125, 140, 0.05);
+  border-color: rgba(42, 125, 140, 0.2);
+}
+
+.App.theme-light .ideate-idea:hover {
+  background: rgba(42, 125, 140, 0.09);
+  border-color: rgba(42, 125, 140, 0.4);
+}
+
+.App.theme-light .ideate-idea__use-btn {
+  border-color: rgba(42, 125, 140, 0.7);
+  background: rgba(42, 125, 140, 0.1);
+  color: rgba(42, 125, 140, 1);
+}
+
+.App.theme-light .ideate-idea__use-btn:hover {
+  background: rgba(42, 125, 140, 0.2);
+  box-shadow: 0 0 10px rgba(42, 125, 140, 0.3);
 }
 
 .App.theme-light .col-panel--review .content-box {

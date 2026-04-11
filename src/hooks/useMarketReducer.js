@@ -174,6 +174,17 @@ function reducer(state, action) {
     case 'IDEATE_SUCCESS':
       return { ...state, loading: null, loadingMeta: null, ideatingContent: action.content };
 
+    case 'USE_IDEA_FOR_DRAFT':
+      // Switch to Draft Market mode and populate the question + references
+      // from an ideate suggestion so the user can immediately refine and draft.
+      return {
+        ...state,
+        mode: 'draft',
+        question: action.question || '',
+        references: action.references || '',
+        error: null,
+      };
+
     case 'START_EARLY_RESOLUTION':
       return {
         ...state,
