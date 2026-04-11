@@ -797,13 +797,13 @@ function App() {
               {mode === 'draft' && (
               <div className="market-form">
                 <div className="form-group">
-                  <label htmlFor="question">Prediction Market Question</label>
+                  <label htmlFor="question">42.space Market Question</label>
                   <input
                     id="question"
                     type="text"
                     value={question}
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'question', value: e.target.value })}
-                    placeholder="e.g., Will AI achieve AGI by 2030?"
+                    placeholder="e.g., Which artist tops the Billboard Hot 100 year-end chart 2026?"
                     className="input"
                     disabled={loading === 'draft'}
                   />
@@ -943,7 +943,7 @@ function App() {
                     id="ideatingInput"
                     value={ideatingInput}
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'ideatingInput', value: e.target.value })}
-                    placeholder="Describe a rough area of interest — e.g., 'AI regulation in 2026', 'upcoming crypto ETF decisions', 'European elections'. The model will research and brainstorm market ideas."
+                    placeholder="Describe a rough area of interest — e.g., 'esports finals season 2026', 'upcoming awards races', 'memecoin narratives'. The model will brainstorm 42.space-shaped multi-outcome market ideas."
                     className="input textarea textarea--tall"
                     disabled={loading === 'ideate'}
                   />
