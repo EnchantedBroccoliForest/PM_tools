@@ -97,6 +97,37 @@ function parseRiskLevel(text) {
   return match ? match[1].toLowerCase() : 'unknown';
 }
 
+function toSimpleRoutingReason(reason) {
+  if (!reason) return '';
+  if (reason === 'verification hard_fail') return 'the checks found a serious failure';
+  if (reason === 'verification soft_fail') return 'the checks found a possible issue';
+  if (reason === 'draft contradicts claim') return 'the draft says the opposite of this claim';
+  if (reason === 'not covered by draft') return 'the draft does not clearly address this claim';
+  if (reason === 'cited URL did not resolve') return 'a cited link could not be opened';
+  if (reason === 'run has a global blocker criticism') return 'there is a run-level blocker that must be fixed';
+  const blockerMatch = reason.match(/^(\d+)\s+blocker criticism\(s\)$/);
+  if (blockerMatch) return `${blockerMatch[1]} blocker concern(s) were raised about this claim`;
+  const majorMatch = reason.match(/^(\d+)\s+major criticism\(s\)$/);
+  if (majorMatch) return `${majorMatch[1]} major concern(s) were raised about this claim`;
+  return reason;
+}
+
+function getSimpleBlockReasons(currentRun) {
+  const reasons = new Set();
+  const routingItems = currentRun?.routing?.items || [];
+  for (const item of routingItems) {
+    if (item.severity !== 'blocking') continue;
+    for (const reason of item.reasons || []) {
+      reasons.add(toSimpleRoutingReason(reason));
+    }
+  }
+
+  if ((currentRun?.criticisms || []).some((c) => c.claimId === 'global' && c.severity === 'blocker')) {
+    reasons.add('a blocker applies to the whole run');
+  }
+  return Array.from(reasons);
+}
+
 function App() {
   const [state, dispatch] = useMarketReducer();
   const { mode: ambientMode, setMode: setAmbientMode, config: ambientConfig } = useAmbientMode();
@@ -1291,6 +1322,9 @@ function App() {
                         </span>
                       </div>
                       <div className="risk-gate__body">
+                        <p className="risk-gate__hint">
+                          Rigor routing is a quick safety check that sorts claims into: okay, needs more review, or blocks finalize.
+                        </p>
                         {(() => {
                           const grouped = groupRoutingBySeverity(currentRun.routing);
                           const claimsById = new Map(currentRun.claims.map((c) => [c.id, c]));
@@ -1303,7 +1337,7 @@ function App() {
                                   {claim ? ` — ${claim.text}` : ''}
                                   {item.reasons.length > 0 && (
                                     <span className="risk-gate__reasons">
-                                      {' '}({item.reasons.join('; ')})
+                                      {' '}({item.reasons.map(toSimpleRoutingReason).join('; ')})
                                     </span>
                                   )}
                                 </li>
@@ -1329,9 +1363,19 @@ function App() {
                       </div>
                       {needsRoutingAck && (
                         <div className="risk-gate__actions">
+                          {getSimpleBlockReasons(currentRun).length > 0 && (
+                            <>
+                              <p className="risk-gate__subheading">Why it is blocked:</p>
+                              <ul className="risk-gate__list">
+                                {getSimpleBlockReasons(currentRun).map((reason) => (
+                                  <li key={reason}>{reason}</li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
                           <p className="risk-gate__warning">
-                            The rigor pipeline flagged blocking claims above. Re-run Review → Update to
-                            address them, or acknowledge to finalize anyway.
+                            The draft is blocked because one or more claims have serious issues.
+                            Re-run Review → Update to fix them, or acknowledge to finalize anyway.
                           </p>
                           <button
                             type="button"
@@ -1898,7 +1942,7 @@ function App() {
                               </div>
                               {item.reasons.length > 0 && (
                                 <div className="run-trace__routing-reasons">
-                                  {item.reasons.join('; ')}
+                                  {item.reasons.map(toSimpleRoutingReason).join('; ')}
                                 </div>
                               )}
                             </li>
