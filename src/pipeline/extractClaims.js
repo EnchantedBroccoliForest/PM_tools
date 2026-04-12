@@ -22,10 +22,16 @@ import {
 } from '../constants/prompts.js';
 import { ClaimArraySchema } from '../types/run.js';
 
+/** Max completion tokens for claim extraction calls. */
+const CLAIM_EXTRACTION_MAX_TOKENS = 8000;
+
 /**
  * Best-effort parse of an LLM response to JSON. Models sometimes wrap JSON
  * in ```json fences or add a stray leading explanation; peel those off
  * before handing to JSON.parse.
+ *
+ * Returns `{ data, recovered }` where `recovered` is true when truncation
+ * recovery was used (meaning some trailing claims were likely dropped).
  */
 function tryParseJson(text) {
   if (typeof text !== 'string') return null;
@@ -37,29 +43,34 @@ function tryParseJson(text) {
   const bracketed = candidate.match(/\[[\s\S]*\]/);
   const exact = bracketed ? bracketed[0] : candidate;
   try {
-    return JSON.parse(exact);
+    return { data: JSON.parse(exact), recovered: false };
   } catch {
     // fall through to truncation recovery
   }
 
   // RECOVERY: if the model hit max_tokens, the JSON array may be truncated
-  // mid-object. Find the last complete object and close the array.
+  // mid-object. Walk backwards through } positions and try JSON.parse at
+  // each one until we find a valid cut point. This avoids the pitfall of
+  // lastIndexOf('}') matching a } inside a string value.
   const arrayStart = candidate.indexOf('[');
   if (arrayStart === -1) return null;
 
-  let truncated = candidate.slice(arrayStart);
-  const lastCompleteObject = truncated.lastIndexOf('}');
-  if (lastCompleteObject === -1) return null;
+  const truncated = candidate.slice(arrayStart);
+  let pos = truncated.length - 1;
 
-  let recovered = truncated.slice(0, lastCompleteObject + 1)
-    .replace(/,\s*$/, ''); // remove trailing comma
-  recovered += ']'; // close the array
+  while (pos >= 0) {
+    pos = truncated.lastIndexOf('}', pos);
+    if (pos === -1) break;
 
-  try {
-    return JSON.parse(recovered);
-  } catch {
-    return null;
+    const slice = truncated.slice(0, pos + 1).replace(/,\s*$/, '') + ']';
+    try {
+      return { data: JSON.parse(slice), recovered: true };
+    } catch {
+      pos -= 1; // try the next } to the left
+    }
   }
+
+  return null;
 }
 
 /**
@@ -102,7 +113,7 @@ export async function extractClaims(model, draftContent) {
         { role: 'system', content: SYSTEM_PROMPTS.claimExtractor },
         { role: 'user', content: buildClaimExtractorPrompt(draftContent) },
       ],
-      { temperature: 0.2, maxTokens: 8000 }
+      { temperature: 0.2, maxTokens: CLAIM_EXTRACTION_MAX_TOKENS }
     );
     accumulate(result);
     rawResponse = result.content;
@@ -119,13 +130,15 @@ export async function extractClaims(model, draftContent) {
   }
 
   const parsed1 = tryParseJson(rawResponse);
-  const validated1 = parsed1 && ClaimArraySchema.safeParse(parsed1);
+  const validated1 = parsed1 && ClaimArraySchema.safeParse(parsed1.data);
   if (validated1 && validated1.success) {
     return {
       claims: validated1.data,
       usage: aggregate.usage,
       wallClockMs: aggregate.wallClockMs,
-      logEntry: null,
+      logEntry: parsed1.recovered
+        ? { level: 'warn', message: `Claim extractor output was truncated; recovered ${validated1.data.length} claims (some may have been dropped).` }
+        : null,
     };
   }
 
@@ -138,7 +151,7 @@ export async function extractClaims(model, draftContent) {
         { role: 'system', content: SYSTEM_PROMPTS.claimExtractor },
         { role: 'user', content: buildStrictClaimExtractorRetryPrompt(draftContent) },
       ],
-      { temperature: 0.1, maxTokens: 8000 }
+      { temperature: 0.1, maxTokens: CLAIM_EXTRACTION_MAX_TOKENS }
     );
     accumulate(result);
     retryResponse = result.content;
@@ -155,15 +168,18 @@ export async function extractClaims(model, draftContent) {
   }
 
   const parsed2 = tryParseJson(retryResponse);
-  const validated2 = parsed2 && ClaimArraySchema.safeParse(parsed2);
+  const validated2 = parsed2 && ClaimArraySchema.safeParse(parsed2.data);
   if (validated2 && validated2.success) {
+    const retryNote = parsed2.recovered
+      ? ` Output was truncated; recovered ${validated2.data.length} claims (some may have been dropped).`
+      : '';
     return {
       claims: validated2.data,
       usage: aggregate.usage,
       wallClockMs: aggregate.wallClockMs,
       logEntry: {
         level: 'warn',
-        message: 'Claim extractor succeeded on strict retry (first pass was invalid JSON).',
+        message: `Claim extractor succeeded on strict retry (first pass was invalid JSON).${retryNote}`,
       },
     };
   }
