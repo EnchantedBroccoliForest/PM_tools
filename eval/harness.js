@@ -89,10 +89,9 @@ export async function runFixture(fixture, ablation) {
     // compat with metrics.js which expects these top-level fields.
     const gates = run.gates || {};
 
-    const riskLevel = gates.risk?.level || 'unknown';
-    // Find the risk analyst log entry to extract the raw text.
-    const riskLogEntry = run.log.find((l) => l.stage === 'early_resolution');
-    const risk = { level: riskLevel, text: riskLogEntry?.message || '' };
+    // The orchestrator stashes the raw risk-analyst response on the run
+    // so we can surface the full model output, not just the summary log.
+    const risk = run.riskAnalysis || { level: gates.risk?.level || 'unknown', text: '' };
 
     const gate = {
       allowed: run.status === 'complete',

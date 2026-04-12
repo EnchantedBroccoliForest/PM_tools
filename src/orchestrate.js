@@ -519,6 +519,7 @@ async function _orchestrateInner(config, signal) {
   });
   if (!ok || run.status === 'error') {
     run.cost = cost.snapshot();
+    run.gates = buildGates(run, riskLevel);
     return run;
   }
 
@@ -530,6 +531,7 @@ async function _orchestrateInner(config, signal) {
   });
   if (!ok || run.status === 'error') {
     run.cost = cost.snapshot();
+    run.gates = buildGates(run, riskLevel);
     return run;
   }
 
@@ -568,11 +570,17 @@ async function _orchestrateInner(config, signal) {
   }
 
   // --- 5. Risk analysis ---
+  let riskText = '';
   ok = await stage('early_resolution', async () => {
     const result = await runRiskStage(run, models, cost, callbacks);
     riskLevel = result.level;
+    riskText = result.text;
     return result;
   });
+  // Stash the raw risk-analyst response on the run so consumers (eval
+  // harness, CLI summary) can access the full text, not just the parsed level.
+  run.riskAnalysis = { level: riskLevel, text: riskText };
+
   if (!ok || run.status === 'error') {
     run.cost = cost.snapshot();
     run.gates = buildGates(run, riskLevel);
