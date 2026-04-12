@@ -3,9 +3,11 @@ const MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff
 
-// The documented env var is VITE_OPENROUTER_API_KEY. We accept the legacy
-// VITE_OPENAI_API_KEY as a fallback so existing deployments keep working,
-// but warn loudly at module load if neither is set.
+// API key precedence (first match wins):
+//   1. OPENROUTER_API_KEY       — CLI / server / headless use (no VITE_ prefix)
+//   2. VITE_OPENROUTER_API_KEY  — Vite dev server (browser)
+//   3. VITE_OPENAI_API_KEY      — legacy fallback for existing deployments
+const CLI_API_KEY_ENV = 'OPENROUTER_API_KEY';
 const API_KEY_ENV = 'VITE_OPENROUTER_API_KEY';
 const LEGACY_API_KEY_ENV = 'VITE_OPENAI_API_KEY';
 
@@ -30,8 +32,13 @@ function readEnv(key) {
 }
 
 function readConfiguredApiKey() {
+  // 1. OPENROUTER_API_KEY — preferred for CLI / server / headless use.
+  const cli = readEnv(CLI_API_KEY_ENV);
+  if (cli && cli !== 'YOUR_API_KEY_HERE') return cli;
+  // 2. VITE_OPENROUTER_API_KEY — Vite dev server (browser).
   const primary = readEnv(API_KEY_ENV);
   if (primary && primary !== 'YOUR_API_KEY_HERE') return primary;
+  // 3. VITE_OPENAI_API_KEY — legacy fallback.
   const legacy = readEnv(LEGACY_API_KEY_ENV);
   if (legacy && legacy !== 'YOUR_API_KEY_HERE') {
     console.warn(
