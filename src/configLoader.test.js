@@ -118,4 +118,15 @@ describe('validateConfig', () => {
   it('returns null for minimal valid config', () => {
     expect(validateConfig({})).toBeNull();
   });
+
+  it('returns errors for non-object reviewer entries (null)', () => {
+    const errors = validateConfig({
+      models: { reviewers: [null, 42, 'string'] },
+    });
+    expect(errors).not.toBeNull();
+    expect(errors).toHaveLength(3);
+    expect(errors[0]).toMatch(/reviewers\[0\] must be an object/);
+    expect(errors[1]).toMatch(/reviewers\[1\] must be an object/);
+    expect(errors[2]).toMatch(/reviewers\[2\] must be an object/);
+  });
 });

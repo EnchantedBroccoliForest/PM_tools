@@ -56,18 +56,22 @@ export function hasUnanimousAgreement(reviews) {
   const successful = reviews.filter((r) => r.reviewProse !== null);
   if (successful.length < 2) return true; // nothing to disagree on
 
-  // Group votes by ruleId
+  // Group votes by ruleId, tracking which reviewers voted on each
   const byRule = new Map();
   for (const review of successful) {
     for (const vote of review.rubricVotes) {
-      if (!byRule.has(vote.ruleId)) byRule.set(vote.ruleId, new Set());
-      byRule.get(vote.ruleId).add(vote.verdict);
+      if (!byRule.has(vote.ruleId)) byRule.set(vote.ruleId, { verdicts: new Set(), voterCount: 0 });
+      const entry = byRule.get(vote.ruleId);
+      entry.verdicts.add(vote.verdict);
+      entry.voterCount += 1;
     }
   }
 
-  // If every rule has exactly one distinct verdict, it's unanimous
-  for (const verdicts of byRule.values()) {
+  // If any rule has multiple distinct verdicts, or any reviewer omitted
+  // a rule that others voted on, treat it as disagreement.
+  for (const { verdicts, voterCount } of byRule.values()) {
     if (verdicts.size > 1) return false;
+    if (voterCount < successful.length) return false;
   }
   return true;
 }

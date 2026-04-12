@@ -95,26 +95,24 @@ export function validateStageInterface(obj) {
     return { valid: false, errors: ['not an object'] };
   }
 
-  // Check required properties
-  const nameDesc = Object.getOwnPropertyDescriptor(
-    Object.getPrototypeOf(obj),
-    'name',
-  );
-  if (!nameDesc || typeof nameDesc.get !== 'function') {
-    // Fall back to checking if `name` is a plain property or getter on the instance
-    if (typeof obj.name !== 'string' || obj.name.length === 0) {
+  // Check required properties. Use try/catch to handle abstract getters
+  // that throw when not overridden (e.g. PipelineStage base class).
+  try {
+    const name = obj.name;
+    if (typeof name !== 'string' || name.length === 0) {
       errors.push('name must be a non-empty string');
     }
+  } catch {
+    errors.push('name getter threw — subclass must override get name()');
   }
 
-  const descDesc = Object.getOwnPropertyDescriptor(
-    Object.getPrototypeOf(obj),
-    'description',
-  );
-  if (!descDesc || typeof descDesc.get !== 'function') {
-    if (typeof obj.description !== 'string' || obj.description.length === 0) {
+  try {
+    const desc = obj.description;
+    if (typeof desc !== 'string' || desc.length === 0) {
       errors.push('description must be a non-empty string');
     }
+  } catch {
+    errors.push('description getter threw — subclass must override get description()');
   }
 
   if (typeof obj.execute !== 'function') {

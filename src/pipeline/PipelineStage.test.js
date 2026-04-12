@@ -112,4 +112,12 @@ describe('validateStageInterface', () => {
     const result = validateStageInterface(obj);
     expect(result.valid).toBe(true);
   });
+
+  it('returns errors instead of crashing on base PipelineStage (abstract getters)', () => {
+    const base = new PipelineStage();
+    const result = validateStageInterface(base);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('name getter threw'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('description getter threw'))).toBe(true);
+  });
 });

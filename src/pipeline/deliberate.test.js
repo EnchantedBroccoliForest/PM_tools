@@ -93,6 +93,20 @@ describe('hasUnanimousAgreement', () => {
     ];
     expect(hasUnanimousAgreement(reviews)).toBe(true);
   });
+
+  it('returns false when a reviewer omits a rubric item that others voted on', () => {
+    const reviews = [
+      makeReview('a', 'A', [
+        { ruleId: 'mece', verdict: 'yes' },
+        { ruleId: 'objective_source', verdict: 'yes' },
+      ]),
+      makeReview('b', 'B', [
+        { ruleId: 'mece', verdict: 'yes' },
+        // objective_source omitted — incomplete output
+      ]),
+    ];
+    expect(hasUnanimousAgreement(reviews)).toBe(false);
+  });
 });
 
 describe('formatPeerSummary', () => {

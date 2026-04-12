@@ -253,8 +253,17 @@ async function runReviewStage(run, models, options, cost, callbacks) {
     for (const entry of deliberationResult.logEntries) {
       log(run, 'deliberation', entry.level, entry.message, callbacks);
     }
+    // Only count usage from reviews that actually went through deliberation
+    // (i.e., have new usage data). Fallback reviews reuse the initial review
+    // object whose usage was already counted under 'review' above.
     for (const r of deliberationResult.reviews) {
-      if (r.usage) cost.record('deliberation', { usage: r.usage, wallClockMs: r.wallClockMs });
+      if (!r.usage) continue;
+      // If the review object is the exact same reference as the initial one,
+      // its usage was already recorded — skip to avoid double-counting.
+      const wasInitial = successful.some((s) => s === r);
+      if (!wasInitial) {
+        cost.record('deliberation', { usage: r.usage, wallClockMs: r.wallClockMs });
+      }
     }
     if (deliberationResult.mindChanges.length > 0) {
       log(

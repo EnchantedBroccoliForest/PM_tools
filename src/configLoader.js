@@ -130,6 +130,10 @@ export function validateConfig(config) {
       } else {
         for (let i = 0; i < config.models.reviewers.length; i++) {
           const r = config.models.reviewers[i];
+          if (!r || typeof r !== 'object') {
+            errors.push(`models.reviewers[${i}] must be an object with id and name`);
+            continue;
+          }
           if (!r.id || typeof r.id !== 'string') {
             errors.push(`models.reviewers[${i}].id must be a non-empty string`);
           }
