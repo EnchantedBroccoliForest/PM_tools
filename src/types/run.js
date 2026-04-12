@@ -316,6 +316,16 @@ export const EntailmentVerdictSchema = z.object({
 
 export const BatchEntailmentResponseSchema = z.array(EntailmentVerdictSchema);
 
+// Orchestrator-level gate summaries. Populated by orchestrate() after the
+// pipeline completes (or fails). Optional so existing Run objects (from the
+// UI, from saved fixtures) remain valid without these fields.
+export const GatesSchema = z.object({
+  risk: z.object({ level: z.enum(['low', 'medium', 'high']), blocked: z.boolean() }),
+  routing: z.object({ overall: z.enum(['clean', 'needs_update', 'blocked']), blocked: z.boolean() }),
+  verification: z.object({ hasHardFail: z.boolean(), blocked: z.boolean() }),
+  sources: z.object({ status: z.enum(['ok', 'some_unreachable', 'all_unreachable', 'no_sources']), blocked: z.boolean() }),
+});
+
 export const RunSchema = z.object({
   runId: z.string(),
   startedAt: z.number(),
@@ -337,6 +347,9 @@ export const RunSchema = z.object({
   finalJson: z.record(z.string(), z.unknown()).nullable(),
   cost: RunCostSchema,
   log: z.array(LogEntrySchema),
+  // Orchestrator status and gate summaries — optional for backward compat.
+  status: z.enum(['complete', 'blocked', 'partial', 'error']).optional().default('partial'),
+  gates: GatesSchema.optional(),
 });
 
 // ------------------------------------------------------------------ factories
