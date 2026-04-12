@@ -35,9 +35,28 @@ function tryParseJson(text) {
   const candidate = fenced ? fenced[1] : trimmed;
   // As a final salvage, clip to the outermost [ ... ] if there is leading prose.
   const bracketed = candidate.match(/\[[\s\S]*\]/);
-  const final = bracketed ? bracketed[0] : candidate;
+  const exact = bracketed ? bracketed[0] : candidate;
   try {
-    return JSON.parse(final);
+    return JSON.parse(exact);
+  } catch {
+    // fall through to truncation recovery
+  }
+
+  // RECOVERY: if the model hit max_tokens, the JSON array may be truncated
+  // mid-object. Find the last complete object and close the array.
+  const arrayStart = candidate.indexOf('[');
+  if (arrayStart === -1) return null;
+
+  let truncated = candidate.slice(arrayStart);
+  const lastCompleteObject = truncated.lastIndexOf('}');
+  if (lastCompleteObject === -1) return null;
+
+  let recovered = truncated.slice(0, lastCompleteObject + 1)
+    .replace(/,\s*$/, ''); // remove trailing comma
+  recovered += ']'; // close the array
+
+  try {
+    return JSON.parse(recovered);
   } catch {
     return null;
   }
@@ -83,7 +102,7 @@ export async function extractClaims(model, draftContent) {
         { role: 'system', content: SYSTEM_PROMPTS.claimExtractor },
         { role: 'user', content: buildClaimExtractorPrompt(draftContent) },
       ],
-      { temperature: 0.2, maxTokens: 4000 }
+      { temperature: 0.2, maxTokens: 8000 }
     );
     accumulate(result);
     rawResponse = result.content;
@@ -119,7 +138,7 @@ export async function extractClaims(model, draftContent) {
         { role: 'system', content: SYSTEM_PROMPTS.claimExtractor },
         { role: 'user', content: buildStrictClaimExtractorRetryPrompt(draftContent) },
       ],
-      { temperature: 0.1, maxTokens: 4000 }
+      { temperature: 0.1, maxTokens: 8000 }
     );
     accumulate(result);
     retryResponse = result.content;
