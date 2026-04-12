@@ -52,10 +52,15 @@ function tryParseJson(text) {
   // mid-object. Walk backwards through } positions and try JSON.parse at
   // each one until we find a valid cut point. This avoids the pitfall of
   // lastIndexOf('}') matching a } inside a string value.
-  const arrayStart = candidate.indexOf('[');
+  //
+  // Anchor to `exact` (the already-clipped slice) rather than raw
+  // `candidate`, so leading prose with stray brackets (e.g. "[note]")
+  // doesn't cause recovery to start from the wrong position.
+  const source = exact;
+  const arrayStart = source.indexOf('[');
   if (arrayStart === -1) return null;
 
-  const truncated = candidate.slice(arrayStart);
+  const truncated = source.slice(arrayStart);
   let pos = truncated.length - 1;
 
   while (pos >= 0) {
