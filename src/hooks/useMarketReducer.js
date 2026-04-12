@@ -212,13 +212,20 @@ function reducer(state, action) {
       return { ...state, loading: null, loadingMeta: null, ideatingContent: action.content };
 
     case 'USE_IDEA_FOR_DRAFT':
-      // Switch to Draft Market mode and populate the question + references
-      // from an ideate suggestion so the user can immediately refine and draft.
+      // Switch to Draft Market mode and populate the question, references,
+      // and dates from an ideate suggestion so the user can immediately
+      // refine and draft. Dates are derived from the idea's suggested
+      // timeframe (start defaults to tomorrow, end from the timeframe text).
+      // Use ?? (not ||) so that missing payload dates preserve any
+      // user-entered values rather than silently wiping them to ''.
       return {
         ...state,
         mode: 'draft',
         question: action.question || '',
         references: action.references || '',
+        startDate: action.startDate ?? state.startDate,
+        endDate: action.endDate ?? state.endDate,
+        dateError: null,
         error: null,
       };
 
