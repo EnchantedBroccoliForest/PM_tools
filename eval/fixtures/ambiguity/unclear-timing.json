@@ -1,0 +1,35 @@
+{
+  "id": "ambig-unclear-timing",
+  "bucket": "ambiguity",
+  "description": "Draft specifies \"by end of year\" without timezone or HH:MM. Reviewers fail timing_unambiguous; market needs an explicit UTC cutoff.",
+  "input": {
+    "question": "Will the CPI reading come in under 2% by end of year?",
+    "startDate": "2027-06-01",
+    "endDate": "2027-12-31",
+    "references": "https://www.bls.gov/cpi"
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "'End of year' is not precise enough. CPI data drops on a specific day at 8:30 AM ET — the cutoff must be pinned to that timestamp in UTC to avoid disputes about late-arriving revisions.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "yes", "rationale": "Under 2% vs not-under-2% partitions cleanly." },
+          { "ruleId": "objective_source", "verdict": "yes", "rationale": "BLS is public and mechanical." },
+          { "ruleId": "timing_unambiguous", "verdict": "no", "rationale": "'End of year' lacks a specific cutoff and timezone." },
+          { "ruleId": "manipulation_resistant", "verdict": "yes", "rationale": "BLS is neutral." },
+          { "ruleId": "atomic_claims", "verdict": "yes", "rationale": "Threshold is single number." },
+          { "ruleId": "edge_cases_covered", "verdict": "no", "rationale": "No rule for CPI revisions after cutoff." }
+        ],
+        "criticisms": [
+          { "claimId": "claim.timestamp.end", "severity": "blocker", "category": "timing", "rationale": "Replace 'end of year' with '2027-12-31T13:30:00Z' or similar explicit UTC timestamp." }
+        ]
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "blocked",
+    "expected_aggregation_overall": "fail",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_routing": true
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "ambig-clean-baseline",
+  "bucket": "ambiguity",
+  "description": "Clean happy path — all claims verify, no citation failures, low risk. Under the default (selective) escalation, review is skipped because the claim set is clean; the fixture still finalizes cleanly.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "expectedProperties": {
+    "expected_risk": "low",
+    "expected_routing_overall": "clean",
+    "expected_aggregation_overall": "pass",
+    "expected_aggregation_protocol": "majority",
+    "expected_finalize_allowed": true,
+    "expected_blocked_by_risk": false,
+    "expected_blocked_by_routing": false,
+    "expected_blocked_by_verification": false,
+    "expected_review_skipped": false,
+    "expected_citation_resolves_all": true,
+    "min_claims": 6
+  }
+}

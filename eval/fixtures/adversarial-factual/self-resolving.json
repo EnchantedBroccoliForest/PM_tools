@@ -1,0 +1,35 @@
+{
+  "id": "advf-self-resolving",
+  "bucket": "adversarial-factual",
+  "description": "Draft has a self-referential outcome (\"if this market resolves X\"). Reviewer flags manipulation_resistant = no.",
+  "input": {
+    "question": "Will a majority of 42.space users vote this market resolved?",
+    "startDate": "2027-04-01",
+    "endDate": "2027-12-31",
+    "references": "https://www.42.space"
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "Self-referential — the market's own participants decide resolution, which creates an arbitrage incentive: buy No, vote No. Cannot ship as a real market.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "yes", "rationale": "Majority/no-majority partitions the space." },
+          { "ruleId": "objective_source", "verdict": "no", "rationale": "Resolver is the user pool — not an external source." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "Window is explicit." },
+          { "ruleId": "manipulation_resistant", "verdict": "no", "rationale": "Self-referential; any participant can vote-manipulate." },
+          { "ruleId": "atomic_claims", "verdict": "yes", "rationale": "Outcomes are atomic." },
+          { "ruleId": "edge_cases_covered", "verdict": "no", "rationale": "No rule for non-voters." }
+        ],
+        "criticisms": [
+          { "claimId": "claim.question.0", "severity": "blocker", "category": "manipulation", "rationale": "Replace with an external resolution source unrelated to market participation." }
+        ]
+      }
+    ]
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "blocked",
+    "expected_aggregation_overall": "fail",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_routing": true
+  }
+}

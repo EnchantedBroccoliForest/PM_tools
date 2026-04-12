@@ -1,0 +1,38 @@
+{
+  "id": "rag-typo-url",
+  "bucket": "rag-trap",
+  "description": "Cited URL has a typo (\"bloomberq\") that resolves to NXDOMAIN. Same gate as rag-dead-url: soft_fail and targeted_review.",
+  "input": {
+    "question": "Will the S&P 500 close above 7000 by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://www.bloomberq.com/markets"
+  },
+  "mockResponses": {
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the S&P 500 close above 7000 by 2027-12-31?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "Market starts 2027-01-01T00:00:00Z.", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "Market ends 2027-12-31T21:00:00Z (post-close).", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins if close >= 7000.", "sourceRefs": [] },
+      { "id": "claim.source.0", "category": "source", "text": "https://www.bloomberq.com/markets", "sourceRefs": [] },
+      { "id": "claim.threshold.0", "category": "threshold", "text": "Threshold: S&P 500 daily close >= 7000.", "sourceRefs": [] }
+    ],
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.threshold.0", "entailment": "entailed", "rationale": "Present." }
+    ],
+    "urlResolves": {
+      "https://www.bloomberq.com": false
+    }
+  },
+  "expectedProperties": {
+    "expected_citation_resolves_all": false,
+    "expected_has_soft_fail": true,
+    "expected_routing_overall": "needs_update",
+    "expected_finalize_allowed": true
+  }
+}

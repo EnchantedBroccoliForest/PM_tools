@@ -21,13 +21,13 @@
  * defeats the whole point of grounding aggregation in the same review.
  */
 
-import { queryModel } from '../api/openrouter';
+import { queryModel } from '../api/openrouter.js';
 import {
   SYSTEM_PROMPTS,
   buildStructuredReviewPrompt,
   buildStrictStructuredReviewRetryPrompt,
-} from '../constants/prompts';
-import { StructuredReviewResponseSchema } from '../types/run';
+} from '../constants/prompts.js';
+import { StructuredReviewResponseSchema } from '../types/run.js';
 
 /** Same JSON salvage logic as the claim extractor — see extractClaims.js. */
 function tryParseJson(text) {

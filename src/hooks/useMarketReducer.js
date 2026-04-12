@@ -27,7 +27,7 @@ const initialState = {
   ideatingContent: null,
 
   // Processing
-  loading: null, // null | 'draft' | 'review' | 'update' | 'accept' | 'early-resolution' | 'ideate'
+  loading: null, // null | 'draft' | 'review' | 'update' | 'accept' | 'early-resolution' | 'source-accessibility' | 'ideate'
   loadingMeta: null, // { models: string[], startTime: number } | null
   error: null,
   dateError: null,
@@ -54,6 +54,16 @@ const initialState = {
   // a fresh draft resets this to false.
   routingAcknowledged: false,
 
+  // Pre-finalize data-source accessibility gate. Runs after the
+  // early-resolution check and before Accept & Finalize: harvests the
+  // specific data-source URLs referenced in the resolution rule and
+  // probes each with a short no-cors fetch. Any unreachable source
+  // blocks Accept until the user explicitly acknowledges (or re-runs
+  // Update after fixing the sources).
+  /** @type {import('../pipeline/checkSources').SourceCheckResult|null} */
+  sourceAccessibility: null,
+  sourceAccessibilityAcknowledged: false,
+
   // Phase 1: canonical Run artifact. Every handler that performs an LLM call
   // appends to this in parallel with the legacy view-state fields. The
   // view-state fields (draftContent, reviews, deliberatedReview, finalContent)
@@ -76,6 +86,10 @@ function clearEarlyResolution(state) {
     // Phase 5: a new draft always resets the routing acknowledgement so
     // the user has to re-confirm any surviving blocking claims.
     routingAcknowledged: false,
+    // Source-accessibility gate is per-draft: a fresh draft invalidates
+    // any prior reachability check and drops any prior acknowledgement.
+    sourceAccessibility: null,
+    sourceAccessibilityAcknowledged: false,
   };
 }
 
@@ -197,6 +211,17 @@ function reducer(state, action) {
     case 'IDEATE_SUCCESS':
       return { ...state, loading: null, loadingMeta: null, ideatingContent: action.content };
 
+    case 'USE_IDEA_FOR_DRAFT':
+      // Switch to Draft Market mode and populate the question + references
+      // from an ideate suggestion so the user can immediately refine and draft.
+      return {
+        ...state,
+        mode: 'draft',
+        question: action.question || '',
+        references: action.references || '',
+        error: null,
+      };
+
     case 'START_EARLY_RESOLUTION':
       return {
         ...state,
@@ -231,6 +256,48 @@ function reducer(state, action) {
 
     case 'ACKNOWLEDGE_EARLY_RESOLUTION':
       return { ...state, earlyResolutionAcknowledged: true };
+
+    case 'START_SOURCE_ACCESSIBILITY':
+      return {
+        ...state,
+        loading: 'source-accessibility',
+        loadingMeta: { models: [], startTime: Date.now() },
+        sourceAccessibility: null,
+        sourceAccessibilityAcknowledged: false,
+      };
+
+    case 'SOURCE_ACCESSIBILITY_SUCCESS':
+      return {
+        ...state,
+        loading: null,
+        loadingMeta: null,
+        sourceAccessibility: action.result,
+        sourceAccessibilityAcknowledged: false,
+      };
+
+    case 'SOURCE_ACCESSIBILITY_ERROR':
+      return {
+        ...state,
+        loading: null,
+        loadingMeta: null,
+        sourceAccessibility: {
+          status: 'error',
+          sources: [],
+          checkedAt: Date.now(),
+          wallClockMs: 0,
+          error: action.error,
+          logEntry: {
+            level: 'error',
+            message: `Source accessibility: ${action.error}`,
+          },
+        },
+        // Errors do NOT block Accept — we only block on confirmed
+        // unreachable sources. The UI surfaces the error message.
+        sourceAccessibilityAcknowledged: false,
+      };
+
+    case 'ACKNOWLEDGE_SOURCE_ACCESSIBILITY':
+      return { ...state, sourceAccessibilityAcknowledged: true };
 
     // ----- Phase 1: Run artifact plumbing ------------------------------
     //
@@ -462,6 +529,10 @@ function rehydrateFromRun(state, run) {
     earlyResolutionRisk: null,
     earlyResolutionRiskLevel: null,
     earlyResolutionAcknowledged: false,
+    // Source-accessibility gate is also not persisted; an imported run has
+    // to be re-checked if the user wants the gate to gate Accept.
+    sourceAccessibility: null,
+    sourceAccessibilityAcknowledged: false,
   };
 }
 

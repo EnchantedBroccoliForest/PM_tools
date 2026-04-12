@@ -1,0 +1,617 @@
+/**
+ * Headless pipeline orchestrator.
+ *
+ * Runs the full PM_tools pipeline (draft → extract claims → verify → gather
+ * evidence → route → review → aggregate → update → risk → finalize) without
+ * any React UI. Takes a config object, returns a Run artifact.
+ *
+ * Consumers: the CLI (`bin/pm-tools.js`), the eval harness (via mock LLMs),
+ * and any future server / agent integration.
+ *
+ * Key differences from the eval harness's original `runFixture()`:
+ *   - Does NOT call installQueryModel() — uses the real queryModel by default.
+ *   - Model IDs come from config.models, not hardcoded mock IDs.
+ *   - Supports abort via AbortSignal.
+ *   - Calls lifecycle callbacks (onStageStart / onStageEnd / onLog).
+ *   - Wraps every stage in try/catch — never throws, returns partial Runs.
+ *   - Populates run.status and run.gates on completion.
+ *   - Enforces a concurrency limit (semaphore) to prevent API credit burn.
+ */
+
+import { queryModel } from './api/openrouter.js';
+import {
+  SYSTEM_PROMPTS,
+  buildDraftPrompt,
+  buildUpdatePrompt,
+  buildRoutingFocusBlock,
+  buildFinalizePrompt,
+  buildEarlyResolutionPrompt,
+} from './constants/prompts.js';
+import { extractClaims } from './pipeline/extractClaims.js';
+import { verifyClaims, structuralCheck } from './pipeline/verify.js';
+import { gatherEvidence } from './pipeline/gatherEvidence.js';
+import { routeClaims } from './pipeline/route.js';
+import { runStructuredReviewsParallel } from './pipeline/structuredReview.js';
+import { aggregate } from './pipeline/aggregate.js';
+import { RIGOR_RUBRIC } from './constants/rubric.js';
+import { createRun } from './types/run.js';
+import {
+  DEFAULT_DRAFTER_MODEL,
+  DEFAULT_REVIEWER_MODELS,
+  DEFAULT_JUDGE_MODEL,
+  DEFAULT_OPTIONS,
+} from './defaults.js';
+
+// ----------------------------------------------------------------- semaphore
+
+const MAX_CONCURRENT = 3;
+let _running = 0;
+const _queue = [];
+
+function acquireSemaphore() {
+  if (_running < MAX_CONCURRENT) {
+    _running++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    _queue.push(resolve);
+  });
+}
+
+function releaseSemaphore() {
+  if (_queue.length > 0) {
+    const next = _queue.shift();
+    next();
+  } else {
+    _running--;
+  }
+}
+
+// --------------------------------------------------------- cost accounting
+
+function createCostTracker() {
+  const byStage = {};
+  let totalTokensIn = 0;
+  let totalTokensOut = 0;
+  let wallClockMs = 0;
+  return {
+    record(stage, result) {
+      if (!result) return;
+      const tokensIn = Number(result.usage?.promptTokens) || 0;
+      const tokensOut = Number(result.usage?.completionTokens) || 0;
+      const ms = Number(result.wallClockMs) || 0;
+      totalTokensIn += tokensIn;
+      totalTokensOut += tokensOut;
+      wallClockMs += ms;
+      byStage[stage] = (byStage[stage] || 0) + tokensIn + tokensOut;
+    },
+    snapshot() {
+      return { totalTokensIn, totalTokensOut, wallClockMs, byStage: { ...byStage } };
+    },
+  };
+}
+
+// --------------------------------------------------------------- helpers
+
+function log(run, stage, level, message, callbacks) {
+  const entry = { stage, level, message, ts: Date.now() };
+  run.log.push(entry);
+  callbacks?.onLog?.(entry);
+}
+
+/**
+ * Check whether the caller has requested an abort. If aborted, sets
+ * run.status to 'error' with a log message and returns true.
+ */
+function checkAbort(run, signal, callbacks) {
+  if (!signal?.aborted) return false;
+  log(run, 'orchestrate', 'error', 'Pipeline aborted by caller.', callbacks);
+  run.status = 'error';
+  return true;
+}
+
+/**
+ * Decide whether the review stage is worth running under 'selective'
+ * escalation. A claim set is "clean" if no verification is hard_fail,
+ * no entailment is contradicted, and no cited URL failed to resolve.
+ */
+function isClaimSetClean(run) {
+  for (const v of run.verification || []) {
+    if (v.verdict === 'hard_fail') return false;
+    if (v.entailment === 'contradicted') return false;
+    if (v.citationResolves === false) return false;
+  }
+  return true;
+}
+
+// --------------------------------------------------------- sub-stages
+
+/**
+ * Run extraction + verification + evidence + routing for a draft and fold
+ * the results into the Run artifact.
+ */
+async function runClaimPipeline(run, draftText, models, options, fetchImpl, cost, callbacks) {
+  // 1. Claim extraction.
+  const claimResult = await extractClaims(models.drafter, draftText);
+  cost.record('claims', claimResult);
+  if (claimResult.logEntry) {
+    log(run, 'claims', claimResult.logEntry.level, claimResult.logEntry.message, callbacks);
+  }
+  run.claims = claimResult.claims;
+
+  if (run.claims.length === 0) {
+    run.verification = [];
+    run.evidence = [];
+    run.routing = routeClaims({ claims: [], verifications: [], criticisms: run.criticisms || [] });
+    return;
+  }
+
+  // 2. Verification.
+  let verifications = [];
+  if (options.verifiers === 'off') {
+    verifications = [];
+    log(run, 'verify', 'info', 'Verification skipped (verifiers=off).', callbacks);
+  } else if (options.verifiers === 'partial') {
+    verifications = run.claims.map((c) => ({ ...structuralCheck(c), entailment: 'not_applicable' }));
+    log(run, 'verify', 'info', `Verification structural-only (${verifications.length} claim(s)).`, callbacks);
+  } else {
+    const vResult = await verifyClaims(run.claims, draftText, models.drafter);
+    cost.record('verify', vResult);
+    verifications = vResult.verifications;
+    if (vResult.logEntry) {
+      log(run, 'verify', vResult.logEntry.level, vResult.logEntry.message, callbacks);
+    }
+  }
+  run.verification = verifications;
+
+  // 3. Evidence gathering.
+  if (options.evidence === 'none') {
+    run.evidence = [];
+    log(run, 'evidence', 'info', 'Evidence gathering skipped (evidence=none).', callbacks);
+  } else {
+    const eResult = await gatherEvidence({
+      references: run.input.references,
+      claims: run.claims,
+      verifications: run.verification,
+      fetchImpl,
+      timeoutMs: 3000,
+    });
+    cost.record('evidence', { usage: null, wallClockMs: eResult.wallClockMs });
+    run.evidence = eResult.evidence;
+    run.verification = eResult.updatedVerifications;
+    if (eResult.logEntry) {
+      log(run, 'evidence', eResult.logEntry.level, eResult.logEntry.message, callbacks);
+    }
+  }
+
+  // 4. Routing.
+  run.routing = routeClaims({
+    claims: run.claims,
+    verifications: run.verification,
+    criticisms: run.criticisms || [],
+    evidence: run.evidence,
+  });
+  log(
+    run, 'route',
+    run.routing.overall === 'blocked' ? 'error' : run.routing.overall === 'needs_update' ? 'warn' : 'info',
+    `Routing: overall=${run.routing.overall}, ` +
+      `${run.routing.items.filter((i) => i.severity === 'blocking').length} blocking, ` +
+      `${run.routing.items.filter((i) => i.severity === 'targeted_review').length} targeted, ` +
+      `${run.routing.items.filter((i) => i.severity === 'ok').length} ok.`,
+    callbacks,
+  );
+}
+
+/**
+ * Run the review stage: parallel structured reviews, aggregation, and a
+ * re-route that folds the resulting criticisms into the routing state.
+ */
+async function runReviewStage(run, models, options, cost, callbacks) {
+  const structured = await runStructuredReviewsParallel(
+    models.reviewers,
+    run.drafts[run.drafts.length - 1].content,
+    RIGOR_RUBRIC,
+  );
+  for (const r of structured) {
+    if (r.usage) cost.record('review', { usage: r.usage, wallClockMs: r.wallClockMs });
+    if (r.logEntry) {
+      log(run, 'review', r.logEntry.level, r.logEntry.message, callbacks);
+    }
+  }
+
+  const successful = structured.filter((r) => r.reviewProse !== null);
+  if (successful.length === 0) {
+    log(run, 'review', 'error', 'All reviewers failed.', callbacks);
+    return;
+  }
+
+  const allCriticisms = successful.flatMap((r) => r.criticisms);
+  run.criticisms = [...(run.criticisms || []), ...allCriticisms];
+
+  const allVotes = successful.flatMap((r) => r.rubricVotes);
+  const judgeModel = options.aggregation === 'judge' ? models.judge : undefined;
+  const aggResult = await aggregate(
+    options.aggregation,
+    RIGOR_RUBRIC,
+    allVotes,
+    judgeModel,
+  );
+  if (aggResult.usage && aggResult.usage.totalTokens > 0) {
+    cost.record('aggregation', { usage: aggResult.usage, wallClockMs: aggResult.wallClockMs });
+  }
+  if (aggResult.logEntry) {
+    log(run, 'aggregation', aggResult.logEntry.level, aggResult.logEntry.message, callbacks);
+  }
+  run.aggregation = aggResult.aggregation;
+
+  // Re-route with the newly-landed criticisms.
+  run.routing = routeClaims({
+    claims: run.claims,
+    verifications: run.verification,
+    criticisms: run.criticisms,
+    evidence: run.evidence,
+  });
+}
+
+/**
+ * Run the update stage: new draft, re-extract, re-verify, re-route.
+ */
+async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks) {
+  const latestDraft = run.drafts[run.drafts.length - 1].content;
+  const reviewText = run.aggregation?.checklist
+    ?.map((item) => `${item.id}: ${item.decision}`)
+    .join('\n') || '(no review)';
+  const focusBlock = buildRoutingFocusBlock(run.routing, run.claims);
+  const humanFeedback = options.humanFeedback || '';
+  const updateResult = await queryModel(
+    models.drafter,
+    [
+      { role: 'system', content: SYSTEM_PROMPTS.drafter },
+      { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock) },
+    ],
+  );
+  cost.record('update', updateResult);
+  run.drafts.push({
+    model: models.drafter,
+    content: updateResult.content,
+    timestamp: Date.now(),
+    kind: 'updated',
+  });
+  // Re-run the claim pipeline on the updated draft.
+  await runClaimPipeline(run, updateResult.content, models, options, fetchImpl, cost, callbacks);
+}
+
+/**
+ * Run the early-resolution risk analyst. Parses the risk level from the
+ * response using the same regex as App.jsx.
+ */
+async function runRiskStage(run, models, cost, callbacks) {
+  const latestDraft = run.drafts[run.drafts.length - 1].content;
+  const riskResult = await queryModel(
+    models.drafter,
+    [
+      { role: 'system', content: SYSTEM_PROMPTS.earlyResolutionAnalyst },
+      { role: 'user', content: buildEarlyResolutionPrompt(latestDraft, run.input.startDate, run.input.endDate) },
+    ],
+  );
+  cost.record('early_resolution', riskResult);
+  const match = typeof riskResult.content === 'string'
+    ? riskResult.content.match(/risk\s*rating\s*[:-]?\s*(low|medium|high)/i)
+    : null;
+  const level = match ? match[1].toLowerCase() : 'unknown';
+  log(
+    run, 'early_resolution',
+    level === 'high' ? 'warn' : 'info',
+    `Risk analyst → ${level}`,
+    callbacks,
+  );
+  return { level, text: riskResult.content };
+}
+
+/**
+ * Run the finalizer and record whether the Accept gate allowed the final
+ * JSON. Gate logic mirrors App.jsx's handleAccept.
+ */
+async function runFinalizeStage(run, riskLevel, models, cost, callbacks) {
+  const latestDraft = run.drafts[run.drafts.length - 1].content;
+  const routingOverall = run.routing?.overall || 'clean';
+  const blockedByRisk = riskLevel === 'high';
+  const blockedByRouting = routingOverall === 'blocked';
+  const blockedByVerification = (run.verification || []).some((v) => v.verdict === 'hard_fail');
+
+  const gateResult = {
+    allowed: !blockedByRisk && !blockedByRouting && !blockedByVerification,
+    blockedByRisk,
+    blockedByRouting,
+    blockedByVerification,
+  };
+
+  if (!gateResult.allowed) {
+    log(
+      run, 'accept', 'error',
+      `Finalize blocked: risk=${blockedByRisk}, routing=${blockedByRouting}, verification=${blockedByVerification}`,
+      callbacks,
+    );
+    return gateResult;
+  }
+
+  const finalResult = await queryModel(
+    models.drafter,
+    [
+      { role: 'system', content: SYSTEM_PROMPTS.finalizer },
+      { role: 'user', content: buildFinalizePrompt(latestDraft, run.input.startDate, run.input.endDate) },
+    ],
+    { temperature: 0.3 },
+  );
+  cost.record('accept', finalResult);
+  let parsed;
+  try {
+    const match = finalResult.content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+    parsed = match ? JSON.parse(match[1]) : JSON.parse(finalResult.content);
+  } catch {
+    parsed = { raw: finalResult.content };
+  }
+  run.finalJson = parsed;
+  return gateResult;
+}
+
+// -------------------------------------------------------- gates builder
+
+/**
+ * Populate run.gates from the data already on the Run. Does not add new
+ * pipeline logic — just summarizes existing state.
+ */
+function buildGates(run, riskLevel) {
+  const level = (riskLevel === 'low' || riskLevel === 'medium' || riskLevel === 'high')
+    ? riskLevel
+    : 'medium'; // unknown risk → treat as medium for the gates summary
+
+  const routingOverall = run.routing?.overall || 'clean';
+  const hasHardFail = (run.verification || []).some((v) => v.verdict === 'hard_fail');
+
+  // Source status: derive from evidence. If no evidence was gathered, the
+  // status depends on whether there were any URLs to check.
+  let sourcesStatus = 'no_sources';
+  if (run.evidence && run.evidence.length > 0) {
+    // If any source-claim verification has citationResolves === false,
+    // some sources are unreachable.
+    const sourceVerifs = (run.verification || []).filter((v) => {
+      const claim = (run.claims || []).find((c) => c.id === v.claimId);
+      return claim && claim.category === 'source';
+    });
+    if (sourceVerifs.length === 0) {
+      sourcesStatus = 'ok';
+    } else {
+      const allResolve = sourceVerifs.every((v) => v.citationResolves !== false);
+      const noneResolve = sourceVerifs.every((v) => v.citationResolves === false);
+      if (allResolve) sourcesStatus = 'ok';
+      else if (noneResolve) sourcesStatus = 'all_unreachable';
+      else sourcesStatus = 'some_unreachable';
+    }
+  }
+
+  return {
+    risk: { level, blocked: level === 'high' },
+    routing: { overall: routingOverall, blocked: routingOverall === 'blocked' },
+    verification: { hasHardFail, blocked: hasHardFail },
+    sources: { status: sourcesStatus, blocked: sourcesStatus === 'all_unreachable' },
+  };
+}
+
+// ------------------------------------------------- public entry point
+
+/**
+ * Run the full PM_tools pipeline headlessly.
+ *
+ * @param {object} config
+ * @param {object} config.input
+ * @param {string} config.input.question         required
+ * @param {string} config.input.startDate        ISO 8601, required
+ * @param {string} config.input.endDate          ISO 8601, required
+ * @param {string[]} [config.input.references]   resolution source URLs
+ * @param {object} [config.models]
+ * @param {string} [config.models.drafter]
+ * @param {{id:string, name:string}[]} [config.models.reviewers]
+ * @param {string} [config.models.judge]
+ * @param {object} [config.options]
+ * @param {'majority'|'unanimity'|'judge'} [config.options.aggregation]
+ * @param {'always'|'selective'} [config.options.escalation]
+ * @param {'none'|'retrieval'} [config.options.evidence]
+ * @param {'off'|'partial'|'full'} [config.options.verifiers]
+ * @param {string} [config.options.humanFeedback]
+ * @param {boolean} [config.options.skipUpdate]
+ * @param {boolean} [config.options.skipFinalize]
+ * @param {object} [config.callbacks]
+ * @param {(stage:string)=>void} [config.callbacks.onStageStart]
+ * @param {(stage:string, result:any)=>void} [config.callbacks.onStageEnd]
+ * @param {(entry:object)=>void} [config.callbacks.onLog]
+ * @param {typeof fetch} [config.fetchImpl]      override for tests (evidence URL probes)
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<object>} the Run artifact
+ */
+export async function orchestrate(config, signal) {
+  await acquireSemaphore();
+  try {
+    return await _orchestrateInner(config, signal);
+  } finally {
+    releaseSemaphore();
+  }
+}
+
+async function _orchestrateInner(config, signal) {
+  const { input, models: modelsRaw, options: optionsRaw, callbacks, fetchImpl } = config || {};
+
+  // Resolve models with defaults.
+  const models = {
+    drafter: modelsRaw?.drafter || DEFAULT_DRAFTER_MODEL,
+    reviewers: modelsRaw?.reviewers?.length > 0 ? modelsRaw.reviewers : DEFAULT_REVIEWER_MODELS,
+    judge: modelsRaw?.judge || DEFAULT_JUDGE_MODEL,
+  };
+
+  // Resolve options with defaults.
+  const options = {
+    aggregation: optionsRaw?.aggregation || DEFAULT_OPTIONS.aggregation,
+    escalation: optionsRaw?.escalation || DEFAULT_OPTIONS.escalation,
+    evidence: optionsRaw?.evidence || DEFAULT_OPTIONS.evidence,
+    verifiers: optionsRaw?.verifiers || DEFAULT_OPTIONS.verifiers,
+    humanFeedback: optionsRaw?.humanFeedback || undefined,
+    skipUpdate: !!optionsRaw?.skipUpdate,
+    skipFinalize: !!optionsRaw?.skipFinalize,
+  };
+
+  // Build the Run input. References may arrive as an array (CLI) or string (UI/harness).
+  const refs = input?.references;
+  const referencesStr = Array.isArray(refs) ? refs.join('\n') : (refs || '');
+
+  const run = createRun({
+    question: input?.question || '',
+    startDate: input?.startDate || '',
+    endDate: input?.endDate || '',
+    references: referencesStr,
+  });
+
+  let riskLevel = 'unknown';
+
+  // Helper to wrap a stage in try/catch with abort check and callbacks.
+  const stage = async (name, fn) => {
+    if (checkAbort(run, signal, callbacks)) return false;
+    callbacks?.onStageStart?.(name);
+    try {
+      const result = await fn();
+      callbacks?.onStageEnd?.(name, result);
+      return true;
+    } catch (err) {
+      log(run, name, 'error', `Stage failed: ${err.message || err}`, callbacks);
+      run.status = 'error';
+      callbacks?.onStageEnd?.(name, { error: err.message || String(err) });
+      return false;
+    }
+  };
+
+  const cost = createCostTracker();
+
+  // --- 1. Draft ---
+  let ok = await stage('draft', async () => {
+    const draftResult = await queryModel(
+      models.drafter,
+      [
+        { role: 'system', content: SYSTEM_PROMPTS.drafter },
+        {
+          role: 'user',
+          content: buildDraftPrompt(
+            input?.question || '',
+            input?.startDate || '',
+            input?.endDate || '',
+            referencesStr,
+          ),
+        },
+      ],
+    );
+    cost.record('draft', draftResult);
+    run.drafts.push({
+      model: models.drafter,
+      content: draftResult.content,
+      timestamp: Date.now(),
+      kind: 'initial',
+    });
+    return draftResult;
+  });
+  if (!ok || run.status === 'error') {
+    run.cost = cost.snapshot();
+    run.gates = buildGates(run, riskLevel);
+    return run;
+  }
+
+  // --- 2. Claim pipeline on the initial draft ---
+  ok = await stage('claims', async () => {
+    await runClaimPipeline(
+      run, run.drafts[0].content, models, options, fetchImpl, cost, callbacks,
+    );
+  });
+  if (!ok || run.status === 'error') {
+    run.cost = cost.snapshot();
+    run.gates = buildGates(run, riskLevel);
+    return run;
+  }
+
+  // --- 3. Escalation gate + Review ---
+  if (options.skipUpdate) {
+    // Stop after initial draft + claim pipeline.
+    run.status = 'partial';
+    run.cost = cost.snapshot();
+    run.gates = buildGates(run, riskLevel);
+    return run;
+  }
+
+  if (options.escalation === 'selective' && isClaimSetClean(run)) {
+    log(run, 'review', 'info', 'Review skipped by selective escalation (claim set clean).', callbacks);
+  } else {
+    ok = await stage('review', async () => {
+      await runReviewStage(run, models, options, cost, callbacks);
+    });
+    if (!ok || run.status === 'error') {
+      run.cost = cost.snapshot();
+      run.gates = buildGates(run, riskLevel);
+      return run;
+    }
+  }
+
+  // --- 4. Update ---
+  ok = await stage('update', async () => {
+    await runUpdateStage(run, models, options, fetchImpl, cost, callbacks);
+  });
+  if (!ok || run.status === 'error') {
+    run.cost = cost.snapshot();
+    run.gates = buildGates(run, riskLevel);
+    return run;
+  }
+
+  // --- 5. Risk analysis ---
+  let riskText = '';
+  ok = await stage('early_resolution', async () => {
+    const result = await runRiskStage(run, models, cost, callbacks);
+    riskLevel = result.level;
+    riskText = result.text;
+    return result;
+  });
+  // Stash the raw risk-analyst response on the run so consumers (eval
+  // harness, CLI summary) can access the full text, not just the parsed level.
+  run.riskAnalysis = { level: riskLevel, text: riskText };
+
+  if (!ok || run.status === 'error') {
+    run.cost = cost.snapshot();
+    run.gates = buildGates(run, riskLevel);
+    return run;
+  }
+
+  // --- 6. Finalize ---
+  if (options.skipFinalize) {
+    run.status = 'partial';
+    run.cost = cost.snapshot();
+    run.gates = buildGates(run, riskLevel);
+    return run;
+  }
+
+  let gate;
+  ok = await stage('accept', async () => {
+    gate = await runFinalizeStage(run, riskLevel, models, cost, callbacks);
+    return gate;
+  });
+  if (!ok || run.status === 'error') {
+    run.cost = cost.snapshot();
+    run.gates = buildGates(run, riskLevel);
+    return run;
+  }
+
+  // --- Set final status ---
+  run.cost = cost.snapshot();
+  run.gates = buildGates(run, riskLevel);
+
+  if (gate && !gate.allowed) {
+    run.status = 'blocked';
+  } else {
+    run.status = 'complete';
+  }
+
+  return run;
+}

@@ -1,0 +1,57 @@
+{
+  "id": "rag-multiple-dead",
+  "bucket": "rag-trap",
+  "description": "Every cited URL is dead. Reviewer additionally flags the claim with a blocker criticism for using unstable single-blog sources. Both signals combine to route the source claim to blocking.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://someblog.invalid/post1 https://anotherblog.invalid/post2"
+  },
+  "mockResponses": {
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the referenced event occur by 2027-12-31?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "Market starts 2027-01-01T00:00:00Z.", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "Market ends 2027-12-31T23:59:59Z.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins.", "sourceRefs": [] },
+      { "id": "claim.source.0", "category": "source", "text": "https://someblog.invalid/post1", "sourceRefs": [] },
+      { "id": "claim.source.1", "category": "source", "text": "https://anotherblog.invalid/post2", "sourceRefs": [] }
+    ],
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.1", "entailment": "entailed", "rationale": "Present." }
+    ],
+    "reviews": [
+      {
+        "reviewProse": "Both cited sources are single blogs with no archival guarantees; additionally neither URL resolves at review time. Market cannot be shipped until a stable public source is chosen.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "yes", "rationale": "Partition OK." },
+          { "ruleId": "objective_source", "verdict": "no", "rationale": "Single-blog sources aren't objective." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "UTC cutoff." },
+          { "ruleId": "manipulation_resistant", "verdict": "no", "rationale": "Blog authors could edit or delete posts mid-market." },
+          { "ruleId": "atomic_claims", "verdict": "yes", "rationale": "Atomic." },
+          { "ruleId": "edge_cases_covered", "verdict": "yes", "rationale": "Edge cases listed." }
+        ],
+        "criticisms": [
+          { "claimId": "claim.source.0", "severity": "blocker", "category": "source", "rationale": "Replace single-blog source with a stable institutional URL." }
+        ]
+      }
+    ],
+    "urlResolves": {
+      "https://someblog.invalid": false,
+      "https://anotherblog.invalid": false
+    }
+  },
+  "expectedProperties": {
+    "expected_citation_resolves_all": false,
+    "expected_routing_overall": "blocked",
+    "expected_aggregation_overall": "fail",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_routing": true,
+    "expected_blocking_count": "gte-1"
+  }
+}

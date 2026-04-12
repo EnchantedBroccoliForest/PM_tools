@@ -1,0 +1,49 @@
+{
+  "id": "ambig-vague-predicate",
+  "bucket": "ambiguity",
+  "description": "Vague predicate (\"successful\") with no operational definition. Reviewers fail MECE and atomic_claims, routing blocks finalize.",
+  "input": {
+    "question": "Will the next iPhone be successful?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": ""
+  },
+  "mockResponses": {
+    "reviews": [
+      {
+        "reviewProse": "The term 'successful' is not operationally defined. Without a concrete metric (unit sales, revenue, review score) the market cannot be resolved mechanically.",
+        "rubricVotes": [
+          { "ruleId": "mece", "verdict": "no", "rationale": "Success has no threshold so Yes/No cannot partition the space." },
+          { "ruleId": "objective_source", "verdict": "no", "rationale": "No source named for measuring success." },
+          { "ruleId": "timing_unambiguous", "verdict": "yes", "rationale": "Dates are UTC-anchored." },
+          { "ruleId": "manipulation_resistant", "verdict": "unsure", "rationale": "Depends on metric chosen." },
+          { "ruleId": "atomic_claims", "verdict": "no", "rationale": "'Successful' conflates multiple propositions." },
+          { "ruleId": "edge_cases_covered", "verdict": "no", "rationale": "No edge case for partial success." }
+        ],
+        "criticisms": [
+          { "claimId": "claim.question.0", "severity": "blocker", "category": "ambiguity", "rationale": "'Successful' is undefined — define an explicit numerical threshold." },
+          { "claimId": "claim.outcome.0.win", "severity": "major", "category": "mece", "rationale": "Yes win condition depends on undefined term." }
+        ]
+      }
+    ],
+    "judgeDecision": {
+      "perItemDecisions": [
+        { "id": "mece", "decision": "fail" },
+        { "id": "objective_source", "decision": "fail" },
+        { "id": "timing_unambiguous", "decision": "pass" },
+        { "id": "manipulation_resistant", "decision": "escalate" },
+        { "id": "atomic_claims", "decision": "fail" },
+        { "id": "edge_cases_covered", "decision": "fail" }
+      ],
+      "overall": "fail",
+      "rationale": "The draft's central predicate is undefined; four of six rubric items fail."
+    }
+  },
+  "expectedProperties": {
+    "expected_routing_overall": "blocked",
+    "expected_aggregation_overall": "fail",
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_routing": true,
+    "expected_blocking_count": "gte-1"
+  }
+}

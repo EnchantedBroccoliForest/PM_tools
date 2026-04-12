@@ -1,0 +1,37 @@
+{
+  "id": "advf-invented-edge-case",
+  "bucket": "adversarial-factual",
+  "description": "Extractor emitted an edge-case claim that does not exist in the draft. Entailment=not_covered flags it for targeted review without blocking finalize.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "mockResponses": {
+    "claims": [
+      { "id": "claim.question.0", "category": "question", "text": "Will the referenced event occur by 2027-12-31?", "sourceRefs": [] },
+      { "id": "claim.timestamp.start", "category": "timestamp", "text": "Market starts 2027-01-01T00:00:00Z.", "sourceRefs": [] },
+      { "id": "claim.timestamp.end", "category": "timestamp", "text": "Market ends 2027-12-31T23:59:59Z.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.win", "category": "outcome_win", "text": "Yes wins if event occurs.", "sourceRefs": [] },
+      { "id": "claim.outcome.0.criterion", "category": "outcome_criterion", "text": "Per feed.", "sourceRefs": [] },
+      { "id": "claim.source.0", "category": "source", "text": "https://example.com/feed", "sourceRefs": [] },
+      { "id": "claim.edge.0", "category": "edge_case", "text": "If the entire internet is permanently destroyed, the market resolves 50/50.", "sourceRefs": [] }
+    ],
+    "entailment": [
+      { "id": "claim.question.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.start", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.timestamp.end", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.win", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.outcome.0.criterion", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.source.0", "entailment": "entailed", "rationale": "Present." },
+      { "id": "claim.edge.0", "entailment": "not_covered", "rationale": "Draft never mentions internet destruction as an edge case — extractor hallucination." }
+    ]
+  },
+  "expectedProperties": {
+    "expected_has_soft_fail": true,
+    "expected_routing_overall": "needs_update",
+    "expected_finalize_allowed": true,
+    "expected_targeted_count": "gte-1"
+  }
+}

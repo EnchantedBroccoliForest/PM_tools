@@ -1,0 +1,30 @@
+{
+  "id": "advf-judge-overrides",
+  "bucket": "adversarial-factual",
+  "description": "All reviewers vote yes, but the judge explicitly flags manipulation_resistant = fail. Used to verify that the judge aggregator can override a majority-pass baseline when run with --aggregation=judge. Under the default --aggregation=majority this fixture passes cleanly; under --aggregation=judge it fails — this asymmetry is the test.",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01",
+    "endDate": "2027-12-31",
+    "references": "https://example.com/feed"
+  },
+  "mockResponses": {
+    "judgeDecision": {
+      "perItemDecisions": [
+        { "id": "mece", "decision": "pass" },
+        { "id": "objective_source", "decision": "pass" },
+        { "id": "timing_unambiguous", "decision": "pass" },
+        { "id": "manipulation_resistant", "decision": "fail" },
+        { "id": "atomic_claims", "decision": "pass" },
+        { "id": "edge_cases_covered", "decision": "pass" }
+      ],
+      "overall": "fail",
+      "rationale": "Reviewers missed a latent manipulation surface; the judge overrides the majority-pass baseline."
+    }
+  },
+  "expectedProperties": {
+    "expected_aggregation_overall": "pass",
+    "expected_aggregation_protocol": "majority",
+    "expected_finalize_allowed": true
+  }
+}

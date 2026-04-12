@@ -21,6 +21,7 @@ import { aggregate } from './pipeline/aggregate';
 import { verifyClaims } from './pipeline/verify';
 import { gatherEvidence } from './pipeline/gatherEvidence';
 import { routeClaims, groupRoutingBySeverity } from './pipeline/route';
+import { checkResolutionSources } from './pipeline/checkSources';
 import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
 import { parseRun } from './types/run';
 import { useMarketReducer } from './hooks/useMarketReducer';
@@ -98,6 +99,145 @@ function formatInline(text) {
   });
 }
 
+// Parse the Ideate stage output into discrete ideas. The prompt asks the
+// model to number ideas `1.`, `2.`, ... and include a `**Title**` field for
+// each, so we split on top-level numbered starts and best-effort extract the
+// title from each block. The trailing "themes / follow-up" note (if any) is
+// captured as a postamble so it isn't absorbed into the last idea.
+function parseIdeateContent(rawText) {
+  if (!rawText || typeof rawText !== 'string') {
+    return { preamble: '', ideas: [], postamble: '' };
+  }
+  const lines = rawText.split('\n');
+  const preambleLines = [];
+  const ideas = [];
+  let current = null;
+
+  for (const line of lines) {
+    const startMatch = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
+    if (startMatch) {
+      if (current) ideas.push(current);
+      current = { number: Number(startMatch[1]), lines: [line] };
+      continue;
+    }
+    if (current) {
+      current.lines.push(line);
+    } else {
+      preambleLines.push(line);
+    }
+  }
+  if (current) ideas.push(current);
+
+  // Detach a trailing "themes / follow-up" paragraph from the last idea if
+  // it looks like a standalone note (separated by a blank line, not indented,
+  // and not one of the known Idea sub-fields). This keeps the button
+  // association clean when the LLM ends with a summary sentence.
+  let postamble = '';
+  if (ideas.length > 0) {
+    const last = ideas[ideas.length - 1];
+    let splitAt = -1;
+    for (let i = last.lines.length - 1; i > 0; i--) {
+      const prev = last.lines[i - 1];
+      const curr = last.lines[i];
+      const isBlank = prev.trim() === '';
+      const isTopLevelProse =
+        curr.trim() !== '' &&
+        !/^\s/.test(curr) &&
+        !/^\s*[-*]\s/.test(curr) &&
+        !/\*\*(Title|Outcome Set|Why|Resolvability|Suggested timeframe)/i.test(curr);
+      if (isBlank && isTopLevelProse) {
+        splitAt = i;
+        break;
+      }
+    }
+    if (splitAt > 0) {
+      const tail = last.lines.slice(splitAt);
+      last.lines = last.lines.slice(0, splitAt);
+      postamble = tail.join('\n').trim();
+    }
+  }
+
+  const parsedIdeas = ideas.map((idea) => {
+    const rawText = idea.lines.join('\n');
+    const { title, rest } = extractIdeaTitleAndRest(rawText, idea.number);
+    return {
+      number: idea.number,
+      rawText,
+      title,
+      rest,
+    };
+  });
+
+  return {
+    preamble: preambleLines.join('\n').trim(),
+    ideas: parsedIdeas,
+    postamble,
+  };
+}
+
+// Extract a clean title string and the "rest" of the idea body (everything
+// except the title line), for populating Draft Market's Reference field.
+function extractIdeaTitleAndRest(ideaText, number) {
+  const lines = ideaText.split('\n');
+
+  // Strategy 1: find an explicit "**Title**" label anywhere in the idea.
+  let titleLineIdx = -1;
+  let title = '';
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/\*\*\s*Title\s*\*\*\s*[—:-]*\s*(.+)$/i);
+    if (m) {
+      titleLineIdx = i;
+      title = m[1];
+      break;
+    }
+  }
+
+  // Strategy 2: fall back to the first line after the "N." prefix.
+  if (titleLineIdx === -1 && lines.length > 0) {
+    const firstLineMatch = lines[0].match(/^\s*\d+[.)]\s+(.+)$/);
+    if (firstLineMatch) {
+      titleLineIdx = 0;
+      title = firstLineMatch[1];
+    }
+  }
+
+  // Clean up the title: strip markdown bold, leading label prefixes, and
+  // surrounding quotes.
+  title = (title || '')
+    .replace(/\*\*/g, '')
+    .replace(/^\s*Title\s*[:—-]\s*/i, '')
+    .replace(/^["'`\u201C\u2018]+|["'`\u201D\u2019]+$/g, '')
+    .trim();
+
+  // Build the "rest" by removing just the title line (or the title segment
+  // from the first line if the title came from strategy 2).
+  let rest;
+  if (titleLineIdx === 0) {
+    // The title was on the first line, possibly preceded by "N.".
+    // Drop the whole first line so we don't duplicate the title in the
+    // Reference field.
+    rest = lines.slice(1).join('\n');
+  } else if (titleLineIdx > 0) {
+    // Preserve everything except the dedicated title line.
+    rest = [...lines.slice(0, titleLineIdx), ...lines.slice(titleLineIdx + 1)]
+      .join('\n');
+  } else {
+    // Could not find a title at all — keep the body as-is (minus the
+    // leading number so it reads cleanly).
+    rest = ideaText.replace(/^\s*\d+[.)]\s*/, '');
+  }
+
+  return { title: title || `Idea ${number}`, rest: rest.trim() };
+}
+
+// Build the text that goes into the Draft Market "References" field when an
+// idea's arrow button is clicked. Includes the idea's context (Outcome Set,
+// Why it's interesting, Resolvability, Suggested timeframe) so the drafting
+// model has the same framing the ideator used.
+function buildReferenceFromIdea(idea) {
+  return (idea.rest || idea.rawText || '').trim();
+}
+
 // Parse the risk level out of the early-resolution analyst response. The
 // prompt instructs the model to begin with "Risk rating: Low/Medium/High" —
 // anything else falls back to 'unknown', which does NOT block the gate (only
@@ -106,6 +246,37 @@ function parseRiskLevel(text) {
   if (typeof text !== 'string' || text.length === 0) return 'unknown';
   const match = text.match(/risk\s*rating\s*[:-]?\s*(low|medium|high)/i);
   return match ? match[1].toLowerCase() : 'unknown';
+}
+
+function toSimpleRoutingReason(reason) {
+  if (!reason) return '';
+  if (reason === 'verification hard_fail') return 'the checks found a serious failure';
+  if (reason === 'verification soft_fail') return 'the checks found a possible issue';
+  if (reason === 'draft contradicts claim') return 'the draft says the opposite of this claim';
+  if (reason === 'not covered by draft') return 'the draft does not clearly address this claim';
+  if (reason === 'cited URL did not resolve') return 'a cited link could not be opened';
+  if (reason === 'run has a global blocker criticism') return 'there is a run-level blocker that must be fixed';
+  const blockerMatch = reason.match(/^(\d+)\s+blocker criticism\(s\)$/);
+  if (blockerMatch) return `${blockerMatch[1]} blocker concern(s) were raised about this claim`;
+  const majorMatch = reason.match(/^(\d+)\s+major criticism\(s\)$/);
+  if (majorMatch) return `${majorMatch[1]} major concern(s) were raised about this claim`;
+  return reason;
+}
+
+function getSimpleBlockReasons(currentRun) {
+  const reasons = new Set();
+  const routingItems = currentRun?.routing?.items || [];
+  for (const item of routingItems) {
+    if (item.severity !== 'blocking') continue;
+    for (const reason of item.reasons || []) {
+      reasons.add(toSimpleRoutingReason(reason));
+    }
+  }
+
+  if ((currentRun?.criticisms || []).some((c) => c.claimId === 'global' && c.severity === 'blocker')) {
+    reasons.add('a blocker applies to the whole run');
+  }
+  return Array.from(reasons);
 }
 
 function App() {
@@ -154,6 +325,8 @@ function App() {
     earlyResolutionRiskLevel,
     earlyResolutionAcknowledged,
     routingAcknowledged,
+    sourceAccessibility,
+    sourceAccessibilityAcknowledged,
     currentRun,
     runTraceOpen,
     copiedId,
@@ -177,6 +350,17 @@ function App() {
   // block — it's surfaced as a warning in the Run trace panel only.
   const routingOverall = currentRun?.routing?.overall || 'clean';
   const needsRoutingAck = routingOverall === 'blocked' && !routingAcknowledged;
+
+  // Pre-finalize source-accessibility gate. Runs after early-resolution in
+  // handleUpdate. Any confirmed-unreachable source URL blocks Accept until
+  // the user either re-runs Update with better sources or explicitly
+  // acknowledges. Gate statuses:
+  //   - 'ok' / 'no_sources' / 'error' / null → do not block
+  //   - 'some_unreachable' / 'all_unreachable' → block until ack
+  const sourceAccessStatus = sourceAccessibility?.status || null;
+  const sourceAccessHasUnreachable =
+    sourceAccessStatus === 'some_unreachable' || sourceAccessStatus === 'all_unreachable';
+  const needsSourceAck = sourceAccessHasUnreachable && !sourceAccessibilityAcknowledged;
 
   const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
   const anyLoading = loading !== null;
@@ -392,7 +576,14 @@ function App() {
       });
       // Claim extraction runs in the background so the UI isn't blocked
       // on a second LLM round-trip; failures are logged, not thrown.
-      runClaimExtractorAndRecord(result.content);
+      runClaimExtractorAndRecord(result.content).catch((bgErr) => {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'claims',
+          level: 'error',
+          message: `Background claim extraction crashed: ${bgErr?.message || bgErr}`,
+        });
+      });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate draft' });
       dispatch({ type: 'RUN_LOG', stage: 'draft', level: 'error', message: err.message || 'Draft failed' });
@@ -583,7 +774,14 @@ function App() {
       });
       // Re-extract claims from the updated draft — the latest extraction
       // is always the canonical one for downstream verifiers.
-      runClaimExtractorAndRecord(updatedDraft);
+      runClaimExtractorAndRecord(updatedDraft).catch((bgErr) => {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'claims',
+          level: 'error',
+          message: `Background claim extraction crashed: ${bgErr?.message || bgErr}`,
+        });
+      });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to update draft' });
       dispatch({ type: 'RUN_LOG', stage: 'update', level: 'error', message: err.message || 'Update failed' });
@@ -615,6 +813,50 @@ function App() {
         message: riskErr.message || 'Early resolution check failed',
       });
     }
+
+    // Chain: data-source accessibility check. Runs against the updated
+    // draft, the user references, and whatever claims have already been
+    // extracted (claim extraction happens in the background, so this may
+    // run before or after it completes — it degrades gracefully when
+    // claims aren't yet available by scanning the draft text directly).
+    dispatch({ type: 'START_SOURCE_ACCESSIBILITY' });
+    try {
+      const checkResult = await checkResolutionSources({
+        draftContent: updatedDraft,
+        references,
+        claims: currentRunRef.current?.claims || [],
+      });
+      dispatch({
+        type: 'RUN_COST',
+        stage: 'source_accessibility',
+        tokensIn: 0,
+        tokensOut: 0,
+        wallClockMs: checkResult.wallClockMs || 0,
+      });
+      dispatch({
+        type: 'SOURCE_ACCESSIBILITY_SUCCESS',
+        result: checkResult,
+      });
+      if (checkResult.logEntry) {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'source_accessibility',
+          level: checkResult.logEntry.level,
+          message: checkResult.logEntry.message,
+        });
+      }
+    } catch (srcErr) {
+      dispatch({
+        type: 'SOURCE_ACCESSIBILITY_ERROR',
+        error: srcErr.message || 'Failed to check source accessibility',
+      });
+      dispatch({
+        type: 'RUN_LOG',
+        stage: 'source_accessibility',
+        level: 'error',
+        message: srcErr.message || 'Source accessibility check failed',
+      });
+    }
   };
 
   // --- Stage 4: Finalize to structured JSON ---
@@ -624,6 +866,7 @@ function App() {
     if (!draftContent) return;
     if (needsRiskAck) return; // belt-and-braces; button should already be disabled
     if (needsRoutingAck) return; // Phase 5: block on un-acknowledged blocking claims
+    if (needsSourceAck) return; // block until unreachable data sources are addressed or acknowledged
     dispatch({ type: 'START_LOADING', phase: 'accept', models: [getModelName(selectedModel)] });
 
     try {
@@ -673,7 +916,14 @@ function App() {
       content: trimmed,
       kind: 'initial',
     });
-    runClaimExtractorAndRecord(trimmed);
+    runClaimExtractorAndRecord(trimmed).catch((bgErr) => {
+      dispatch({
+        type: 'RUN_LOG',
+        stage: 'claims',
+        level: 'error',
+        message: `Background claim extraction crashed: ${bgErr?.message || bgErr}`,
+      });
+    });
   };
 
   // --- Ideating: generate market ideas from vague user direction ---
@@ -688,6 +938,17 @@ function App() {
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate market ideas' });
     }
+  };
+
+  // Handoff from Ideate → Draft Market: switch modes and prefill the
+  // Question and References fields from the chosen idea. The user can then
+  // pick dates / tweak the question and hit Draft Market.
+  const handleUseIdeaForDraft = (idea) => {
+    dispatch({
+      type: 'USE_IDEA_FOR_DRAFT',
+      question: idea.title || '',
+      references: buildReferenceFromIdea(idea),
+    });
   };
 
   const handleReset = () => dispatch({ type: 'RESET' });
@@ -776,24 +1037,6 @@ function App() {
               <div className="mode-toggle">
                 <button
                   type="button"
-                  className={`mode-toggle__btn ${mode === 'draft' ? 'mode-toggle__btn--active' : ''}`}
-                  onClick={() => dispatch({ type: 'SET_FIELD', field: 'mode', value: 'draft' })}
-                  disabled={anyLoading}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-                  Draft Market
-                </button>
-                <button
-                  type="button"
-                  className={`mode-toggle__btn ${mode === 'review' ? 'mode-toggle__btn--active' : ''}`}
-                  onClick={() => dispatch({ type: 'SET_FIELD', field: 'mode', value: 'review' })}
-                  disabled={anyLoading}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
-                  Review Market
-                </button>
-                <button
-                  type="button"
                   className={`mode-toggle__btn ${mode === 'ideating' ? 'mode-toggle__btn--active' : ''}`}
                   onClick={() => dispatch({ type: 'SET_FIELD', field: 'mode', value: 'ideating' })}
                   disabled={anyLoading}
@@ -801,18 +1044,27 @@ function App() {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.74V17h8v-2.26A7 7 0 0 0 12 2z" /></svg>
                   Ideating
                 </button>
+                <button
+                  type="button"
+                  className={`mode-toggle__btn ${mode === 'draft' ? 'mode-toggle__btn--active' : ''}`}
+                  onClick={() => dispatch({ type: 'SET_FIELD', field: 'mode', value: 'draft' })}
+                  disabled={anyLoading}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+                  Draft Market
+                </button>
               </div>
 
               {mode === 'draft' && (
               <div className="market-form">
                 <div className="form-group">
-                  <label htmlFor="question">Prediction Market Question</label>
+                  <label htmlFor="question">42.space Market Question</label>
                   <input
                     id="question"
                     type="text"
                     value={question}
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'question', value: e.target.value })}
-                    placeholder="e.g., Will AI achieve AGI by 2030?"
+                    placeholder="e.g., Which artist tops the Billboard Hot 100 year-end chart 2026?"
                     className="input"
                     disabled={loading === 'draft'}
                   />
@@ -952,7 +1204,7 @@ function App() {
                     id="ideatingInput"
                     value={ideatingInput}
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'ideatingInput', value: e.target.value })}
-                    placeholder="Describe a rough area of interest — e.g., 'AI regulation in 2026', 'upcoming crypto ETF decisions', 'European elections'. The model will research and brainstorm market ideas."
+                    placeholder="Describe a rough area of interest — e.g., 'esports finals season 2026', 'upcoming awards races', 'memecoin narratives'. The model will brainstorm 42.space-shaped multi-outcome market ideas."
                     className="input textarea textarea--tall"
                     disabled={loading === 'ideate'}
                   />
@@ -1017,7 +1269,51 @@ function App() {
                         </div>
                       </div>
                       <div className="content-box content-box--rich">
-                        {renderContent(ideatingContent)}
+                        {(() => {
+                          const { preamble, ideas, postamble } = parseIdeateContent(ideatingContent);
+                          if (ideas.length === 0) {
+                            // Fallback: the LLM didn't number its output, so
+                            // render the raw content without per-idea buttons.
+                            return renderContent(ideatingContent);
+                          }
+                          return (
+                            <>
+                              {preamble && (
+                                <div className="ideate-preamble">{renderContent(preamble)}</div>
+                              )}
+                              <div className="ideate-ideas">
+                                {ideas.map((idea, idx) => (
+                                  <div
+                                    key={`idea-${idx}-${idea.number}`}
+                                    className="ideate-idea"
+                                  >
+                                    <div className="ideate-idea__header">
+                                      <span className="ideate-idea__number">{idea.number}.</span>
+                                      <span className="ideate-idea__title">{idea.title}</span>
+                                      <button
+                                        type="button"
+                                        className="ideate-idea__use-btn"
+                                        onClick={() => handleUseIdeaForDraft(idea)}
+                                        title="Use this idea in Draft Market"
+                                        aria-label={`Use idea ${idea.number} in Draft Market`}
+                                      >
+                                        &rarr;
+                                      </button>
+                                    </div>
+                                    {idea.rest && (
+                                      <div className="ideate-idea__body">
+                                        {renderContent(idea.rest)}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              {postamble && (
+                                <div className="ideate-postamble">{renderContent(postamble)}</div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1263,14 +1559,16 @@ function App() {
                           <button
                             type="button"
                             className="accept-button"
-                            disabled={anyLoading || needsRiskAck || needsRoutingAck}
+                            disabled={anyLoading || needsRiskAck || needsRoutingAck || needsSourceAck}
                             onClick={handleAccept}
                             title={
                               needsRiskAck
                                 ? 'Acknowledge the HIGH early-resolution risk below before finalizing.'
                                 : needsRoutingAck
                                   ? 'Resolve or acknowledge the blocking claims flagged by the rigor pipeline before finalizing.'
-                                  : undefined
+                                  : needsSourceAck
+                                    ? 'One or more data sources in the resolution rule are unreachable. Fix the sources and re-run Update, or acknowledge to finalize anyway.'
+                                    : undefined
                             }
                           >
                             {loading === 'accept' ? (
@@ -1350,6 +1648,9 @@ function App() {
                         </span>
                       </div>
                       <div className="risk-gate__body">
+                        <p className="risk-gate__hint">
+                          Rigor routing is a quick safety check that sorts claims into: okay, needs more review, or blocks finalize.
+                        </p>
                         {(() => {
                           const grouped = groupRoutingBySeverity(currentRun.routing);
                           const claimsById = new Map(currentRun.claims.map((c) => [c.id, c]));
@@ -1362,7 +1663,7 @@ function App() {
                                   {claim ? ` — ${claim.text}` : ''}
                                   {item.reasons.length > 0 && (
                                     <span className="risk-gate__reasons">
-                                      {' '}({item.reasons.join('; ')})
+                                      {' '}({item.reasons.map(toSimpleRoutingReason).join('; ')})
                                     </span>
                                   )}
                                 </li>
@@ -1388,9 +1689,19 @@ function App() {
                       </div>
                       {needsRoutingAck && (
                         <div className="risk-gate__actions">
+                          {getSimpleBlockReasons(currentRun).length > 0 && (
+                            <>
+                              <p className="risk-gate__subheading">Why it is blocked:</p>
+                              <ul className="risk-gate__list">
+                                {getSimpleBlockReasons(currentRun).map((reason) => (
+                                  <li key={reason}>{reason}</li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
                           <p className="risk-gate__warning">
-                            The rigor pipeline flagged blocking claims above. Re-run Review → Update to
-                            address them, or acknowledge to finalize anyway.
+                            The draft is blocked because one or more claims have serious issues.
+                            Re-run Review → Update to fix them, or acknowledge to finalize anyway.
                           </p>
                           <button
                             type="button"
@@ -1403,6 +1714,137 @@ function App() {
                       )}
                     </div>
                   )}
+
+                  {/* Data-source accessibility gate — runs pre-finalize after
+                      early-resolution. Confirmed-unreachable source URLs
+                      block Accept until the user explicitly acknowledges. */}
+                  {hasUpdated && (loading === 'source-accessibility' || sourceAccessibility) && (() => {
+                    const status = sourceAccessibility?.status || null;
+                    const isChecking = loading === 'source-accessibility';
+                    const gateLevel =
+                      status === 'ok'
+                        ? 'low'
+                        : status === 'all_unreachable'
+                          ? 'high'
+                          : status === 'some_unreachable'
+                            ? 'medium'
+                            : status === 'error' || status === 'no_sources'
+                              ? 'unknown'
+                              : 'checking';
+                    const levelLabel = isChecking
+                      ? null
+                      : status === 'ok'
+                        ? 'REACHABLE'
+                        : status === 'all_unreachable'
+                          ? 'ALL UNREACHABLE'
+                          : status === 'some_unreachable'
+                            ? 'PARTIAL'
+                            : status === 'no_sources'
+                              ? 'NO SOURCES'
+                              : status === 'error'
+                                ? 'ERROR'
+                                : 'UNKNOWN';
+                    const originLabel = (origin) => {
+                      if (origin === 'source_claim') return 'source claim';
+                      if (origin === 'resolution_section') return 'resolution section';
+                      if (origin === 'references') return 'references block';
+                      if (origin === 'draft_body') return 'draft body';
+                      return origin;
+                    };
+                    const sources = sourceAccessibility?.sources || [];
+                    const unreachable = sources.filter((s) => !s.accessible);
+                    const reachable = sources.filter((s) => s.accessible);
+                    return (
+                      <div
+                        className={`risk-gate risk-gate--${gateLevel} fade-in`}
+                        role={needsSourceAck ? 'alert' : 'status'}
+                      >
+                        <div className="risk-gate__header">
+                          <span className="risk-gate__label">Data Source Accessibility</span>
+                          {isChecking ? (
+                            <span className="risk-gate__level risk-gate__level--checking">
+                              <span className="spinner" /> Checking…
+                            </span>
+                          ) : (
+                            <span className={`risk-gate__level risk-gate__level--${gateLevel}`}>
+                              {levelLabel}
+                            </span>
+                          )}
+                        </div>
+                        {!isChecking && sourceAccessibility && (
+                          <div className="risk-gate__body">
+                            <p className="risk-gate__hint">
+                              Probes each data source in the resolution rule to confirm the oracle will actually be
+                              able to read it at settlement time. Unreachable sources risk a market that cannot
+                              resolve — fix them before finalizing.
+                            </p>
+                            {status === 'no_sources' && (
+                              <p>
+                                No machine-readable URLs were found in the draft, its resolution section, references,
+                                or source claims. Add explicit source URLs to the resolution rules before finalizing.
+                              </p>
+                            )}
+                            {status === 'error' && (
+                              <p>
+                                Accessibility check failed: {sourceAccessibility.error || 'unknown error'}.
+                                This does not block Finalize, but you should verify the sources manually.
+                              </p>
+                            )}
+                            {unreachable.length > 0 && (
+                              <>
+                                <p className="risk-gate__subheading">
+                                  Unreachable ({unreachable.length}):
+                                </p>
+                                <ul className="risk-gate__list">
+                                  {unreachable.slice(0, 10).map((s) => (
+                                    <li key={s.url}>
+                                      <code>{s.url}</code>
+                                      <span className="risk-gate__reasons">
+                                        {' '}({originLabel(s.origin)})
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+                            {reachable.length > 0 && (
+                              <>
+                                <p className="risk-gate__subheading">
+                                  Reachable ({reachable.length}):
+                                </p>
+                                <ul className="risk-gate__list">
+                                  {reachable.slice(0, 10).map((s) => (
+                                    <li key={s.url}>
+                                      <code>{s.url}</code>
+                                      <span className="risk-gate__reasons">
+                                        {' '}({originLabel(s.origin)})
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {needsSourceAck && (
+                          <div className="risk-gate__actions">
+                            <p className="risk-gate__warning">
+                              {status === 'all_unreachable'
+                                ? 'None of the cited data sources resolved from the browser. The oracle cannot read a source it cannot reach — revise the draft with working URLs before finalizing, or acknowledge to finalize anyway.'
+                                : 'Some cited data sources did not resolve from the browser. Revise the draft with working URLs, or acknowledge to finalize anyway.'}
+                            </p>
+                            <button
+                              type="button"
+                              className="risk-gate__ack-btn"
+                              onClick={() => dispatch({ type: 'ACKNOWLEDGE_SOURCE_ACCESSIBILITY' })}
+                            >
+                              Acknowledge unreachable sources & unlock Finalize
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Your Feedback */}
                   <div className="col-panel col-panel--review">
@@ -1957,7 +2399,7 @@ function App() {
                               </div>
                               {item.reasons.length > 0 && (
                                 <div className="run-trace__routing-reasons">
-                                  {item.reasons.join('; ')}
+                                  {item.reasons.map(toSimpleRoutingReason).join('; ')}
                                 </div>
                               )}
                             </li>

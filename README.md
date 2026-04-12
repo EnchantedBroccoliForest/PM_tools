@@ -62,7 +62,7 @@ src/
 - **State management** uses React's `useReducer` (via the `useMarketReducer` custom hook) rather than an external state library, keeping the dependency footprint minimal.
 - **Prompt engineering** is centralized in `src/constants/prompts.js` with distinct system prompts for the drafter, reviewer, and finalizer roles, plus builder functions for each stage's user prompt.
 - **API resilience** — The OpenRouter client (`src/api/openrouter.js`) implements automatic retries with exponential backoff (3 retries at 1s/2s/4s intervals).
-- **Model flexibility** — 20+ models are available across 6 providers (OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral). Default drafting model is GPT-5.1; default reviewer is Claude 3.5 Haiku.
+- **Model flexibility** — 20+ models are available across 6 providers (OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral). The default drafting and review models are declared in `src/constants/models.js` as `DEFAULT_DRAFT_MODEL` and `DEFAULT_REVIEW_MODEL`; these are revised in lock-step with OpenRouter model availability, so this README intentionally does not pin specific ids.
 
 ## Tech Stack
 
@@ -110,6 +110,52 @@ npm run preview
 npm run lint
 ```
 
+### Regression eval harness
+
+The Phase 6 eval harness runs the full PM_tools pipeline (draft → extract
+claims → verify → gather evidence → review → aggregate → update → risk →
+finalize) against 30+ fixtures without the UI, using a deterministic mock
+LLM and mock URL fetcher so the run is reproducible and requires no API
+key.
+
+```bash
+# Run the full suite against the default ablation
+npm run eval
+
+# Run with specific ablation flags (the four knobs from the work order)
+npm run eval -- --aggregation=majority --escalation=selective --evidence=retrieval --verifiers=full
+
+# Only run fixtures matching a substring
+npm run eval -- --fixtures=rag
+
+# Overwrite eval/baseline.json with the current metrics (use after a
+# deliberate pipeline change)
+npm run eval:baseline
+
+# Run and fail (exit 1) if any metric regresses by more than 10% vs the
+# committed baseline — this is what CI runs on every PR
+npm run eval:check
+```
+
+Per-run output (one JSON file per fixture with the full Run artifact,
+plus a top-level summary) is written to `eval/out/<timestamp>/`.
+
+Fixtures live in `eval/fixtures/<bucket>/*.json`, split across four
+buckets mirroring the work order: `ambiguity`, `adversarial-factual`,
+`rag-trap`, and `numerical-date`. Each fixture carries its own
+`expectedProperties` block that the harness checks against the
+resulting Run artifact.
+
+A GitHub Actions workflow at `.github/workflows/eval.yml` runs the eval
+on every PR that touches `src/pipeline/**`, `src/constants/prompts.js`,
+`src/api/openrouter.js`, `eval/**`, or the workflow itself. A PR that
+weakens a verifier gate (or otherwise regresses accuracy, citation
+coverage, or verifier pass rate by more than 10%) fails CI.
+
 ## Attribution
 
 PM_tools' multi-reviewer deliberation stage is **inspired by** the "Structure D" pattern from [`karpathy/llm-council`](https://github.com/karpathy/llm-council) and has been re-implemented from scratch here. Because `karpathy/llm-council` ships without a licence, no code has been copied from that repository — only the high-level pattern (independent parallel reviews followed by a synthesis pass) has been borrowed. Any resemblance beyond that is coincidental.
+
+## Licence
+
+PM_tools is released under the [MIT License](LICENSE).
