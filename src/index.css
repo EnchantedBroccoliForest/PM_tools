@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+/* Inter variable font — the only typeface */
+@import url('https://rsms.me/inter/inter.css');
 
 * {
   box-sizing: border-box;
@@ -7,13 +8,20 @@
 }
 
 :root {
-  font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  line-height: 1.55;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.25;
   font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-variant-numeric: tabular-nums;
+}
+
+@supports (font-variation-settings: normal) {
+  :root {
+    font-family: 'Inter var', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
 }
 
 body {

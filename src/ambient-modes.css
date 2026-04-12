@@ -1,24 +1,32 @@
-@property --bg-dark { syntax: '<color>'; inherits: true; initial-value: #0a0a0f; }
-@property --text-1 { syntax: '<color>'; inherits: true; initial-value: #f0f6ff; }
-@property --text-2 { syntax: '<color>'; inherits: true; initial-value: #c1cee0; }
-@property --text-3 { syntax: '<color>'; inherits: true; initial-value: #8a98b0; }
-@property --neon-cyan { syntax: '<color>'; inherits: true; initial-value: #00e5ff; }
-@property --neon-magenta { syntax: '<color>'; inherits: true; initial-value: #ff006e; }
-@property --neon-green { syntax: '<color>'; inherits: true; initial-value: #39ff14; }
+/* ================================================
+   Ambient Mode Transitions & Themes
+   ================================================ */
+@property --bg-dark { syntax: '<color>'; inherits: true; initial-value: #1C1520; }
+@property --text-1 { syntax: '<color>'; inherits: true; initial-value: #F9F9F9; }
+@property --text-2 { syntax: '<color>'; inherits: true; initial-value: #A1A1AA; }
+@property --text-3 { syntax: '<color>'; inherits: true; initial-value: #868089; }
+@property --neon-cyan { syntax: '<color>'; inherits: true; initial-value: #DE8BF3; }
+@property --neon-magenta { syntax: '<color>'; inherits: true; initial-value: #DE8BF3; }
+@property --neon-green { syntax: '<color>'; inherits: true; initial-value: #2E9F4A; }
 
 .App {
   transition:
-    --bg-dark 500ms cubic-bezier(0.23, 1, 0.32, 1),
-    --text-1 500ms cubic-bezier(0.23, 1, 0.32, 1),
-    --text-2 500ms cubic-bezier(0.23, 1, 0.32, 1),
-    --text-3 500ms cubic-bezier(0.23, 1, 0.32, 1),
-    --neon-cyan 500ms cubic-bezier(0.23, 1, 0.32, 1),
-    --neon-magenta 500ms cubic-bezier(0.23, 1, 0.32, 1),
-    --neon-green 500ms cubic-bezier(0.23, 1, 0.32, 1),
-    background 500ms cubic-bezier(0.23, 1, 0.32, 1);
+    --bg-dark 400ms ease,
+    --text-1 400ms ease,
+    --text-2 400ms ease,
+    --text-3 400ms ease,
+    --neon-cyan 400ms ease,
+    --neon-magenta 400ms ease,
+    --neon-green 400ms ease,
+    background-color 400ms ease,
+    color 400ms ease;
 }
 
-/* Light */
+/* ================================================
+   Light Mode
+   Keeps existing earthy color scheme, updated to
+   match 42.space typography & flat component style.
+   ================================================ */
 .App.ambient-light {
   --bg-dark: #f5f0e8;
   --surface-1: rgba(139, 119, 90, 0.06);
@@ -49,93 +57,194 @@
   --neon-green: #3a8a5c;
   --neon-yellow: #b8960c;
   --neon-purple: #7c5cbf;
-  background:
-    radial-gradient(ellipse at 10% 20%, rgba(210, 190, 160, 0.25) 0%, transparent 40%),
-    radial-gradient(ellipse at 90% 80%, rgba(200, 180, 150, 0.2) 0%, transparent 35%),
-    linear-gradient(165deg, #f5f0e8 0%, #efe8da 30%, #f2ece2 60%, #f5f0e8 100%);
+  background: #f5f0e8;
 }
-.App.ambient-light::before {
-  opacity: 1;
-  background:
-    radial-gradient(ellipse at 20% 15%, rgba(160, 140, 110, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 75% 85%, rgba(140, 120, 95, 0.05) 0%, transparent 45%),
-    repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(139, 119, 90, 0.02) 3px, rgba(139, 119, 90, 0.02) 4px);
+
+/* Light-mode component overrides */
+.App.ambient-light .input {
+  background: rgba(255, 252, 245, 0.65);
+  color: var(--text-1);
+  border-color: var(--border);
 }
-.App.ambient-light::after {
-  background: radial-gradient(ellipse at 50% 50%, transparent 65%, rgba(200, 185, 160, 0.2) 100%);
+.App.ambient-light .input:focus {
+  background: rgba(255, 253, 248, 0.85);
+  box-shadow: 0 0 0 1px rgba(42, 125, 140, 0.3);
 }
-.App.ambient-light .input { background: rgba(255, 252, 245, 0.65); color: var(--text-1); border-color: var(--border); }
-.App.ambient-light .input:focus { background: rgba(255, 253, 248, 0.85); }
 .App.ambient-light .input::placeholder { color: var(--text-3); }
-.App.ambient-light .panel { background: rgba(255, 252, 245, 0.6); border-color: var(--border); }
-.App.ambient-light .panel--active { border-color: rgba(42, 125, 140, 0.4); box-shadow: 0 0 20px rgba(42, 125, 140, 0.06); }
-.App.ambient-light .content-box { background: rgba(255, 252, 245, 0.7); border-color: rgba(139, 119, 90, 0.22); color: var(--text-1); }
+
+.App.ambient-light .panel {
+  background: rgba(255, 252, 245, 0.6);
+  border-color: var(--border);
+}
+.App.ambient-light .panel--active {
+  border-color: rgba(42, 125, 140, 0.4);
+}
+
+.App.ambient-light .content-box {
+  background: rgba(255, 252, 245, 0.7);
+  border-color: rgba(139, 119, 90, 0.22);
+  color: var(--text-1);
+}
 .App.ambient-light .content-box--rich .md-heading,
 .App.ambient-light .content-box--rich strong { color: #120a02; }
-.App.ambient-light .panel-placeholder p { color: var(--text-2); }
-.App.ambient-light .action-toolbar { background: rgba(245, 240, 232, 0.8); border-color: var(--border); }
-.App.ambient-light .toolbar-select { background: rgba(255, 252, 245, 0.65); color: var(--text-1); }
-.App.ambient-light .toolbar-select option, .App.ambient-light select.input option { background: #f5f0e8; color: var(--text-1); }
-.App.ambient-light .mode-toggle { border-color: var(--border); }
-.App.ambient-light .mode-toggle__btn--active { box-shadow: inset 0 -2px 0 var(--neon-cyan); }
-.App.ambient-light .draft-button { background: var(--accent); border-color: var(--accent); box-shadow: none; }
-.App.ambient-light .spinner { border-color: rgba(42, 125, 140, 0.2); border-top-color: var(--neon-cyan); }
-.App.ambient-light .model-badge, .App.ambient-light .llm-loading__model-tag { background: rgba(42, 125, 140, 0.08); border-color: rgba(42, 125, 140, 0.2); color: var(--neon-cyan); }
-.App.ambient-light .wordmark-dot { background: var(--accent); box-shadow: 0 0 8px rgba(192, 83, 58, 0.4); }
-.App.ambient-light .panel-body { scrollbar-color: rgba(139, 119, 90, 0.2) transparent; }
-.App.ambient-light .copy-btn { background: rgba(42, 125, 140, 0.08); border-color: rgba(42, 125, 140, 0.2); color: var(--neon-cyan); }
-.App.ambient-light .copy-btn:hover { background: rgba(42, 125, 140, 0.15); border-color: rgba(42, 125, 140, 0.35); }
-.App.ambient-light .ambient-bar__inner { background: rgba(0, 0, 0, 0.04); border-color: rgba(139, 119, 90, 0.15); }
-.App.ambient-light .ambient-btn { color: var(--text-3); }
-.App.ambient-light .ambient-btn:hover:not(.ambient-btn--active) { background: rgba(0, 0, 0, 0.04); color: var(--text-2); }
-.App.ambient-light .skeleton { background: rgba(139, 119, 90, 0.08); }
-.App.ambient-light .error-message { background: rgba(192, 57, 43, 0.06); border-color: rgba(192, 57, 43, 0.2); }
-.App.ambient-light .human-review-section { border-color: var(--border); background: rgba(255, 252, 245, 0.4); }
-.App.ambient-light .time-display { color: var(--text-2); background: rgba(139, 119, 90, 0.06); border-color: var(--border); }
 
-/* Dark */
+.App.ambient-light .panel-placeholder p { color: var(--text-2); }
+.App.ambient-light .action-toolbar {
+  background: rgba(245, 240, 232, 0.8);
+  border-color: var(--border);
+}
+.App.ambient-light .toolbar-select {
+  background: rgba(255, 252, 245, 0.65);
+  color: var(--text-1);
+}
+.App.ambient-light .toolbar-select option,
+.App.ambient-light select.input option {
+  background: #f5f0e8;
+  color: var(--text-1);
+}
+
+.App.ambient-light .mode-toggle { border-color: var(--border); }
+.App.ambient-light .mode-toggle__btn--active {
+  box-shadow: inset 0 -2px 0 var(--neon-cyan);
+}
+
+.App.ambient-light .draft-button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.App.ambient-light .draft-button:hover:not(:disabled) {
+  background: #c0533a;
+}
+
+.App.ambient-light .spinner {
+  border-color: rgba(42, 125, 140, 0.2);
+  border-top-color: var(--neon-cyan);
+}
+
+.App.ambient-light .model-badge,
+.App.ambient-light .llm-loading__model-tag {
+  background: rgba(42, 125, 140, 0.08);
+  border-color: rgba(42, 125, 140, 0.2);
+  color: var(--neon-cyan);
+}
+
+.App.ambient-light .wordmark-dot {
+  background: var(--accent);
+}
+
+.App.ambient-light .panel-body {
+  scrollbar-color: rgba(139, 119, 90, 0.2) transparent;
+}
+
+.App.ambient-light .copy-btn {
+  background: rgba(42, 125, 140, 0.08);
+  border-color: rgba(42, 125, 140, 0.2);
+  color: var(--neon-cyan);
+}
+.App.ambient-light .copy-btn:hover {
+  background: rgba(42, 125, 140, 0.15);
+  border-color: rgba(42, 125, 140, 0.35);
+}
+
+.App.ambient-light .ambient-bar__inner {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(139, 119, 90, 0.15);
+}
+.App.ambient-light .ambient-btn { color: var(--text-3); }
+.App.ambient-light .ambient-btn:hover:not(.ambient-btn--active) {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-2);
+}
+
+.App.ambient-light .skeleton {
+  background: rgba(139, 119, 90, 0.08);
+}
+
+.App.ambient-light .error-message {
+  background: rgba(192, 57, 43, 0.06);
+  border-color: rgba(192, 57, 43, 0.2);
+}
+
+.App.ambient-light .human-review-section {
+  border-color: var(--border);
+  background: rgba(255, 252, 245, 0.4);
+}
+
+.App.ambient-light .time-display {
+  color: var(--text-2);
+  background: rgba(139, 119, 90, 0.06);
+  border-color: var(--border);
+}
+
+.App.ambient-light .ideate-idea {
+  background: rgba(42, 125, 140, 0.05);
+  border-color: rgba(42, 125, 140, 0.2);
+}
+.App.ambient-light .ideate-idea:hover {
+  background: rgba(42, 125, 140, 0.09);
+}
+.App.ambient-light .ideate-idea__use-btn {
+  border-color: rgba(42, 125, 140, 0.7);
+  background: rgba(42, 125, 140, 0.1);
+  color: #2a7d8c;
+}
+.App.ambient-light .ideate-idea__use-btn:hover {
+  background: rgba(42, 125, 140, 0.2);
+}
+
+.App.ambient-light .run-trace {
+  border-color: rgba(139, 119, 90, 0.15);
+  background: rgba(139, 119, 90, 0.03);
+}
+.App.ambient-light .run-trace__body {
+  border-top-color: rgba(139, 119, 90, 0.1);
+}
+.App.ambient-light .run-trace__button {
+  border-color: rgba(139, 119, 90, 0.2);
+  background: rgba(255, 255, 255, 0.4);
+}
+.App.ambient-light .run-trace__button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+/* ================================================
+   Dark Mode — 42.space palette
+   Tokens match :root defaults, just sets background.
+   ================================================ */
 .App.ambient-dark {
-  --bg-dark: #060810;
-  --surface-1: rgba(140, 160, 200, 0.04);
-  --surface-2: rgba(140, 160, 200, 0.07);
-  --surface-3: rgba(140, 160, 200, 0.1);
-  --surface-draft: rgba(120, 140, 200, 0.06);
-  --surface-review: rgba(140, 160, 220, 0.05);
-  --border: rgba(140, 160, 200, 0.12);
-  --border-hover: rgba(140, 160, 200, 0.22);
-  --border-focus: rgba(160, 180, 220, 0.5);
-  --text-1: #eaf0fa;
-  --text-2: #b8c3d8;
-  --text-3: #8591ab;
-  --accent: #7080c0;
-  --accent-light: #8a9ad4;
-  --accent-glow: rgba(112, 128, 192, 0.2);
-  --blue: #6080c0;
-  --blue-hover: #4a6aaa;
-  --blue-glow: rgba(96, 128, 192, 0.2);
-  --teal: #4a9480;
-  --teal-light: #5aaa94;
-  --teal-glow: rgba(74, 148, 128, 0.15);
-  --neon-cyan: #7090cc;
-  --neon-magenta: #9070b8;
-  --neon-green: #508a70;
-  --neon-yellow: #b0a060;
-  --neon-purple: #9080c0;
-  background:
-    radial-gradient(ellipse at 75% 10%, rgba(120, 140, 200, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 25% 80%, rgba(80, 100, 160, 0.04) 0%, transparent 40%),
-    linear-gradient(165deg, #060810 0%, #080c18 50%, #060810 100%);
+  --bg-dark: #1C1520;
+  --surface-1: rgba(255, 255, 255, 0.02);
+  --surface-2: rgba(255, 255, 255, 0.04);
+  --surface-3: rgba(255, 255, 255, 0.07);
+  --surface-draft: rgba(222, 139, 243, 0.06);
+  --surface-review: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --border-focus: rgba(222, 139, 243, 0.6);
+  --text-1: #F9F9F9;
+  --text-2: #A1A1AA;
+  --text-3: #868089;
+  --accent: #DE8BF3;
+  --accent-light: #D745FF;
+  --accent-glow: rgba(215, 69, 255, 0.2);
+  --blue: #DE8BF3;
+  --blue-hover: #C876DC;
+  --blue-glow: rgba(222, 139, 243, 0.2);
+  --teal: #2E9F4A;
+  --teal-light: #89E389;
+  --teal-glow: rgba(46, 159, 74, 0.15);
+  --neon-cyan: #DE8BF3;
+  --neon-magenta: #DE8BF3;
+  --neon-green: #2E9F4A;
+  --neon-yellow: #F4C211;
+  --neon-purple: #DE8BF3;
+  background: #1C1520;
 }
-.App.ambient-dark::before {
-  opacity: 0.02;
-  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(140, 160, 200, 0.1) 2px, rgba(140, 160, 200, 0.1) 4px);
-}
-.App.ambient-dark::after {
-  background: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 10, 0.5) 100%);
-}
-.App.ambient-dark .panel { background: rgba(8, 12, 24, 0.85); }
-.App.ambient-dark .input { background: rgba(8, 12, 24, 0.4); color: var(--text-1); }
+
+.App.ambient-dark .panel { background: #120917; }
+.App.ambient-dark .input { background: #1E1E1E; color: var(--text-1); }
 .App.ambient-dark .content-box { color: var(--text-1); }
 .App.ambient-dark .content-box--rich .md-heading,
-.App.ambient-dark .content-box--rich strong { color: #ffffff; }
-.App.ambient-dark .wordmark-dot { background: #7090cc; box-shadow: 0 0 12px rgba(112, 144, 204, 0.5); }
+.App.ambient-dark .content-box--rich strong { color: #F9F9F9; }
+.App.ambient-dark .wordmark-dot { background: var(--accent); }
