@@ -476,7 +476,6 @@ async function _orchestrateInner(config, signal) {
   const stage = async (name, fn) => {
     if (checkAbort(run, signal, callbacks)) return false;
     callbacks?.onStageStart?.(name);
-    const start = Date.now();
     try {
       const result = await fn();
       callbacks?.onStageEnd?.(name, result);
@@ -544,9 +543,7 @@ async function _orchestrateInner(config, signal) {
     return run;
   }
 
-  let reviewSkipped = false;
   if (options.escalation === 'selective' && isClaimSetClean(run)) {
-    reviewSkipped = true;
     log(run, 'review', 'info', 'Review skipped by selective escalation (claim set clean).', callbacks);
   } else {
     ok = await stage('review', async () => {
