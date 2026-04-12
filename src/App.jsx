@@ -761,7 +761,7 @@ function App() {
       );
       const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildUpdatePrompt(draftContent, reviewText, humanReviewInput, focusBlock) },
+        { role: 'user', content: buildUpdatePrompt(displayedDraftContent, reviewText, humanReviewInput, focusBlock) },
       ]);
       updatedDraft = result.content;
       dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });

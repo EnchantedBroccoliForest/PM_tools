@@ -527,6 +527,13 @@ function rehydrateFromRun(state, run) {
     // run-trace panel is the authoritative view of imported runs. The main
     // UI still renders the latest draft and final JSON.
     draftContent: lastDraft ? lastDraft.content : null,
+    draftVersions: drafts.map((d) => ({
+      content: d.content,
+      timestamp: d.timestamp || 0,
+      source: d.kind === 'updated' ? 'update' : 'draft',
+    })),
+    viewingVersionIndex: Math.max(0, drafts.length - 1),
+    draftJustUpdated: false,
     reviews: [],
     deliberatedReview: null,
     finalContent: run.finalJson || null,
