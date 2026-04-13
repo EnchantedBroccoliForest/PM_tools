@@ -11,8 +11,7 @@
 //
 // Sources: docs.42.space/getting-started/protocol-mechanics-101/42-markets,
 // www.42.space, alkimiya.io rebrand notes, @42space "Events Futures:
-// Rethinking How Markets Trade" thread, APRO Oracle x 42Space partnership
-// announcement.
+// Rethinking How Markets Trade" thread.
 export const PROTOCOL_NAME = '42.space';
 
 export const PROTOCOL_CONTEXT = `42.space PROTOCOL — every market is an Events Futures market on 42, NOT a Polymarket/CTF/LMSR binary-share market. Design must respect 42's mechanism:
@@ -22,7 +21,7 @@ export const PROTOCOL_CONTEXT = `42.space PROTOCOL — every market is an Events
 3. MECE IS HARD-REQUIRED: outcomes must be mutually exclusive AND collectively exhaustive. Overlap breaks pro-rata math; gaps PERMANENTLY STRAND real collateral. A catch-all "Other / None" is REQUIRED unless the outcome space is provably closed.
 4. MULTI-OUTCOME PREFERRED: 42 is built for n-way categorical races (3–10 OTs). Binary YES/NO is a degenerate fallback only — prefer multi-outcome whenever the question permits.
 5. NO RAW SCALAR PAYOUT MECHANICS: 42 settles to a single winning Outcome Token, so it cannot pay out a continuous range. Scalar questions (price, count, %, viewership) are still valid market topics, but they MUST be discretized into clean partitioning named buckets BEFORE launch (e.g. "<$10M", "$10M–$25M", "$25M–$50M", "$50M+"). Each bucket is its own OT.
-6. OBJECTIVE MACHINE-READABLE ORACLE (APRO is 42's primary data partner): official scoreboards, awards-body announcements, exchange/government feeds, on-chain data, official APIs. Editorial / paywalled / interpretive / self-referential ("if users vote X") sources are forbidden.
+6. OBJECTIVE MACHINE-READABLE ORACLE: official scoreboards, awards-body announcements, exchange/government feeds, on-chain data, official APIs. Editorial / paywalled / interpretive / self-referential ("if users vote X") sources are forbidden.
 7. FIXED OUTCOME SET AT LAUNCH — cannot add outcomes mid-flight. Enumerate every plausible result up front.
 8. HARD UTC DEADLINE — single unambiguous timestamp. Postponement, source-unavailable, ambiguous reporting, ties, and "no listed outcome occurred" MUST be addressed in edge cases with NAMED outcomes they map to (no "resolver discretion" without a named fallback).
 9. MEANINGFUL TRADE PHASE: 42's bonding curve rewards early conviction (two winning-OT holders can earn different returns based on entry point). A good market stays genuinely uncertain across most of the window — flag markets that collapse to certainty within ~24h.
