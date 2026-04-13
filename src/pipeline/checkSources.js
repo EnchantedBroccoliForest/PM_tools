@@ -14,7 +14,7 @@
  * claims the extractor produced, and the user-provided references block.
  * URLs are deduplicated and probed in parallel via `resolveCitation` from
  * gatherEvidence (no-cors GET with a short timeout). Non-URL sources
- * (e.g. "official APRO feed for X") are reported but not fetch-checkable.
+ * (e.g. "official data feed for X") are reported but not fetch-checkable.
  *
  * Never throws. Individual URL failures are captured in the per-source
  * result; catastrophic failures (no fetch implementation, etc.) degrade

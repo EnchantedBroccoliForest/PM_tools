@@ -44,7 +44,7 @@ export const RIGOR_RUBRIC = [
   {
     id: 'objective_source',
     question:
-      'Does the resolution map onto a clearly named, machine-readable, objectively verifiable source that an oracle (e.g. APRO) can read deterministically?',
+      'Does the resolution map onto a clearly named, machine-readable, objectively verifiable source that an oracle can read deterministically?',
     rationale:
       'A source that is ambiguous, paywalled, editorial, interpretive, or self-referential turns the market into an opinion poll and breaks 42\'s objective-oracle settlement pipeline. Sources must be official scoreboards, awards-body announcements, government / exchange feeds, on-chain data, or official APIs.',
   },
