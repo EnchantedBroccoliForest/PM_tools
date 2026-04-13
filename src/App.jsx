@@ -78,6 +78,17 @@ function renderContent(text) {
   return elements;
 }
 
+function formatRelativeTime(timestamp) {
+  if (!timestamp) return '';
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
 function formatInline(text) {
   // Split on **bold** markers
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
@@ -278,6 +289,7 @@ function App() {
   useModels();
   const panel2Ref = useRef(null);
   const panel3Ref = useRef(null);
+  const draftOutputRef = useRef(null);
   // Phase 5: a mirror of `currentRun` kept in a ref so async handlers that
   // fire successive dispatches (claim extract → verify → evidence → route)
   // can read the latest criticism/claim set synchronously without waiting
@@ -303,6 +315,9 @@ function App() {
     error,
     dateError,
     draftContent,
+    draftVersions,
+    viewingVersionIndex,
+    draftJustUpdated,
     reviews,
     deliberatedReview,
     finalContent,
@@ -317,6 +332,11 @@ function App() {
     runTraceOpen,
     copiedId,
   } = state;
+
+  const latestVersionIndex = draftVersions.length - 1;
+  const displayedVersion = draftVersions[viewingVersionIndex];
+  const displayedDraftContent = displayedVersion ? displayedVersion.content : draftContent;
+  const isViewingLatest = viewingVersionIndex === latestVersionIndex;
 
   // Phase 0 gate: Accept & Finalize is blocked when the early-resolution
   // analyst has flagged the updated draft as HIGH risk and the user has not
@@ -355,6 +375,16 @@ function App() {
       panel3Ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [currentStep]);
+
+  // After an update, scroll the refreshed draft into view and clear the flash flag
+  useEffect(() => {
+    if (!draftJustUpdated) return;
+    if (draftOutputRef.current) {
+      draftOutputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    const timer = setTimeout(() => dispatch({ type: 'CLEAR_DRAFT_JUST_UPDATED' }), 1800);
+    return () => clearTimeout(timer);
+  }, [draftJustUpdated, dispatch]);
 
   // Keep the ref mirror of `currentRun` up to date so async pipelines can
   // read the latest criticism/claim set without closing over stale state.
@@ -732,7 +762,7 @@ function App() {
       );
       const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildUpdatePrompt(draftContent, reviewText, humanReviewInput, focusBlock) },
+        { role: 'user', content: buildUpdatePrompt(displayedDraftContent, reviewText, humanReviewInput, focusBlock) },
       ], { maxTokens: DRAFT_MAX_TOKENS });
       updatedDraft = result.content;
       dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });
@@ -1299,22 +1329,72 @@ function App() {
                 </div>
               )}
               {mode !== 'ideating' && draftContent && (
-                <div className="draft-output-section fade-in">
-                  <div className="col-panel col-panel--draft">
+                <div className="draft-output-section fade-in" ref={draftOutputRef}>
+                  <div className={`col-panel col-panel--draft ${draftJustUpdated ? 'col-panel--just-updated' : ''}`}>
                     <div className="col-panel-header">
-                      <h2>Draft</h2>
+                      <div className="draft-title-group">
+                        <h2>Draft</h2>
+                        {draftVersions.length > 0 && (
+                          <span className="version-badge" title={`Version ${viewingVersionIndex + 1} of ${draftVersions.length}`}>
+                            v{viewingVersionIndex + 1}
+                            {draftVersions.length > 1 && <span className="version-badge__total">/{draftVersions.length}</span>}
+                          </span>
+                        )}
+                        {displayedVersion && (
+                          <span className="version-timestamp">
+                            {isViewingLatest && displayedVersion.source === 'update' ? 'Updated ' : ''}
+                            {formatRelativeTime(displayedVersion.timestamp)}
+                          </span>
+                        )}
+                      </div>
                       <div className="col-panel-actions">
+                        {draftVersions.length > 1 && (
+                          <div className="version-switcher" role="group" aria-label="Draft version history">
+                            <button
+                              type="button"
+                              className="version-switcher__btn"
+                              disabled={viewingVersionIndex === 0}
+                              onClick={() => dispatch({ type: 'SET_VIEWING_VERSION', index: viewingVersionIndex - 1 })}
+                              aria-label="Previous version"
+                              title="Previous version"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="version-switcher__btn"
+                              disabled={isViewingLatest}
+                              onClick={() => dispatch({ type: 'SET_VIEWING_VERSION', index: viewingVersionIndex + 1 })}
+                              aria-label="Next version"
+                              title="Next version"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                            </button>
+                          </div>
+                        )}
                         <span className="model-badge" data-tooltip={getModelName(selectedModel)}>{getModelAbbrev(selectedModel)}</span>
                         <button
                           className={`copy-btn ${copiedId === 'draft' ? 'copy-btn--copied' : ''}`}
-                          onClick={() => handleCopy(draftContent, 'draft')}
+                          onClick={() => handleCopy(displayedDraftContent, 'draft')}
                         >
                           {copiedId === 'draft' ? 'Copied!' : 'Copy'}
                         </button>
                       </div>
                     </div>
+                    {!isViewingLatest && (
+                      <div className="version-banner">
+                        <span>Viewing an earlier version (v{viewingVersionIndex + 1} of {draftVersions.length})</span>
+                        <button
+                          type="button"
+                          className="version-banner__btn"
+                          onClick={() => dispatch({ type: 'SET_VIEWING_VERSION', index: latestVersionIndex })}
+                        >
+                          Jump to latest
+                        </button>
+                      </div>
+                    )}
                     <div className="content-box content-box--rich">
-                      {renderContent(draftContent)}
+                      {renderContent(displayedDraftContent)}
                     </div>
                   </div>
                 </div>
