@@ -40,6 +40,7 @@ import {
   DEFAULT_REVIEWER_MODELS,
   DEFAULT_JUDGE_MODEL,
   DEFAULT_OPTIONS,
+  DRAFT_MAX_TOKENS,
 } from './defaults.js';
 
 // ----------------------------------------------------------------- semaphore
@@ -269,6 +270,7 @@ async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks) 
       { role: 'system', content: SYSTEM_PROMPTS.drafter },
       { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock) },
     ],
+    { maxTokens: 8000 },
   );
   cost.record('update', updateResult);
   run.drafts.push({
@@ -506,6 +508,7 @@ async function _orchestrateInner(config, signal) {
           ),
         },
       ],
+      { maxTokens: DRAFT_MAX_TOKENS },
     );
     cost.record('draft', draftResult);
     run.drafts.push({
