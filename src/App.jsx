@@ -24,6 +24,7 @@ import { routeClaims, groupRoutingBySeverity } from './pipeline/route';
 import { checkResolutionSources } from './pipeline/checkSources';
 import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
 import { parseRun } from './types/run';
+import { DRAFT_MAX_TOKENS } from './defaults';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
@@ -535,7 +536,7 @@ function App() {
       const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
         { role: 'user', content: buildDraftPrompt(question, startDate, endDate, references) },
-      ]);
+      ], { maxTokens: DRAFT_MAX_TOKENS });
       dispatch({ type: 'DRAFT_SUCCESS', content: result.content });
       recordCost('draft', result);
       dispatch({
@@ -732,7 +733,7 @@ function App() {
       const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
         { role: 'user', content: buildUpdatePrompt(draftContent, reviewText, humanReviewInput, focusBlock) },
-      ]);
+      ], { maxTokens: DRAFT_MAX_TOKENS });
       updatedDraft = result.content;
       dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });
       recordCost('update', result);

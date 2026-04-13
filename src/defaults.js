@@ -27,6 +27,13 @@ export const DEFAULT_REVIEWER_MODELS = [
 export const DEFAULT_JUDGE_MODEL = DEFAULT_REVIEW_MODEL;
 
 /**
+ * Max output tokens for draft and update calls. 3000 (the API default) is
+ * too low for complex markets — edge cases and resolution criteria get
+ * truncated. 8000 matches the claim-extraction budget.
+ */
+export const DRAFT_MAX_TOKENS = 8000;
+
+/**
  * Default pipeline options. Mirrors the initial state in useMarketReducer
  * and the eval harness's default ablation settings.
  */
