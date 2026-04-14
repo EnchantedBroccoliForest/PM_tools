@@ -11,6 +11,11 @@ const initialState = {
   startDate: '',
   endDate: '',
   references: '',
+  // Optional hard restriction on the outcome-set cardinality. Stored as a
+  // string because it comes straight from a text input; empty string means
+  // "no restriction — let the drafter choose". When non-empty, every
+  // drafter / reviewer / finalizer prompt receives it as a hard rule.
+  numberOfOutcomes: '',
   selectedModel: DEFAULT_DRAFT_MODEL,
   reviewModels: [DEFAULT_REVIEW_MODEL],
   humanReviewInput: '',
@@ -522,6 +527,7 @@ function rehydrateFromRun(state, run) {
     startDate: run.input?.startDate || '',
     endDate: run.input?.endDate || '',
     references: run.input?.references || '',
+    numberOfOutcomes: run.input?.numberOfOutcomes || '',
     // View-state rebuild. Criticisms/aggregation are Phase 2 concerns so we
     // don't try to map them back to the legacy `reviews[]` shape here — the
     // run-trace panel is the authoritative view of imported runs. The main

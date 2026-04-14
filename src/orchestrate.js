@@ -212,6 +212,7 @@ async function runReviewStage(run, models, options, cost, callbacks) {
     models.reviewers,
     run.drafts[run.drafts.length - 1].content,
     RIGOR_RUBRIC,
+    run.input?.numberOfOutcomes || '',
   );
   for (const r of structured) {
     if (r.usage) cost.record('review', { usage: r.usage, wallClockMs: r.wallClockMs });
@@ -268,7 +269,7 @@ async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks) 
     models.drafter,
     [
       { role: 'system', content: SYSTEM_PROMPTS.drafter },
-      { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock) },
+      { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock, run.input?.numberOfOutcomes || '') },
     ],
     { maxTokens: 8000 },
   );
@@ -341,7 +342,7 @@ async function runFinalizeStage(run, riskLevel, models, cost, callbacks) {
     models.drafter,
     [
       { role: 'system', content: SYSTEM_PROMPTS.finalizer },
-      { role: 'user', content: buildFinalizePrompt(latestDraft, run.input.startDate, run.input.endDate) },
+      { role: 'user', content: buildFinalizePrompt(latestDraft, run.input.startDate, run.input.endDate, run.input?.numberOfOutcomes || '') },
     ],
     { temperature: 0.3 },
   );
@@ -505,6 +506,7 @@ async function _orchestrateInner(config, signal) {
             input?.startDate || '',
             input?.endDate || '',
             referencesStr,
+            input?.numberOfOutcomes || '',
           ),
         },
       ],
