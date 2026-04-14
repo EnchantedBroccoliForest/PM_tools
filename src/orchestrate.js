@@ -34,6 +34,7 @@ import { routeClaims } from './pipeline/route.js';
 import { runStructuredReviewsParallel } from './pipeline/structuredReview.js';
 import { aggregate } from './pipeline/aggregate.js';
 import { RIGOR_RUBRIC } from './constants/rubric.js';
+import { enrichReferencesWithXData } from './pipeline/xapi.js';
 import { createRun } from './types/run.js';
 import {
   DEFAULT_DRAFTER_MODEL,
@@ -463,7 +464,7 @@ async function _orchestrateInner(config, signal) {
 
   // Build the Run input. References may arrive as an array (CLI) or string (UI/harness).
   const refs = input?.references;
-  const referencesStr = Array.isArray(refs) ? refs.join('\n') : (refs || '');
+  let referencesStr = Array.isArray(refs) ? refs.join('\n') : (refs || '');
 
   const run = createRun({
     question: input?.question || '',
@@ -556,6 +557,27 @@ async function _orchestrateInner(config, signal) {
       run.cost = cost.snapshot();
       run.gates = buildGates(run, riskLevel);
       return run;
+    }
+  }
+
+  // --- 3.5. Optional xAPI enrichment ---
+  if (options.xapiEnrich) {
+    ok = await stage('xapi_enrich', async () => {
+      const enriched = await enrichReferencesWithXData(
+        referencesStr,
+        run.drafts[run.drafts.length - 1]?.content || '',
+        { fetchImpl },
+      );
+      if (enriched !== referencesStr) {
+        referencesStr = enriched;
+        log(run, 'xapi_enrich', 'info', 'References enriched with X/Twitter context via xAPI.', callbacks);
+      } else {
+        log(run, 'xapi_enrich', 'info', 'No X/Twitter content found to enrich.', callbacks);
+      }
+    });
+    // Enrichment failure is non-fatal — proceed with original references.
+    if (!ok) {
+      log(run, 'xapi_enrich', 'warn', 'xAPI enrichment failed; continuing with original references.', callbacks);
     }
   }
 

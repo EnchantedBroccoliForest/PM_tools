@@ -22,6 +22,7 @@
  */
 
 import { resolveCitation } from './gatherEvidence';
+import { resolveXUrl } from './xapi.js';
 
 // Permissive URL matcher — catches URLs inside markdown links, bullet
 // lists, and trailing punctuation. Matches the regex used in
@@ -174,6 +175,11 @@ export async function checkResolutionSources(input) {
   try {
     results = await Promise.all(
       entries.map(async (entry) => {
+        // Try xAPI for X/Twitter URLs first — richer signal than no-cors fetch.
+        const xResult = await resolveXUrl(entry.url, { fetchImpl, timeoutMs });
+        if (xResult) {
+          return { ...entry, accessible: xResult.accessible, xapiMeta: xResult.meta };
+        }
         const accessible = await resolveCitation(entry.url, { fetchImpl, timeoutMs });
         return { ...entry, accessible };
       })

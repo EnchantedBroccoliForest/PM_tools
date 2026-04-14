@@ -62,6 +62,8 @@
  * @property {{level:'info'|'warn'|'error', message:string}|null} logEntry
  */
 
+import { resolveXUrl } from './xapi.js';
+
 // Match bare http(s) URLs up to the next whitespace / closing punctuation.
 // Intentionally permissive — we want to catch URLs buried in markdown like
 // `[title](https://example.com)` without requiring the link syntax.
@@ -211,13 +213,21 @@ export async function resolveCitation(url, options = {}) {
  * @returns {Promise<Map<string, boolean>>}
  */
 async function resolveAll(urls, options) {
+  /** @type {Map<string, {name?:string, screenName?:string, description?:string, text?:string, authorScreenName?:string}>} */
+  const xapiMeta = new Map();
   const entries = await Promise.all(
     urls.map(async (url) => {
+      // Try xAPI for X/Twitter URLs — richer than a no-cors probe.
+      const xResult = await resolveXUrl(url, options);
+      if (xResult) {
+        xapiMeta.set(url, xResult.meta);
+        return [url, true];
+      }
       const ok = await resolveCitation(url, options);
       return [url, ok];
     })
   );
-  return new Map(entries);
+  return { resolveMap: new Map(entries), xapiMeta };
 }
 
 /**
@@ -290,10 +300,23 @@ export async function gatherEvidence(input) {
   }
 
   const urls = evidence.map((e) => e.url);
-  const resolveMap = await resolveAll(urls, { timeoutMs, fetchImpl });
+  const { resolveMap, xapiMeta } = await resolveAll(urls, { timeoutMs, fetchImpl });
 
   const resolvedCount = Array.from(resolveMap.values()).filter(Boolean).length;
   const unresolvedCount = urls.length - resolvedCount;
+
+  // Enrich evidence records with xAPI metadata (title/excerpt) when available.
+  for (const ev of evidence) {
+    const meta = xapiMeta.get(ev.url);
+    if (!meta) continue;
+    if (meta.text) {
+      ev.title = `@${meta.authorScreenName || 'unknown'}`;
+      ev.excerpt = meta.text.slice(0, 300);
+    } else if (meta.name) {
+      ev.title = meta.name;
+      ev.excerpt = meta.description ? meta.description.slice(0, 300) : '';
+    }
+  }
 
   const updatedVerifications = applyResolveToVerifications(
     verifications || [],
