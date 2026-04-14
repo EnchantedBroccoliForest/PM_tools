@@ -65,10 +65,30 @@ export const SYSTEM_PROMPTS = {
     'You are a precise entailment verifier for 42.space market drafts. Given a draft and a list of atomic claims extracted from it, decide for each claim whether the draft entails it, contradicts it, fails to cover it, or is not applicable. Be strict: a claim is only "entailed" when its content is clearly present in the draft, not merely plausible or consistent. Output strictly valid JSON and nothing else.',
 };
 
-export function buildDraftPrompt(question, startDate, endDate, references) {
+/**
+ * Build the outcome-count hard-restriction block that gets injected into
+ * every drafter / reviewer / finalizer prompt when the user has specified a
+ * number in the Draft Market form. Returns an empty string when the user
+ * has NOT specified a number, preserving the pre-existing "drafter picks"
+ * behaviour. Parsed as a positive integer; invalid / non-positive values
+ * are treated as "no restriction".
+ *
+ * @param {string|number|null|undefined} numberOfOutcomes
+ * @returns {string}
+ */
+export function buildOutcomeCountConstraint(numberOfOutcomes) {
+  const raw = numberOfOutcomes == null ? '' : String(numberOfOutcomes).trim();
+  if (!raw) return '';
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return `\nHARD RESTRICTION — OUTCOME SET SIZE: the market MUST have EXACTLY ${n} Outcome Tokens — no more, no fewer. This is a user-imposed constraint and overrides any instinct to add or drop outcomes. The mandatory catch-all "Other / None" (required unless the field is provably closed) counts toward the ${n}. If ${n} is too small to cover the outcome space MECE-ly, compress by merging adjacent buckets rather than exceeding ${n}, and state explicitly in the draft how the merge preserves MECE. Do NOT emit a draft with any other number of outcomes.\n`;
+}
+
+export function buildDraftPrompt(question, startDate, endDate, references, numberOfOutcomes) {
   const referencesSection = references && references.trim()
     ? `\nReference Links:\n${references.trim()}\n`
     : '';
+  const outcomeCountSection = buildOutcomeCountConstraint(numberOfOutcomes);
   // Per-step prompt is intentionally lean: the protocol rules already live in
   // PROTOCOL_CONTEXT (injected into the drafter system prompt). This prompt
   // only specifies the step's output structure.
@@ -76,8 +96,7 @@ export function buildDraftPrompt(question, startDate, endDate, references) {
 
 User's Question: "${question}"
 Start Date: ${startDate}
-End Date: ${endDate}${referencesSection}
-
+End Date: ${endDate}${referencesSection}${outcomeCountSection}
 Provide a comprehensive draft that includes:
 1. A refined, unambiguous version of the question, framed as a 42 Events Future
 2. The full Outcome Set — every Outcome Token to spawn at launch, each with a one-sentence win condition (include a catch-all entry unless the field is provably closed)
@@ -110,13 +129,14 @@ DRAFT TO REVIEW:
 ${draftContent}`;
 }
 
-export function buildDeliberationPrompt(draftContent, reviews) {
+export function buildDeliberationPrompt(draftContent, reviews, numberOfOutcomes) {
   const reviewsText = reviews
     .map(
       (r, i) =>
         `--- Reviewer ${i + 1} (${r.modelName}) ---\n${r.content}`
     )
     .join('\n\n');
+  const outcomeCountSection = buildOutcomeCountConstraint(numberOfOutcomes);
 
   // Per-step prompt is intentionally lean: the protocol failure modes are
   // already in PROTOCOL_CONTEXT (system prompt). This prompt only orchestrates
@@ -135,7 +155,7 @@ ORIGINAL DRAFT:
 ${draftContent}
 
 OTHER REVIEWERS' CRITIQUES:
-${reviewsText}
+${reviewsText}${outcomeCountSection}
 
 Provide your consolidated, adversarial review, noting:
 1. Points of agreement across reviewers — AND whether you think the reviewers collectively missed anything in those areas
@@ -144,7 +164,7 @@ Provide your consolidated, adversarial review, noting:
 4. Your final prioritized list of recommended changes — blockers first, then majors, then minors. Every item must be a concrete edit, not a generic direction.`;
 }
 
-export function buildUpdatePrompt(draftContent, reviewContent, humanReviewInput, focusBlock) {
+export function buildUpdatePrompt(draftContent, reviewContent, humanReviewInput, focusBlock, numberOfOutcomes) {
   // Phase 5: `focusBlock` is an optional pre-rendered string produced by
   // buildRoutingFocusBlock(). When present it lists the specific claims
   // the routing pipeline flagged as blocking or needing targeted review,
@@ -153,6 +173,7 @@ export function buildUpdatePrompt(draftContent, reviewContent, humanReviewInput,
   const focusSection = focusBlock && focusBlock.trim()
     ? `\n\nROUTING FOCUS (address these FIRST — blocking claims must be fixed before this draft can be finalized):\n${focusBlock}`
     : '';
+  const outcomeCountSection = buildOutcomeCountConstraint(numberOfOutcomes);
 
   // Per-step prompt is intentionally lean: protocol rules live in
   // PROTOCOL_CONTEXT (system prompt). This prompt only orchestrates the
@@ -168,7 +189,7 @@ CRITICAL REVIEW:
 ${reviewContent}${humanReviewInput.trim() ? `
 
 HUMAN REVIEWER FEEDBACK (HIGH PRIORITY — weight 25% more than AI review):
-${humanReviewInput}` : ''}${focusSection}`;
+${humanReviewInput}` : ''}${focusSection}${outcomeCountSection}`;
 }
 
 /**
@@ -203,11 +224,12 @@ export function buildRoutingFocusBlock(routing, claims) {
     .join('\n');
 }
 
-export function buildFinalizePrompt(draftContent, startDate, endDate) {
+export function buildFinalizePrompt(draftContent, startDate, endDate, numberOfOutcomes) {
+  const outcomeCountSection = buildOutcomeCountConstraint(numberOfOutcomes);
   // Per-step prompt is intentionally lean: protocol rules live in
   // PROTOCOL_CONTEXT (system prompt). This prompt only specifies the JSON
   // schema and the conciseness discipline.
-  return `Based on the following 42.space market draft, generate the final market details in a structured JSON format. Each entry in the "outcomes" array will become an Outcome Token spawned at launch and must respect the protocol rules in your system prompt.
+  return `Based on the following 42.space market draft, generate the final market details in a structured JSON format. Each entry in the "outcomes" array will become an Outcome Token spawned at launch and must respect the protocol rules in your system prompt.${outcomeCountSection}
 
 CONCISENESS RULES:
 - Cut all output text by at least 50% compared to the draft. Be terse and direct.
@@ -256,7 +278,7 @@ export function buildIdeatePrompt(direction) {
 
 ${directionSection}
 
-Produce 6–10 distinct market ideas. For each idea, provide:
+Produce EXACTLY 3 distinct market ideas — no more, no fewer. For each idea, provide:
 1. **Title** — a concise, specific market question framed as a 42 Events Future
 2. **Outcome Set** — the named Outcome Tokens to spawn at launch (3–8 entries preferred; include a catch-all "Other / None" unless the field is provably closed). One line.
 3. **Why it's interesting** — 1 sentence on the narrative tension, catalyst, or uncertainty that gives the market a meaningful trade phase across competing OTs
@@ -265,7 +287,7 @@ Produce 6–10 distinct market ideas. For each idea, provide:
 
 - Avoid duplicates — spread across subtopics, timeframes, and angles.
 - Keep each idea tight — no preamble, no filler.
-- Number the ideas 1., 2., 3., ...
+- Number the ideas 1., 2., 3.
 - End with a brief 1–2 sentence note on themes or follow-up directions the user might explore.`;
 }
 
@@ -321,13 +343,14 @@ ${buildClaimExtractorPrompt(draftContent)}`;
 // The rubric is passed in explicitly so adding or reordering rubric items
 // never requires changing this module — `src/constants/rubric.js` is the
 // single source of truth.
-export function buildStructuredReviewPrompt(draftContent, rubric) {
+export function buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes) {
   const rubricBlock = rubric
     .map(
       (item, i) =>
         `  ${i + 1}. id: "${item.id}"\n     question: ${item.question}\n     rationale: ${item.rationale}`
     )
     .join('\n');
+  const outcomeCountSection = buildOutcomeCountConstraint(numberOfOutcomes);
 
   // Per-step prompt is intentionally lean: the protocol rules and the
   // failure-mode list live in PROTOCOL_CONTEXT (system prompt) and the
@@ -378,7 +401,7 @@ VOTING DISCIPLINE:
 OUTPUT RULES:
   - Output ONLY the JSON object. No markdown fences, no prose before or after.
   - rubricVotes MUST contain exactly one entry per rubric id, in the order given.
-
+${outcomeCountSection}
 DRAFT TO REVIEW:
 ${draftContent}`;
 }
@@ -386,12 +409,12 @@ ${draftContent}`;
 // Strict retry for the structured reviewer. Used when the first pass
 // returned invalid JSON. Identical content but leans harder on the
 // "JSON only" constraint.
-export function buildStrictStructuredReviewRetryPrompt(draftContent, rubric) {
+export function buildStrictStructuredReviewRetryPrompt(draftContent, rubric, numberOfOutcomes) {
   return `Your previous response was not valid JSON. Try again.
 
 Output ONLY a JSON object. No prose. No markdown fences. No commentary. Nothing before or after the object. The first character of your response must be "{" and the last character must be "}".
 
-${buildStructuredReviewPrompt(draftContent, rubric)}`;
+${buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes)}`;
 }
 
 // Judge aggregator prompt — only used when the user selects the 'judge'
