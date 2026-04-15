@@ -40,6 +40,7 @@ DRAFT FLAGS
   --verbose          Print stage progress to stderr
   --no-finalize      Stop after update (skip finalize)
   --no-review        Stop after initial draft + claim pipeline
+  --xapi-enrich      Enrich references with X/Twitter data via xAPI
   --timeout          Max seconds before aborting (default: 300)
 
 IDEATE FLAGS
@@ -49,6 +50,7 @@ IDEATE FLAGS
 ENVIRONMENT
   OPENROUTER_API_KEY         API key (preferred)
   VITE_OPENROUTER_API_KEY    API key (Vite fallback)
+  XAPI_KEY                   xAPI key for X/Twitter enrichment (optional)
 
 STDIN
   If stdin is not a TTY, it is read as JSON matching the orchestrate config
@@ -81,6 +83,7 @@ function parseCliArgs() {
       verbose: { type: 'boolean', default: false },
       'no-finalize': { type: 'boolean', default: false },
       'no-review': { type: 'boolean', default: false },
+      'xapi-enrich': { type: 'boolean', default: false },
       timeout: { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
       // ideate
@@ -220,6 +223,7 @@ async function cmdDraft(values, stdinConfig) {
       humanFeedback: values.feedback || baseOptions.humanFeedback,
       skipUpdate: values['no-review'] || baseOptions.skipUpdate,
       skipFinalize: values['no-finalize'] || baseOptions.skipFinalize,
+      xapiEnrich: values['xapi-enrich'] || baseOptions.xapiEnrich || false,
     },
   };
 

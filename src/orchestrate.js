@@ -34,6 +34,7 @@ import { routeClaims } from './pipeline/route.js';
 import { runStructuredReviewsParallel } from './pipeline/structuredReview.js';
 import { aggregate } from './pipeline/aggregate.js';
 import { RIGOR_RUBRIC } from './constants/rubric.js';
+import { enrichReferencesWithXData } from './pipeline/xapi.js';
 import { createRun } from './types/run.js';
 import {
   DEFAULT_DRAFTER_MODEL,
@@ -258,7 +259,7 @@ async function runReviewStage(run, models, options, cost, callbacks) {
 /**
  * Run the update stage: new draft, re-extract, re-verify, re-route.
  */
-async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks) {
+async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks, referencesStr) {
   const latestDraft = run.drafts[run.drafts.length - 1].content;
   const reviewText = run.aggregation?.checklist
     ?.map((item) => `${item.id}: ${item.decision}`)
@@ -269,7 +270,7 @@ async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks) 
     models.drafter,
     [
       { role: 'system', content: SYSTEM_PROMPTS.drafter },
-      { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock, run.input?.numberOfOutcomes || '') },
+      { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock, run.input?.numberOfOutcomes || '', referencesStr) },
     ],
     { maxTokens: 8000 },
   );
@@ -464,7 +465,7 @@ async function _orchestrateInner(config, signal) {
 
   // Build the Run input. References may arrive as an array (CLI) or string (UI/harness).
   const refs = input?.references;
-  const referencesStr = Array.isArray(refs) ? refs.join('\n') : (refs || '');
+  let referencesStr = Array.isArray(refs) ? refs.join('\n') : (refs || '');
 
   const run = createRun({
     question: input?.question || '',
@@ -561,9 +562,30 @@ async function _orchestrateInner(config, signal) {
     }
   }
 
+  // --- 3.5. Optional xAPI enrichment ---
+  if (options.xapiEnrich) {
+    ok = await stage('xapi_enrich', async () => {
+      const enriched = await enrichReferencesWithXData(
+        referencesStr,
+        run.drafts[run.drafts.length - 1]?.content || '',
+        { fetchImpl },
+      );
+      if (enriched !== referencesStr) {
+        referencesStr = enriched;
+        log(run, 'xapi_enrich', 'info', 'References enriched with X/Twitter context via xAPI.', callbacks);
+      } else {
+        log(run, 'xapi_enrich', 'info', 'No X/Twitter content found to enrich.', callbacks);
+      }
+    });
+    // Enrichment failure is non-fatal — proceed with original references.
+    if (!ok) {
+      log(run, 'xapi_enrich', 'warn', 'xAPI enrichment failed; continuing with original references.', callbacks);
+    }
+  }
+
   // --- 4. Update ---
   ok = await stage('update', async () => {
-    await runUpdateStage(run, models, options, fetchImpl, cost, callbacks);
+    await runUpdateStage(run, models, options, fetchImpl, cost, callbacks, referencesStr);
   });
   if (!ok || run.status === 'error') {
     run.cost = cost.snapshot();

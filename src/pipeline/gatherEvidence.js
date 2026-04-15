@@ -62,6 +62,8 @@
  * @property {{level:'info'|'warn'|'error', message:string}|null} logEntry
  */
 
+import { resolveXUrl } from './xapi.js';
+
 // Match bare http(s) URLs up to the next whitespace / closing punctuation.
 // Intentionally permissive — we want to catch URLs buried in markdown like
 // `[title](https://example.com)` without requiring the link syntax.
@@ -204,20 +206,32 @@ export async function resolveCitation(url, options = {}) {
 }
 
 /**
- * Resolve many URLs in parallel. Returns a Map<url, boolean>. Never throws.
+ * Resolve many URLs in parallel. Returns both the boolean resolve map and
+ * any xAPI metadata captured for X/Twitter URLs. Never throws.
  *
  * @param {string[]} urls
  * @param {{timeoutMs?:number, fetchImpl?:typeof fetch}} [options]
- * @returns {Promise<Map<string, boolean>>}
+ * @returns {Promise<{
+ *   resolveMap: Map<string, boolean>,
+ *   xapiMeta: Map<string, {name?:string, screenName?:string, description?:string, text?:string, authorScreenName?:string}>,
+ * }>}
  */
 async function resolveAll(urls, options) {
+  /** @type {Map<string, {name?:string, screenName?:string, description?:string, text?:string, authorScreenName?:string}>} */
+  const xapiMeta = new Map();
   const entries = await Promise.all(
     urls.map(async (url) => {
+      // Try xAPI for X/Twitter URLs — richer than a no-cors probe.
+      const xResult = await resolveXUrl(url, options);
+      if (xResult) {
+        xapiMeta.set(url, xResult.meta);
+        return [url, true];
+      }
       const ok = await resolveCitation(url, options);
       return [url, ok];
     })
   );
-  return new Map(entries);
+  return { resolveMap: new Map(entries), xapiMeta };
 }
 
 /**
@@ -290,10 +304,23 @@ export async function gatherEvidence(input) {
   }
 
   const urls = evidence.map((e) => e.url);
-  const resolveMap = await resolveAll(urls, { timeoutMs, fetchImpl });
+  const { resolveMap, xapiMeta } = await resolveAll(urls, { timeoutMs, fetchImpl });
 
   const resolvedCount = Array.from(resolveMap.values()).filter(Boolean).length;
   const unresolvedCount = urls.length - resolvedCount;
+
+  // Enrich evidence records with xAPI metadata (title/excerpt) when available.
+  for (const ev of evidence) {
+    const meta = xapiMeta.get(ev.url);
+    if (!meta) continue;
+    if (meta.text) {
+      ev.title = `@${meta.authorScreenName || 'unknown'}`;
+      ev.excerpt = meta.text.slice(0, 300);
+    } else if (meta.name) {
+      ev.title = meta.name;
+      ev.excerpt = meta.description ? meta.description.slice(0, 300) : '';
+    }
+  }
 
   const updatedVerifications = applyResolveToVerifications(
     verifications || [],
@@ -302,10 +329,14 @@ export async function gatherEvidence(input) {
   );
 
   // Attach resolve result to each Evidence record in toolOutput-like form.
-  // We don't add a new schema field for this — the excerpt stays empty
-  // until a later phase populates it with real retrieved content, and the
-  // per-URL resolve status is already surfaced on the linked claim's
-  // Verification.citationResolves. We log a single summary line instead.
+  // The per-URL resolve status is already surfaced on the linked claim's
+  // Verification.citationResolves, so we just log a single summary line.
+  //
+  // Note on title/excerpt: these were originally left empty until a later
+  // phase could populate them with real retrieved content. The xAPI
+  // integration (see loop above) now populates them for X/Twitter URLs
+  // only, so downstream readers should treat non-empty title/excerpt as
+  // "enriched" rather than the previous "never set" invariant.
   const logEntry = {
     level: unresolvedCount > 0 ? 'warn' : 'info',
     message:
