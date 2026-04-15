@@ -2128,6 +2128,11 @@ select.input optgroup {
   background: rgba(0, 0, 0, 0.06);
 }
 
+.App.theme-light .risk-gate__shared-banner {
+  background: rgba(0, 0, 0, 0.03);
+  border-left-color: rgba(0, 0, 0, 0.15);
+}
+
 /* Time display */
 .App.theme-light .time-display {
   background: rgba(139, 119, 90, 0.08);
@@ -2623,6 +2628,19 @@ select.input optgroup {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  min-width: 0;
+}
+
+.risk-gate__list li {
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.risk-gate__body code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  max-width: 100%;
 }
 
 .risk-gate__item {
@@ -2652,6 +2670,33 @@ select.input optgroup {
   line-height: 1.5;
   color: var(--text-1);
   margin-top: 0.15rem;
+}
+
+.risk-gate__claim-text--faint {
+  color: var(--text-3);
+  font-style: italic;
+}
+
+.risk-gate__shared-banner {
+  margin: 0.25rem 0 0.6rem 0;
+  padding: 0.5rem 0.7rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.risk-gate__shared-title {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  margin-bottom: 0.25rem;
+}
+
+.risk-gate__shared-banner .risk-gate__reason-list {
+  margin-left: 0.75rem;
 }
 
 .risk-gate__reason-list {

@@ -1696,36 +1696,91 @@ function App() {
                         {(() => {
                           const grouped = groupRoutingBySeverity(currentRun.routing);
                           const claimsById = new Map(currentRun.claims.map((c) => [c.id, c]));
-                          const render = (items) =>
-                            items.slice(0, 12).map((item) => {
-                              const claim = claimsById.get(item.claimId);
-                              const category = humanReadableClaimCategory(item.claimId);
-                              return (
-                                <li key={item.claimId} className="risk-gate__item">
-                                  <span className="risk-gate__category">{category}</span>
-                                  {claim && <span className="risk-gate__claim-text">{claim.text}</span>}
-                                  {item.reasons.length > 0 && (
-                                    <ul className="risk-gate__reason-list">
-                                      {item.reasons.map((r, i) => (
-                                        <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                </li>
-                              );
-                            });
+
+                          // Pull out reasons that appear on EVERY item in a group —
+                          // these are universal signals (e.g. a global blocker
+                          // criticism) and are far more useful surfaced once at
+                          // the top than repeated on every card.
+                          const findSharedReasons = (items) => {
+                            if (items.length < 2) return new Set();
+                            const first = new Set(items[0].reasons || []);
+                            for (let i = 1; i < items.length; i++) {
+                              const cur = new Set(items[i].reasons || []);
+                              for (const r of first) {
+                                if (!cur.has(r)) first.delete(r);
+                              }
+                            }
+                            return first;
+                          };
+
+                          const renderCard = (item, shared) => {
+                            const claim = claimsById.get(item.claimId);
+                            const category = humanReadableClaimCategory(item.claimId);
+                            const uniqueReasons = (item.reasons || []).filter((r) => !shared.has(r));
+                            const hasText = claim && claim.text && claim.text.trim();
+                            // Drop cards that add nothing specific — no claim text AND no unique reasons.
+                            // The shared reasons banner already tells the user why they're flagged.
+                            if (!hasText && uniqueReasons.length === 0) return null;
+                            return (
+                              <li key={item.claimId} className="risk-gate__item">
+                                <span className="risk-gate__category">{category}</span>
+                                {hasText ? (
+                                  <span className="risk-gate__claim-text">{claim.text}</span>
+                                ) : (
+                                  <span className="risk-gate__claim-text risk-gate__claim-text--faint">
+                                    <code>{item.claimId}</code> (claim text unavailable)
+                                  </span>
+                                )}
+                                {uniqueReasons.length > 0 && (
+                                  <ul className="risk-gate__reason-list">
+                                    {uniqueReasons.map((r, i) => (
+                                      <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </li>
+                            );
+                          };
+
+                          const renderGroup = (items) => {
+                            const shared = findSharedReasons(items);
+                            const cards = items.slice(0, 12).map((item) => renderCard(item, shared)).filter(Boolean);
+                            return { shared, cards, hiddenCount: items.length - cards.length };
+                          };
+
+                          const renderSharedBanner = (shared, total) => {
+                            if (shared.size === 0) return null;
+                            return (
+                              <div className="risk-gate__shared-banner">
+                                <span className="risk-gate__shared-title">
+                                  Affecting all {total} flagged claim{total === 1 ? '' : 's'}:
+                                </span>
+                                <ul className="risk-gate__reason-list">
+                                  {Array.from(shared).map((r, i) => (
+                                    <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          };
+
+                          const blocking = renderGroup(grouped.blocking);
+                          const targeted = renderGroup(grouped.targeted_review);
+
                           return (
                             <>
                               {grouped.blocking.length > 0 && (
                                 <>
                                   <p className="risk-gate__subheading risk-gate__subheading--blocking">Must fix before finalizing ({grouped.blocking.length}):</p>
-                                  <ul className="risk-gate__list">{render(grouped.blocking)}</ul>
+                                  {renderSharedBanner(blocking.shared, grouped.blocking.length)}
+                                  {blocking.cards.length > 0 && <ul className="risk-gate__list">{blocking.cards}</ul>}
                                 </>
                               )}
                               {grouped.targeted_review.length > 0 && (
                                 <>
                                   <p className="risk-gate__subheading risk-gate__subheading--review">Worth reviewing ({grouped.targeted_review.length}):</p>
-                                  <ul className="risk-gate__list">{render(grouped.targeted_review)}</ul>
+                                  {renderSharedBanner(targeted.shared, grouped.targeted_review.length)}
+                                  {targeted.cards.length > 0 && <ul className="risk-gate__list">{targeted.cards}</ul>}
                                 </>
                               )}
                             </>
