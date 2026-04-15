@@ -176,9 +176,13 @@ export async function checkResolutionSources(input) {
     results = await Promise.all(
       entries.map(async (entry) => {
         // Try xAPI for X/Twitter URLs first — richer signal than no-cors fetch.
+        // We only use it for accessibility here; the SourceCheckEntry shape
+        // does not carry the full metadata because no caller reads it yet.
+        // If a UI surface later wants to show "resolved via @handle", add
+        // an xapiMeta field to the SourceCheckEntry typedef and re-enable.
         const xResult = await resolveXUrl(entry.url, { fetchImpl, timeoutMs });
         if (xResult) {
-          return { ...entry, accessible: xResult.accessible, xapiMeta: xResult.meta };
+          return { ...entry, accessible: xResult.accessible };
         }
         const accessible = await resolveCitation(entry.url, { fetchImpl, timeoutMs });
         return { ...entry, accessible };
