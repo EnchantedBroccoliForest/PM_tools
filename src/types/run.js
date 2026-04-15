@@ -334,6 +334,10 @@ export const RunSchema = z.object({
     startDate: z.string(),
     endDate: z.string(),
     references: z.string(),
+    // Optional hard restriction on outcome-set cardinality. Absent (or empty)
+    // on runs exported before this field existed — defaulted to '' so older
+    // run files still validate against this schema.
+    numberOfOutcomes: z.string().optional().default(''),
   }),
   drafts: z.array(DraftRecordSchema),
   criticisms: z.array(CriticismSchema),
@@ -380,7 +384,7 @@ export function createEmptyCost() {
 
 /**
  * Construct a fresh Run from the drafting inputs.
- * @param {{question:string, startDate:string, endDate:string, references:string}} input
+ * @param {{question:string, startDate:string, endDate:string, references:string, numberOfOutcomes?:string}} input
  * @returns {Run}
  */
 export function createRun(input) {
@@ -392,6 +396,7 @@ export function createRun(input) {
       startDate: input?.startDate || '',
       endDate: input?.endDate || '',
       references: input?.references || '',
+      numberOfOutcomes: input?.numberOfOutcomes || '',
     },
     drafts: [],
     criticisms: [],

@@ -63,9 +63,13 @@ function tryParseJson(text) {
  * @param {{id:string, name:string}} model        reviewer
  * @param {string} draftContent                   the draft being reviewed
  * @param {import('../constants/rubric').RubricItem[]} rubric
+ * @param {string} [numberOfOutcomes]             optional hard restriction on
+ *                                                the outcome-set cardinality;
+ *                                                empty string means no
+ *                                                restriction (default).
  * @returns {Promise<StructuredReviewResult>}
  */
-export async function runStructuredReview(model, draftContent, rubric) {
+export async function runStructuredReview(model, draftContent, rubric, numberOfOutcomes = '') {
   const rubricIds = new Set(rubric.map((r) => r.id));
   const aggregate = {
     usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
@@ -85,7 +89,7 @@ export async function runStructuredReview(model, draftContent, rubric) {
       model.id,
       [
         { role: 'system', content: SYSTEM_PROMPTS.structuredReviewer },
-        { role: 'user', content: buildStructuredReviewPrompt(draftContent, rubric) },
+        { role: 'user', content: buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes) },
       ],
       { temperature: 0.4, maxTokens: 3000 }
     );
@@ -119,7 +123,7 @@ export async function runStructuredReview(model, draftContent, rubric) {
           { role: 'system', content: SYSTEM_PROMPTS.structuredReviewer },
           {
             role: 'user',
-            content: buildStrictStructuredReviewRetryPrompt(draftContent, rubric),
+            content: buildStrictStructuredReviewRetryPrompt(draftContent, rubric, numberOfOutcomes),
           },
         ],
         { temperature: 0.2, maxTokens: 3000 }
@@ -219,11 +223,15 @@ export async function runStructuredReview(model, draftContent, rubric) {
  * @param {Array<{id:string, name:string}>} models
  * @param {string} draftContent
  * @param {import('../constants/rubric').RubricItem[]} rubric
+ * @param {string} [numberOfOutcomes]  optional hard restriction on the
+ *                                     outcome-set cardinality (propagated to
+ *                                     every reviewer); empty string = no
+ *                                     restriction.
  * @returns {Promise<StructuredReviewResult[]>}
  */
-export async function runStructuredReviewsParallel(models, draftContent, rubric) {
+export async function runStructuredReviewsParallel(models, draftContent, rubric, numberOfOutcomes = '') {
   const settled = await Promise.allSettled(
-    models.map((m) => runStructuredReview(m, draftContent, rubric))
+    models.map((m) => runStructuredReview(m, draftContent, rubric, numberOfOutcomes))
   );
   return settled.map((s, i) => {
     if (s.status === 'fulfilled') return s.value;

@@ -302,6 +302,7 @@ function App() {
     startDate,
     endDate,
     references,
+    numberOfOutcomes,
     selectedModel,
     reviewModels,
     aggregationProtocol,
@@ -560,12 +561,12 @@ function App() {
     // Start a fresh Run artifact; previous run (if any) is discarded.
     dispatch({
       type: 'RUN_START',
-      input: { question, startDate, endDate, references },
+      input: { question, startDate, endDate, references, numberOfOutcomes },
     });
     try {
       const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildDraftPrompt(question, startDate, endDate, references) },
+        { role: 'user', content: buildDraftPrompt(question, startDate, endDate, references, numberOfOutcomes) },
       ], { maxTokens: DRAFT_MAX_TOKENS });
       dispatch({ type: 'DRAFT_SUCCESS', content: result.content });
       recordCost('draft', result);
@@ -623,7 +624,8 @@ function App() {
       const structuredResults = await runStructuredReviewsParallel(
         reviewerModels,
         draftContent,
-        RIGOR_RUBRIC
+        RIGOR_RUBRIC,
+        numberOfOutcomes,
       );
 
       // Per-reviewer cost + log accounting.
@@ -660,7 +662,7 @@ function App() {
       // when we have 2+ reviewers.
       let deliberatedReview = null;
       if (legacyReviews.length > 1) {
-        const deliberationPrompt = buildDeliberationPrompt(draftContent, legacyReviews);
+        const deliberationPrompt = buildDeliberationPrompt(draftContent, legacyReviews, numberOfOutcomes);
         const delibResult = await queryModel(legacyReviews[0].model, [
           { role: 'system', content: SYSTEM_PROMPTS.reviewer },
           { role: 'user', content: deliberationPrompt },
@@ -762,7 +764,7 @@ function App() {
       );
       const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildUpdatePrompt(displayedDraftContent, reviewText, humanReviewInput, focusBlock) },
+        { role: 'user', content: buildUpdatePrompt(displayedDraftContent, reviewText, humanReviewInput, focusBlock, numberOfOutcomes) },
       ], { maxTokens: DRAFT_MAX_TOKENS });
       updatedDraft = result.content;
       dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });
@@ -875,7 +877,7 @@ function App() {
         selectedModel,
         [
           { role: 'system', content: SYSTEM_PROMPTS.finalizer },
-          { role: 'user', content: buildFinalizePrompt(draftContent, startDate, endDate) },
+          { role: 'user', content: buildFinalizePrompt(draftContent, startDate, endDate, numberOfOutcomes) },
         ],
         { temperature: 0.3 }
       );
@@ -1121,6 +1123,23 @@ function App() {
                 </div>
 
                 <div className="form-group">
+                  <label htmlFor="numberOfOutcomes">
+                    Number of Outcomes <span className="label-hint">(optional)</span>
+                  </label>
+                  <input
+                    id="numberOfOutcomes"
+                    type="number"
+                    min="2"
+                    step="1"
+                    value={numberOfOutcomes}
+                    onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'numberOfOutcomes', value: e.target.value })}
+                    placeholder="Leave blank to let the drafter choose"
+                    className="input"
+                    disabled={loading === 'draft'}
+                  />
+                </div>
+
+                <div className="form-group">
                   <label htmlFor="model">Drafting Model</label>
                   <ModelSelect
                     id="model"
@@ -1261,6 +1280,17 @@ function App() {
                         <h2>Market Ideas</h2>
                         <div className="col-panel-actions">
                           <span className="model-badge" data-tooltip={getModelName(ideatingModel)}>{getModelAbbrev(ideatingModel)}</span>
+                          <button
+                            type="button"
+                            className="copy-btn"
+                            onClick={handleIdeate}
+                            disabled={!ideatingInput.trim() || loading === 'ideate'}
+                            title="Generate a fresh batch of 3 ideas"
+                            aria-label="Refresh ideas"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-1px', marginRight: 4 }}><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" /><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" /></svg>
+                            Refresh
+                          </button>
                           <button
                             className={`copy-btn ${copiedId === 'ideating' ? 'copy-btn--copied' : ''}`}
                             onClick={() => handleCopy(ideatingContent, 'ideating')}
