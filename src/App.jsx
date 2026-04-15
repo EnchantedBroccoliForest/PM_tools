@@ -251,17 +251,28 @@ function parseRiskLevel(text) {
 
 function toSimpleRoutingReason(reason) {
   if (!reason) return '';
-  if (reason === 'verification hard_fail') return 'the checks found a serious failure';
-  if (reason === 'verification soft_fail') return 'the checks found a possible issue';
-  if (reason === 'draft contradicts claim') return 'the draft says the opposite of this claim';
-  if (reason === 'not covered by draft') return 'the draft does not clearly address this claim';
-  if (reason === 'cited URL did not resolve') return 'a cited link could not be opened';
-  if (reason === 'run has a global blocker criticism') return 'there is a run-level blocker that must be fixed';
+  if (reason === 'verification hard_fail') return 'Failed a verification check';
+  if (reason === 'verification soft_fail') return 'Flagged as a potential issue during verification';
+  if (reason === 'draft contradicts claim') return 'The draft contradicts this claim';
+  if (reason === 'not covered by draft') return 'Not clearly addressed in the draft';
+  if (reason === 'cited URL did not resolve') return 'A linked source could not be reached';
+  if (reason === 'run has a global blocker criticism') return 'A reviewer flagged a market-wide issue';
   const blockerMatch = reason.match(/^(\d+)\s+blocker criticism\(s\)$/);
-  if (blockerMatch) return `${blockerMatch[1]} blocker concern(s) were raised about this claim`;
+  if (blockerMatch) return `Reviewers raised ${blockerMatch[1]} blocking concern${blockerMatch[1] === '1' ? '' : 's'}`;
   const majorMatch = reason.match(/^(\d+)\s+major criticism\(s\)$/);
-  if (majorMatch) return `${majorMatch[1]} major concern(s) were raised about this claim`;
+  if (majorMatch) return `Reviewers raised ${majorMatch[1]} major concern${majorMatch[1] === '1' ? '' : 's'}`;
   return reason;
+}
+
+function humanReadableClaimCategory(claimId) {
+  if (!claimId) return '';
+  if (claimId.startsWith('claim.source')) return 'Resolution source';
+  if (claimId.startsWith('claim.threshold')) return 'Resolution rule';
+  if (claimId.startsWith('claim.mece')) return 'Outcome coverage';
+  if (claimId.startsWith('claim.edge')) return 'Edge case';
+  if (claimId.startsWith('claim.timing')) return 'Timing / deadline';
+  if (claimId.startsWith('claim.oracle')) return 'Oracle / data source';
+  return 'Claim';
 }
 
 function getSimpleBlockReasons(currentRun) {
@@ -1680,22 +1691,25 @@ function App() {
                       </div>
                       <div className="risk-gate__body">
                         <p className="risk-gate__hint">
-                          Rigor routing is a quick safety check that sorts claims into: okay, needs more review, or blocks finalize.
+                          These checks verify that the draft's claims — resolution sources, rules, edge cases — are consistent and well-supported.
                         </p>
                         {(() => {
                           const grouped = groupRoutingBySeverity(currentRun.routing);
                           const claimsById = new Map(currentRun.claims.map((c) => [c.id, c]));
                           const render = (items) =>
-                            items.slice(0, 8).map((item) => {
+                            items.slice(0, 12).map((item) => {
                               const claim = claimsById.get(item.claimId);
+                              const category = humanReadableClaimCategory(item.claimId);
                               return (
-                                <li key={item.claimId}>
-                                  <code>{item.claimId}</code>
-                                  {claim ? ` — ${claim.text}` : ''}
+                                <li key={item.claimId} className="risk-gate__item">
+                                  <span className="risk-gate__category">{category}</span>
+                                  {claim && <span className="risk-gate__claim-text">{claim.text}</span>}
                                   {item.reasons.length > 0 && (
-                                    <span className="risk-gate__reasons">
-                                      {' '}({item.reasons.map(toSimpleRoutingReason).join('; ')})
-                                    </span>
+                                    <ul className="risk-gate__reason-list">
+                                      {item.reasons.map((r, i) => (
+                                        <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
+                                      ))}
+                                    </ul>
                                   )}
                                 </li>
                               );
@@ -1704,13 +1718,13 @@ function App() {
                             <>
                               {grouped.blocking.length > 0 && (
                                 <>
-                                  <p className="risk-gate__subheading">Blocking ({grouped.blocking.length}):</p>
+                                  <p className="risk-gate__subheading risk-gate__subheading--blocking">Must fix before finalizing ({grouped.blocking.length}):</p>
                                   <ul className="risk-gate__list">{render(grouped.blocking)}</ul>
                                 </>
                               )}
                               {grouped.targeted_review.length > 0 && (
                                 <>
-                                  <p className="risk-gate__subheading">Needs targeted review ({grouped.targeted_review.length}):</p>
+                                  <p className="risk-gate__subheading risk-gate__subheading--review">Worth reviewing ({grouped.targeted_review.length}):</p>
                                   <ul className="risk-gate__list">{render(grouped.targeted_review)}</ul>
                                 </>
                               )}
