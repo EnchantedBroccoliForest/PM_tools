@@ -259,7 +259,7 @@ async function runReviewStage(run, models, options, cost, callbacks) {
 /**
  * Run the update stage: new draft, re-extract, re-verify, re-route.
  */
-async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks) {
+async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks, referencesStr) {
   const latestDraft = run.drafts[run.drafts.length - 1].content;
   const reviewText = run.aggregation?.checklist
     ?.map((item) => `${item.id}: ${item.decision}`)
@@ -270,7 +270,7 @@ async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks) 
     models.drafter,
     [
       { role: 'system', content: SYSTEM_PROMPTS.drafter },
-      { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock, run.input?.numberOfOutcomes || '') },
+      { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock, run.input?.numberOfOutcomes || '', referencesStr) },
     ],
     { maxTokens: 8000 },
   );
@@ -585,7 +585,7 @@ async function _orchestrateInner(config, signal) {
 
   // --- 4. Update ---
   ok = await stage('update', async () => {
-    await runUpdateStage(run, models, options, fetchImpl, cost, callbacks);
+    await runUpdateStage(run, models, options, fetchImpl, cost, callbacks, referencesStr);
   });
   if (!ok || run.status === 'error') {
     run.cost = cost.snapshot();
