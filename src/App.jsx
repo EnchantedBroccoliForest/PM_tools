@@ -40,23 +40,60 @@ function renderContent(text) {
   while (i < lines.length) {
     const line = lines[i];
 
-    // Heading lines (### or ##)
-    const headingMatch = line.match(/^(#{1,3})\s+(.+)/);
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      const Tag = level === 1 ? 'h3' : level === 2 ? 'h4' : 'h5';
-      elements.push(<Tag key={i} className="md-heading">{formatInline(headingMatch[2])}</Tag>);
+    // Horizontal rule: --- / *** / ___ on its own line
+    if (/^\s*(?:[-*_]\s*){3,}\s*$/.test(line)) {
+      elements.push(<hr key={i} className="md-hr" />);
       i++;
       continue;
     }
 
-    // Bullet or numbered list items
-    if (/^[\s]*[-*]\s/.test(line) || /^[\s]*\d+\.\s/.test(line)) {
+    // Heading lines (# / ## / ### / ####)
+    const headingMatch = line.match(/^(#{1,4})\s+(.+)/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const Tag = level === 1 ? 'h3' : level === 2 ? 'h4' : level === 3 ? 'h5' : 'h6';
+      elements.push(
+        <Tag key={i} className={`md-heading md-heading--${level}`}>
+          {formatInline(headingMatch[2])}
+        </Tag>,
+      );
+      i++;
+      continue;
+    }
+
+    // Blockquote: one or more consecutive lines starting with `>`
+    if (/^\s*>/.test(line)) {
+      const quoteLines = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) {
+        quoteLines.push(lines[i].replace(/^\s*>\s?/, ''));
+        i++;
+      }
+      elements.push(
+        <blockquote key={`quote-${i}`} className="md-blockquote">
+          {quoteLines.map((q, qi) => (
+            <p key={qi} className="md-paragraph">{formatInline(q)}</p>
+          ))}
+        </blockquote>,
+      );
+      continue;
+    }
+
+    // Bullet or numbered list items (allow indented nesting)
+    if (/^\s*[-*]\s/.test(line) || /^\s*\d+\.\s/.test(line)) {
       const listItems = [];
-      const isOrdered = /^[\s]*\d+\.\s/.test(line);
-      while (i < lines.length && (/^[\s]*[-*]\s/.test(lines[i]) || /^[\s]*\d+\.\s/.test(lines[i]))) {
-        const content = lines[i].replace(/^[\s]*[-*]\s/, '').replace(/^[\s]*\d+\.\s/, '');
-        listItems.push(<li key={i}>{formatInline(content)}</li>);
+      const isOrdered = /^\s*\d+\.\s/.test(line);
+      while (i < lines.length && (/^\s*[-*]\s/.test(lines[i]) || /^\s*\d+\.\s/.test(lines[i]))) {
+        const raw = lines[i];
+        const indent = (raw.match(/^\s*/) || [''])[0].length;
+        const content = raw.replace(/^\s*[-*]\s/, '').replace(/^\s*\d+\.\s/, '');
+        listItems.push(
+          <li
+            key={i}
+            className={indent >= 2 ? 'md-list__item md-list__item--nested' : 'md-list__item'}
+          >
+            {formatInline(content)}
+          </li>,
+        );
         i++;
       }
       const ListTag = isOrdered ? 'ol' : 'ul';
@@ -89,12 +126,93 @@ function formatRelativeTime(timestamp) {
   return `${hours}h ago`;
 }
 
+// Parse an agent review whose issues are tagged with severity markers
+// like "BLOCKER #1:", "MAJOR:", "MINOR:", "NIT:". Returns a structured
+// breakdown so the UI can render severity-grouped cards instead of one
+// dense paragraph. Returns { intro, issues: [] } with an empty issues
+// array when the text doesn't match the pattern, so callers can fall
+// back to plain markdown rendering.
+function parseReviewSections(text) {
+  if (!text || typeof text !== 'string') return { intro: '', issues: [] };
+  const markerRegex = /\b(BLOCKER|MAJOR|MINOR|NIT)(?:\s*#\s*\d+)?\s*:/g;
+  /** @type {Array<{severity:'blocker'|'major'|'minor'|'nit', start:number, length:number}>} */
+  const markers = [];
+  let m;
+  while ((m = markerRegex.exec(text)) !== null) {
+    markers.push({
+      severity: m[1].toLowerCase(),
+      start: m.index,
+      length: m[0].length,
+    });
+  }
+  if (markers.length === 0) return { intro: text.trim(), issues: [] };
+  const intro = text.slice(0, markers[0].start).trim();
+  const issues = markers.map((mk, i) => {
+    const bodyStart = mk.start + mk.length;
+    const bodyEnd = i + 1 < markers.length ? markers[i + 1].start : text.length;
+    return { severity: mk.severity, text: text.slice(bodyStart, bodyEnd).trim() };
+  });
+  return { intro, issues };
+}
+
+const REVIEW_SEVERITY_LABELS = {
+  blocker: { plural: 'Blockers', singular: 'Blocker' },
+  major: { plural: 'Major issues', singular: 'Major' },
+  minor: { plural: 'Minor issues', singular: 'Minor' },
+  nit: { plural: 'Nits', singular: 'Nit' },
+};
+
+function renderReview(text) {
+  const parsed = parseReviewSections(text);
+  if (parsed.issues.length === 0) {
+    // No severity tags found — fall back to standard markdown rendering.
+    return renderContent(text);
+  }
+  /** @type {Record<string, Array<{text:string}>>} */
+  const bySeverity = { blocker: [], major: [], minor: [], nit: [] };
+  for (const issue of parsed.issues) {
+    if (bySeverity[issue.severity]) bySeverity[issue.severity].push(issue);
+  }
+  return (
+    <div className="review-breakdown">
+      {parsed.intro && (
+        <p className="review-breakdown__intro">{formatInline(parsed.intro)}</p>
+      )}
+      {['blocker', 'major', 'minor', 'nit'].map((sev) => {
+        const items = bySeverity[sev];
+        if (items.length === 0) return null;
+        const { plural, singular } = REVIEW_SEVERITY_LABELS[sev];
+        return (
+          <div key={sev} className={`review-breakdown__section review-breakdown__section--${sev}`}>
+            <p className="review-breakdown__section-title">{plural} ({items.length})</p>
+            <ul className="review-breakdown__list">
+              {items.map((it, i) => (
+                <li key={i} className="review-breakdown__item">
+                  <span className={`review-breakdown__badge review-breakdown__badge--${sev}`}>
+                    {singular}
+                  </span>
+                  <span className="review-breakdown__text">{formatInline(it.text)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function formatInline(text) {
-  // Split on **bold** markers
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  // Split the line into alternating bold / code / plain segments.
+  // Order matters: bold (**…**) first so `**foo**` isn't eaten as
+  // "*" + "foo" + "*".
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+      return <code key={i} className="md-inline-code">{part.slice(1, -1)}</code>;
     }
     return part;
   });
@@ -1696,6 +1814,18 @@ function App() {
                         {(() => {
                           const grouped = groupRoutingBySeverity(currentRun.routing);
                           const claimsById = new Map(currentRun.claims.map((c) => [c.id, c]));
+                          const verificationsByClaimId = new Map(
+                            (currentRun.verification || []).map((v) => [v.claimId, v]),
+                          );
+                          // Group criticisms by claimId so each card can show the actual
+                          // reviewer rationale text rather than a generic "N criticisms" count.
+                          const criticismsByClaimId = new Map();
+                          for (const c of currentRun.criticisms || []) {
+                            if (!c.claimId || c.claimId === 'global') continue;
+                            const list = criticismsByClaimId.get(c.claimId) || [];
+                            list.push(c);
+                            criticismsByClaimId.set(c.claimId, list);
+                          }
 
                           // Pull out reasons that appear on EVERY item in a group —
                           // these are universal signals (e.g. a global blocker
@@ -1713,14 +1843,42 @@ function App() {
                             return first;
                           };
 
+                          // Strip a "Structural: " or "Entailment: " prefix the verifier adds
+                          // so the rendered text doesn't redundantly label its own source.
+                          const cleanVerifierFragment = (s) => s.replace(/^(?:Structural|Entailment):\s*/, '').trim();
+                          const splitToolOutput = (out) =>
+                            (out || '')
+                              .split(' | ')
+                              .map(cleanVerifierFragment)
+                              .filter(Boolean);
+
+                          const severityLabel = {
+                            blocker: 'Blocker',
+                            major: 'Major',
+                            minor: 'Minor',
+                            nit: 'Nit',
+                          };
+
                           const renderCard = (item, shared) => {
                             const claim = claimsById.get(item.claimId);
                             const category = humanReadableClaimCategory(item.claimId);
                             const uniqueReasons = (item.reasons || []).filter((r) => !shared.has(r));
+                            const verification = verificationsByClaimId.get(item.claimId);
+                            const verifierDetails = verification ? splitToolOutput(verification.toolOutput) : [];
+                            const claimCriticisms = (criticismsByClaimId.get(item.claimId) || [])
+                              .filter((c) => c.severity === 'blocker' || c.severity === 'major')
+                              .slice(0, 3);
                             const hasText = claim && claim.text && claim.text.trim();
-                            // Drop cards that add nothing specific — no claim text AND no unique reasons.
-                            // The shared reasons banner already tells the user why they're flagged.
-                            if (!hasText && uniqueReasons.length === 0) return null;
+                            // Drop cards with truly nothing useful: no claim text, no unique
+                            // reasons, no verifier details, and no criticisms.
+                            if (
+                              !hasText &&
+                              uniqueReasons.length === 0 &&
+                              verifierDetails.length === 0 &&
+                              claimCriticisms.length === 0
+                            ) {
+                              return null;
+                            }
                             return (
                               <li key={item.claimId} className="risk-gate__item">
                                 <span className="risk-gate__category">{category}</span>
@@ -1737,6 +1895,31 @@ function App() {
                                       <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
                                     ))}
                                   </ul>
+                                )}
+                                {verifierDetails.length > 0 && (
+                                  <div className="risk-gate__detail-block">
+                                    <span className="risk-gate__detail-label">Verifier said:</span>
+                                    <ul className="risk-gate__detail-list">
+                                      {verifierDetails.map((d, i) => (
+                                        <li key={i}>{d}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                                {claimCriticisms.length > 0 && (
+                                  <div className="risk-gate__detail-block">
+                                    <span className="risk-gate__detail-label">Reviewer noted:</span>
+                                    <ul className="risk-gate__detail-list">
+                                      {claimCriticisms.map((c, i) => (
+                                        <li key={i}>
+                                          <span className={`risk-gate__criticism-severity risk-gate__criticism-severity--${c.severity}`}>
+                                            {severityLabel[c.severity] || c.severity}
+                                          </span>
+                                          {c.rationale}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
                                 )}
                               </li>
                             );
@@ -1988,7 +2171,7 @@ function App() {
                             </div>
                           </div>
                           <div className="content-box content-box--rich">
-                            {renderContent(deliberatedReview)}
+                            {renderReview(deliberatedReview)}
                           </div>
                         </div>
                       )}
@@ -2008,7 +2191,7 @@ function App() {
                             </div>
                           </div>
                           <div className="content-box content-box--rich">
-                            {renderContent(review.content)}
+                            {renderReview(review.content)}
                           </div>
                         </div>
                       ))}
