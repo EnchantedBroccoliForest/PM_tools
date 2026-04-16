@@ -2110,6 +2110,29 @@ select.input optgroup {
   color: #1a7a2e;
 }
 
+/* Rigor routing gate */
+.App.theme-light .risk-gate__subheading--blocking {
+  color: #b91c1c;
+}
+
+.App.theme-light .risk-gate__subheading--review {
+  color: #92400e;
+}
+
+.App.theme-light .risk-gate__item {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.App.theme-light .risk-gate__category {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.App.theme-light .risk-gate__shared-banner {
+  background: rgba(0, 0, 0, 0.03);
+  border-left-color: rgba(0, 0, 0, 0.15);
+}
+
 /* Time display */
 .App.theme-light .time-display {
   background: rgba(139, 119, 90, 0.08);
@@ -2584,21 +2607,109 @@ select.input optgroup {
 /* Phase 5: routing gate extras (rendered inside the generic risk-gate
    wrapper so it inherits spacing and border styling automatically). */
 .risk-gate__subheading {
-  margin: 0.5rem 0 0.25rem 0;
-  font-size: 0.78rem;
+  margin: 0.75rem 0 0.35rem 0;
+  font-size: 0.8rem;
   font-weight: 600;
-  opacity: 0.8;
+  opacity: 0.9;
+}
+
+.risk-gate__subheading--blocking {
+  color: rgb(252, 165, 165);
+}
+
+.risk-gate__subheading--review {
+  color: rgb(253, 224, 71);
 }
 
 .risk-gate__list {
-  margin: 0 0 0.5rem 1rem;
+  margin: 0 0 0.5rem 0;
   padding: 0;
-  font-size: 0.78rem;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .risk-gate__list li {
-  margin: 0.2rem 0;
+  min-width: 0;
   word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.risk-gate__body code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  max-width: 100%;
+}
+
+.risk-gate__item {
+  padding: 0.5rem 0.65rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  word-break: break-word;
+}
+
+.risk-gate__category {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+  margin-bottom: 0.25rem;
+}
+
+.risk-gate__claim-text {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-1);
+  margin-top: 0.15rem;
+}
+
+.risk-gate__claim-text--faint {
+  color: var(--text-3);
+  font-style: italic;
+}
+
+.risk-gate__shared-banner {
+  margin: 0.25rem 0 0.6rem 0;
+  padding: 0.5rem 0.7rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.risk-gate__shared-title {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  margin-bottom: 0.25rem;
+}
+
+.risk-gate__shared-banner .risk-gate__reason-list {
+  margin-left: 0.75rem;
+}
+
+.risk-gate__reason-list {
+  margin: 0.3rem 0 0 0.75rem;
+  padding: 0;
+  list-style: disc;
+}
+
+.risk-gate__reason-item {
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--text-3);
+  margin: 0.1rem 0;
 }
 
 .risk-gate__reasons {

@@ -251,17 +251,28 @@ function parseRiskLevel(text) {
 
 function toSimpleRoutingReason(reason) {
   if (!reason) return '';
-  if (reason === 'verification hard_fail') return 'the checks found a serious failure';
-  if (reason === 'verification soft_fail') return 'the checks found a possible issue';
-  if (reason === 'draft contradicts claim') return 'the draft says the opposite of this claim';
-  if (reason === 'not covered by draft') return 'the draft does not clearly address this claim';
-  if (reason === 'cited URL did not resolve') return 'a cited link could not be opened';
-  if (reason === 'run has a global blocker criticism') return 'there is a run-level blocker that must be fixed';
+  if (reason === 'verification hard_fail') return 'Failed a verification check';
+  if (reason === 'verification soft_fail') return 'Flagged as a potential issue during verification';
+  if (reason === 'draft contradicts claim') return 'The draft contradicts this claim';
+  if (reason === 'not covered by draft') return 'Not clearly addressed in the draft';
+  if (reason === 'cited URL did not resolve') return 'A linked source could not be reached';
+  if (reason === 'run has a global blocker criticism') return 'A reviewer flagged a market-wide issue';
   const blockerMatch = reason.match(/^(\d+)\s+blocker criticism\(s\)$/);
-  if (blockerMatch) return `${blockerMatch[1]} blocker concern(s) were raised about this claim`;
+  if (blockerMatch) return `Reviewers raised ${blockerMatch[1]} blocking concern${blockerMatch[1] === '1' ? '' : 's'}`;
   const majorMatch = reason.match(/^(\d+)\s+major criticism\(s\)$/);
-  if (majorMatch) return `${majorMatch[1]} major concern(s) were raised about this claim`;
+  if (majorMatch) return `Reviewers raised ${majorMatch[1]} major concern${majorMatch[1] === '1' ? '' : 's'}`;
   return reason;
+}
+
+function humanReadableClaimCategory(claimId) {
+  if (!claimId) return '';
+  if (claimId.startsWith('claim.source')) return 'Resolution source';
+  if (claimId.startsWith('claim.threshold')) return 'Resolution rule';
+  if (claimId.startsWith('claim.mece')) return 'Outcome coverage';
+  if (claimId.startsWith('claim.edge')) return 'Edge case';
+  if (claimId.startsWith('claim.timing')) return 'Timing / deadline';
+  if (claimId.startsWith('claim.oracle')) return 'Oracle / data source';
+  return 'Claim';
 }
 
 function getSimpleBlockReasons(currentRun) {
@@ -1680,38 +1691,96 @@ function App() {
                       </div>
                       <div className="risk-gate__body">
                         <p className="risk-gate__hint">
-                          Rigor routing is a quick safety check that sorts claims into: okay, needs more review, or blocks finalize.
+                          These checks verify that the draft's claims — resolution sources, rules, edge cases — are consistent and well-supported.
                         </p>
                         {(() => {
                           const grouped = groupRoutingBySeverity(currentRun.routing);
                           const claimsById = new Map(currentRun.claims.map((c) => [c.id, c]));
-                          const render = (items) =>
-                            items.slice(0, 8).map((item) => {
-                              const claim = claimsById.get(item.claimId);
-                              return (
-                                <li key={item.claimId}>
-                                  <code>{item.claimId}</code>
-                                  {claim ? ` — ${claim.text}` : ''}
-                                  {item.reasons.length > 0 && (
-                                    <span className="risk-gate__reasons">
-                                      {' '}({item.reasons.map(toSimpleRoutingReason).join('; ')})
-                                    </span>
-                                  )}
-                                </li>
-                              );
-                            });
+
+                          // Pull out reasons that appear on EVERY item in a group —
+                          // these are universal signals (e.g. a global blocker
+                          // criticism) and are far more useful surfaced once at
+                          // the top than repeated on every card.
+                          const findSharedReasons = (items) => {
+                            if (items.length < 2) return new Set();
+                            const first = new Set(items[0].reasons || []);
+                            for (let i = 1; i < items.length; i++) {
+                              const cur = new Set(items[i].reasons || []);
+                              for (const r of first) {
+                                if (!cur.has(r)) first.delete(r);
+                              }
+                            }
+                            return first;
+                          };
+
+                          const renderCard = (item, shared) => {
+                            const claim = claimsById.get(item.claimId);
+                            const category = humanReadableClaimCategory(item.claimId);
+                            const uniqueReasons = (item.reasons || []).filter((r) => !shared.has(r));
+                            const hasText = claim && claim.text && claim.text.trim();
+                            // Drop cards that add nothing specific — no claim text AND no unique reasons.
+                            // The shared reasons banner already tells the user why they're flagged.
+                            if (!hasText && uniqueReasons.length === 0) return null;
+                            return (
+                              <li key={item.claimId} className="risk-gate__item">
+                                <span className="risk-gate__category">{category}</span>
+                                {hasText ? (
+                                  <span className="risk-gate__claim-text">{claim.text}</span>
+                                ) : (
+                                  <span className="risk-gate__claim-text risk-gate__claim-text--faint">
+                                    <code>{item.claimId}</code> (claim text unavailable)
+                                  </span>
+                                )}
+                                {uniqueReasons.length > 0 && (
+                                  <ul className="risk-gate__reason-list">
+                                    {uniqueReasons.map((r, i) => (
+                                      <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </li>
+                            );
+                          };
+
+                          const renderGroup = (items) => {
+                            const shared = findSharedReasons(items);
+                            const cards = items.slice(0, 12).map((item) => renderCard(item, shared)).filter(Boolean);
+                            return { shared, cards, hiddenCount: items.length - cards.length };
+                          };
+
+                          const renderSharedBanner = (shared, total) => {
+                            if (shared.size === 0) return null;
+                            return (
+                              <div className="risk-gate__shared-banner">
+                                <span className="risk-gate__shared-title">
+                                  Affecting all {total} flagged claim{total === 1 ? '' : 's'}:
+                                </span>
+                                <ul className="risk-gate__reason-list">
+                                  {Array.from(shared).map((r, i) => (
+                                    <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          };
+
+                          const blocking = renderGroup(grouped.blocking);
+                          const targeted = renderGroup(grouped.targeted_review);
+
                           return (
                             <>
                               {grouped.blocking.length > 0 && (
                                 <>
-                                  <p className="risk-gate__subheading">Blocking ({grouped.blocking.length}):</p>
-                                  <ul className="risk-gate__list">{render(grouped.blocking)}</ul>
+                                  <p className="risk-gate__subheading risk-gate__subheading--blocking">Must fix before finalizing ({grouped.blocking.length}):</p>
+                                  {renderSharedBanner(blocking.shared, grouped.blocking.length)}
+                                  {blocking.cards.length > 0 && <ul className="risk-gate__list">{blocking.cards}</ul>}
                                 </>
                               )}
                               {grouped.targeted_review.length > 0 && (
                                 <>
-                                  <p className="risk-gate__subheading">Needs targeted review ({grouped.targeted_review.length}):</p>
-                                  <ul className="risk-gate__list">{render(grouped.targeted_review)}</ul>
+                                  <p className="risk-gate__subheading risk-gate__subheading--review">Worth reviewing ({grouped.targeted_review.length}):</p>
+                                  {renderSharedBanner(targeted.shared, grouped.targeted_review.length)}
+                                  {targeted.cards.length > 0 && <ul className="risk-gate__list">{targeted.cards}</ul>}
                                 </>
                               )}
                             </>
