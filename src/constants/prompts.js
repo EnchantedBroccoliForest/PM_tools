@@ -327,6 +327,11 @@ RULES:
   - Do not merge claims. If the draft says "X and Y", emit two claims.
   - Indices start at 0 and are contiguous within a category.
   - If a field is missing from the draft, OMIT the corresponding claim rather than inventing one.
+  - RANGE / BUCKET WIN CONDITIONS ARE A SINGLE ATOMIC CLAIM — do NOT split and do NOT drop a bound.
+    If the outcome wins on a bounded range (e.g. "$50M ≤ FDV < $200M", "wins if score is between 10 and 20",
+    "wins for bucket [A, B)"), emit the ENTIRE range as one claim. Keep both bounds and the inclusivity
+    (≤ vs <) exactly as written. An outcome_win claim for a range MUST mention both bounds. Dropping the
+    upper or lower bound silently changes the resolution condition and is forbidden.
 
 DRAFT:
 ${draftContent}`;

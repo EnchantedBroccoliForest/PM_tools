@@ -43,6 +43,15 @@ import {
 } from '../constants/prompts.js';
 import { BatchEntailmentResponseSchema } from '../types/run.js';
 
+/**
+ * Max completion tokens for the batched entailment verifier. Needs to be
+ * generous because the prompt asks for one JSON object per claim (~50–80
+ * tokens each of rationale); with 40+ claims a 3000-token cap truncates the
+ * response and fails JSON parsing, which then falls back to "not_covered"
+ * for every claim and produces a wall of false routing flags.
+ */
+const ENTAILMENT_VERIFIER_MAX_TOKENS = 8000;
+
 /** Shared JSON salvage helper — same logic as other pipelines. */
 function tryParseJson(text) {
   if (typeof text !== 'string') return null;
@@ -224,9 +233,14 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
   };
 
   const buildStructuralOnlyFallback = (logEntry) => ({
+    // When entailment fails entirely we have NO signal about whether the
+    // draft covers each claim. Marking every claim 'not_covered' would
+    // fan out to the routing panel as a false "not clearly addressed"
+    // flag on every claim, drowning the real issues. 'not_applicable'
+    // is the correct no-signal state — scoreClaim ignores it.
     verifications: claims.map((c) => {
       const s = structuralById.get(c.id);
-      return { ...s, entailment: 'not_covered' };
+      return { ...s, entailment: 'not_applicable' };
     }),
     usage: aggregate.usage,
     wallClockMs: aggregate.wallClockMs,
@@ -241,7 +255,7 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
         { role: 'system', content: SYSTEM_PROMPTS.entailmentVerifier },
         { role: 'user', content: buildBatchEntailmentPrompt(claims, draftContent) },
       ],
-      { temperature: 0.1, maxTokens: 3000 }
+      { temperature: 0.1, maxTokens: ENTAILMENT_VERIFIER_MAX_TOKENS }
     );
     accumulate(r);
     raw = r.content;
