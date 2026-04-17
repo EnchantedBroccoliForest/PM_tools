@@ -238,7 +238,12 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
   }
 
   let parsed = tryParseJsonArray(raw);
-  let validated = parsed && BatchEntailmentResponseSchema.safeParse(parsed.data);
+  // A truncation-recovered parse only contains the leading prefix of the
+  // entailment array; accepting it would silently mark every trailing
+  // claim as not_covered. Force the strict retry instead so the verifier
+  // gets a chance to return a complete response.
+  let validated = parsed && !parsed.recovered
+    && BatchEntailmentResponseSchema.safeParse(parsed.data);
 
   // Attempt 2 — strict retry
   if (!validated || !validated.success) {
@@ -256,6 +261,8 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
       );
       accumulate(r2);
       parsed = tryParseJsonArray(r2.content);
+      // On the retry, a recovered prefix is better than nothing — but we
+      // still surface the drop via the log entry built below.
       validated = parsed && BatchEntailmentResponseSchema.safeParse(parsed.data);
     } catch (err) {
       return buildStructuralOnlyFallback({
