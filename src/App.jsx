@@ -689,11 +689,8 @@ function App() {
       });
 
       // Real Criticism records from every successful reviewer go into the
-      // Run artifact. Snapshot the pre-dispatch run so the routing
-      // computation below operates on a concrete, non-stale value.
-      const priorRun = currentRunRef.current;
+      // Run artifact. Phase 1's synthetic projection is gone.
       const allCriticisms = successful.flatMap((r) => r.criticisms);
-      const combinedCriticisms = [...(priorRun?.criticisms || []), ...allCriticisms];
       if (allCriticisms.length > 0) {
         dispatch({ type: 'RUN_APPEND_CRITICISMS', criticisms: allCriticisms });
       }
@@ -730,14 +727,21 @@ function App() {
       // pre-review routing (from runClaimExtractorAndRecord) was computed
       // off an empty criticism list; recomputing here lets blocker/major
       // criticisms promote a claim into 'blocking' or 'targeted_review'
-      // so the Accept gate sees them immediately. `combinedCriticisms`
-      // was captured above, before the append dispatch, so there is no
-      // race with React's re-render schedule.
+      // so the Accept gate sees them immediately.
+      //
+      // Read claims/verification/evidence from the freshest ref, not a
+      // pre-await snapshot — a background runClaimExtractorAndRecord
+      // started by handleDraft/handleUpdate may have finished during the
+      // aggregate() await above and published new verify/evidence state.
+      // Union allCriticisms in explicitly because the RUN_APPEND_CRITICISMS
+      // dispatched above may not have flushed through to the ref yet.
+      const latestRun = currentRunRef.current;
+      const combinedCriticisms = [...(latestRun?.criticisms || []), ...allCriticisms];
       const routing = routeClaims({
-        claims: priorRun?.claims || [],
-        verifications: priorRun?.verification || [],
+        claims: latestRun?.claims || [],
+        verifications: latestRun?.verification || [],
         criticisms: combinedCriticisms,
-        evidence: priorRun?.evidence || [],
+        evidence: latestRun?.evidence || [],
       });
       dispatch({ type: 'RUN_SET_ROUTING', routing });
     } catch (err) {
