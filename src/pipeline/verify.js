@@ -84,8 +84,13 @@ export function structuralCheck(claim) {
     case 'timestamp': {
       // Require an ISO-8601-ish date OR a time-of-day pattern. We allow
       // both because start/end claims can legitimately be just a date.
-      const hasIsoDate = /\d{4}-\d{2}-\d{2}/.test(claim.text);
-      const hasTime = /\d{1,2}:\d{2}/.test(claim.text);
+      // Components are range-checked (months 01-12, days 01-31, hours
+      // 00-23, minutes/seconds 00-59) so obvious garbage like "1234-99-99"
+      // or "ratio 3:14" fails structurally. Word boundaries are avoided
+      // because real ISO strings run digits straight into the `T` (e.g.
+      // "2027-01-01T00:00:00Z"), which isn't a regex word boundary.
+      const hasIsoDate = /\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])/.test(claim.text);
+      const hasTime = /([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?/.test(claim.text);
       if (!hasIsoDate && !hasTime) {
         return {
           ...base,

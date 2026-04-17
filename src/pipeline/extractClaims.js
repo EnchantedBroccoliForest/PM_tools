@@ -36,10 +36,8 @@ const CLAIM_EXTRACTION_MAX_TOKENS = 8000;
 function tryParseJson(text) {
   if (typeof text !== 'string') return null;
   const trimmed = text.trim();
-  // Strip ```json ... ``` fences.
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   const candidate = fenced ? fenced[1] : trimmed;
-  // As a final salvage, clip to the outermost [ ... ] if there is leading prose.
   const bracketed = candidate.match(/\[[\s\S]*\]/);
   const exact = bracketed ? bracketed[0] : candidate;
   try {
@@ -48,30 +46,42 @@ function tryParseJson(text) {
     // fall through to truncation recovery
   }
 
-  // RECOVERY: if the model hit max_tokens, the JSON array may be truncated
-  // mid-object. Walk backwards through } positions and try JSON.parse at
-  // each one until we find a valid cut point. This avoids the pitfall of
-  // lastIndexOf('}') matching a } inside a string value.
-  //
-  // Anchor to `exact` (the already-clipped slice) rather than raw
-  // `candidate`, so leading prose with stray brackets (e.g. "[note]")
-  // doesn't cause recovery to start from the wrong position.
-  const source = exact;
-  const arrayStart = source.indexOf('[');
+  // RECOVERY: the outer array is truncated mid-element. Scan once, tracking
+  // quote/escape state so `}` inside a JSON string value is ignored. Record
+  // positions where depth returns from 2 to 1 — those are end-of-element
+  // boundaries in the top-level array — and try them from last to first.
+  // This bounds parse attempts by the number of top-level objects rather
+  // than every `}` character.
+  const arrayStart = exact.indexOf('[');
   if (arrayStart === -1) return null;
+  const src = exact.slice(arrayStart);
 
-  const truncated = source.slice(arrayStart);
-  let pos = truncated.length - 1;
+  const cuts = [];
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (escape) { escape = false; continue; }
+    if (inString) {
+      if (ch === '\\') escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === '{' || ch === '[') depth++;
+    else if (ch === '}' || ch === ']') {
+      depth--;
+      if (ch === '}' && depth === 1) cuts.push(i);
+    }
+  }
 
-  while (pos >= 0) {
-    pos = truncated.lastIndexOf('}', pos);
-    if (pos === -1) break;
-
-    const slice = truncated.slice(0, pos + 1).replace(/,\s*$/, '') + ']';
+  for (let i = cuts.length - 1; i >= 0; i--) {
+    const slice = src.slice(0, cuts[i] + 1).replace(/,\s*$/, '') + ']';
     try {
       return { data: JSON.parse(slice), recovered: true };
     } catch {
-      pos -= 1; // try the next } to the left
+      // try an earlier cut
     }
   }
 

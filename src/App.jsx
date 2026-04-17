@@ -689,8 +689,11 @@ function App() {
       });
 
       // Real Criticism records from every successful reviewer go into the
-      // Run artifact. Phase 1's synthetic projection is gone.
+      // Run artifact. Snapshot the pre-dispatch run so the routing
+      // computation below operates on a concrete, non-stale value.
+      const priorRun = currentRunRef.current;
       const allCriticisms = successful.flatMap((r) => r.criticisms);
+      const combinedCriticisms = [...(priorRun?.criticisms || []), ...allCriticisms];
       if (allCriticisms.length > 0) {
         dispatch({ type: 'RUN_APPEND_CRITICISMS', criticisms: allCriticisms });
       }
@@ -727,19 +730,14 @@ function App() {
       // pre-review routing (from runClaimExtractorAndRecord) was computed
       // off an empty criticism list; recomputing here lets blocker/major
       // criticisms promote a claim into 'blocking' or 'targeted_review'
-      // so the Accept gate sees them immediately.
-      const latestRun = currentRunRef.current;
-      const latestClaims = latestRun?.claims || [];
-      const latestVerifs = latestRun?.verification || [];
-      const latestEvidence = latestRun?.evidence || [];
-      // The newly-appended criticisms aren't yet on the ref (dispatch is
-      // async w.r.t. re-render), so union them in explicitly.
-      const combinedCriticisms = [...(latestRun?.criticisms || []), ...allCriticisms];
+      // so the Accept gate sees them immediately. `combinedCriticisms`
+      // was captured above, before the append dispatch, so there is no
+      // race with React's re-render schedule.
       const routing = routeClaims({
-        claims: latestClaims,
-        verifications: latestVerifs,
+        claims: priorRun?.claims || [],
+        verifications: priorRun?.verification || [],
         criticisms: combinedCriticisms,
-        evidence: latestEvidence,
+        evidence: priorRun?.evidence || [],
       });
       dispatch({ type: 'RUN_SET_ROUTING', routing });
     } catch (err) {
@@ -1745,7 +1743,7 @@ function App() {
                           const renderGroup = (items) => {
                             const shared = findSharedReasons(items);
                             const cards = items.slice(0, 12).map((item) => renderCard(item, shared)).filter(Boolean);
-                            return { shared, cards, hiddenCount: items.length - cards.length };
+                            return { shared, cards };
                           };
 
                           const renderSharedBanner = (shared, total) => {

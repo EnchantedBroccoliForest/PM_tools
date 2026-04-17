@@ -423,7 +423,7 @@ function buildGates(run, riskLevel) {
  * @param {'none'|'retrieval'} [config.options.evidence]
  * @param {'off'|'partial'|'full'} [config.options.verifiers]
  * @param {string} [config.options.humanFeedback]
- * @param {boolean} [config.options.skipUpdate]
+ * @param {boolean} [config.options.skipReview]   stop after claim pipeline, before review + update
  * @param {boolean} [config.options.skipFinalize]
  * @param {object} [config.callbacks]
  * @param {(stage:string)=>void} [config.callbacks.onStageStart]
@@ -459,7 +459,7 @@ async function _orchestrateInner(config, signal) {
     evidence: optionsRaw?.evidence || DEFAULT_OPTIONS.evidence,
     verifiers: optionsRaw?.verifiers || DEFAULT_OPTIONS.verifiers,
     humanFeedback: optionsRaw?.humanFeedback || undefined,
-    skipUpdate: !!optionsRaw?.skipUpdate,
+    skipReview: !!optionsRaw?.skipReview,
     skipFinalize: !!optionsRaw?.skipFinalize,
   };
 
@@ -541,7 +541,7 @@ async function _orchestrateInner(config, signal) {
   }
 
   // --- 3. Escalation gate + Review ---
-  if (options.skipUpdate) {
+  if (options.skipReview) {
     // Stop after initial draft + claim pipeline.
     run.status = 'partial';
     run.cost = cost.snapshot();
