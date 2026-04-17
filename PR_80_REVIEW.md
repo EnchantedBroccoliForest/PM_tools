@@ -1,35 +1,52 @@
 # PR #80 Review Notes
 
-Date: 2026-04-17
+Date: 2026-04-17 (updated after follow-up commits)
 Reviewer: Codex agent
 
 ## Scope
-Reviewed the proposed changes on GitHub for:
+Reviewed the updated PR on GitHub:
 `https://github.com/EnchantedBroccoliForest/42_creator_tool/pull/80`
 
-## High-risk finding
+Follow-up commits reviewed:
+- `5169765` — Force entailment strict retry on truncation-recovered first pass
+- `c7659f3` — Allow mixed-case subfields in `ClaimSchema.id` regex
 
-### 1) Claim ID regex likely rejects existing valid IDs (potential data loss)
-**Severity:** High
+## Status
 
-PR #80 introduces a stricter `ClaimSchema.id` regex:
+✅ **No remaining high-risk blockers identified in the new edits.**
 
-- New pattern: `^claim\.[a-z_]+\.[a-z0-9_]+(?:\.[a-z0-9_]+)*$`
+## Previously reported risk: resolved
 
-This disallows uppercase letters in slug segments.
+### 1) Claim ID regex rejected camelCase subfields (previously High)
+**Previous concern:** `ClaimSchema.id` accepted only lowercase slug segments and could reject IDs such as `claim.outcome.0.resolutionCriteria`, causing claim drops.
 
-However, existing in-code examples include camelCase claim IDs, e.g.:
+**What changed in `c7659f3`:**
+- Regex was relaxed from:
+  - `^claim\.[a-z_]+\.[a-z0-9_]+(?:\.[a-z0-9_]+)*$`
+- To:
+  - `^claim\.[a-z_]+\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$`
+- A regression test was added (`src/types/run.test.js`) to ensure camelCase subfields remain valid.
 
-- `claim.outcome.0.resolutionCriteria`
+**Assessment:** This directly addresses the reported incompatibility and removes the primary data-loss risk.
 
-That ID contains uppercase `C`, which is now invalid under the new regex. If extractor/verifier output (or historical fixtures/runs) still uses camelCase segments, valid claims will be dropped during validation. In this PR, extraction now validates claims individually and drops invalid entries, so this can silently reduce claim coverage and increase downstream `not_covered`/routing noise.
+## Additional sanity check on new fix
 
-**Recommendation:**
-- Either relax regex slug segment to allow uppercase (`[A-Za-z0-9_]+`),
-- or ensure prompts and all fixtures are normalized to lowercase claim IDs before this lands.
-- Add a targeted regression test with `claim.outcome.0.resolutionCriteria` to prevent accidental breakage.
+### 2) Truncation-recovered verifier output now forces strict retry (good fix)
+Commit `5169765` updates verification flow so a prefix-only, truncation-recovered array is **not** accepted as a complete first-pass verifier result. Instead, it falls through to strict retry.
 
-## Additional review notes
+**Why this matters:** prevents silent partial-entailment acceptance that could mark trailing claims as `not_covered` and skew routing/finalization.
 
-- Could not check out PR branch in local git due network restrictions in this environment (`CONNECT tunnel failed, response 403` from git fetch).
-- Review was performed from GitHub web/raw file views.
+**Assessment:** Directionally correct and reduces false negatives in entailment coverage.
+
+## Residual risk / follow-up suggestions (non-blocking)
+
+- Consider adding (or confirming) a targeted test in `verify` covering:
+  1. first pass returns `parsed.recovered === true`,
+  2. strict retry returns complete data,
+  3. no trailing claims are incorrectly defaulted to `not_covered`.
+
+This is a confidence improvement, not a blocker.
+
+## Environment note
+
+- Local checkout/fetch of PR branch was not available in this environment; review was performed from the GitHub PR commit views.
