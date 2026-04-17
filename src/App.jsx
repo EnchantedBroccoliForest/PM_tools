@@ -728,18 +728,20 @@ function App() {
       // off an empty criticism list; recomputing here lets blocker/major
       // criticisms promote a claim into 'blocking' or 'targeted_review'
       // so the Accept gate sees them immediately.
+      //
+      // Read claims/verification/evidence from the freshest ref, not a
+      // pre-await snapshot — a background runClaimExtractorAndRecord
+      // started by handleDraft/handleUpdate may have finished during the
+      // aggregate() await above and published new verify/evidence state.
+      // Union allCriticisms in explicitly because the RUN_APPEND_CRITICISMS
+      // dispatched above may not have flushed through to the ref yet.
       const latestRun = currentRunRef.current;
-      const latestClaims = latestRun?.claims || [];
-      const latestVerifs = latestRun?.verification || [];
-      const latestEvidence = latestRun?.evidence || [];
-      // The newly-appended criticisms aren't yet on the ref (dispatch is
-      // async w.r.t. re-render), so union them in explicitly.
       const combinedCriticisms = [...(latestRun?.criticisms || []), ...allCriticisms];
       const routing = routeClaims({
-        claims: latestClaims,
-        verifications: latestVerifs,
+        claims: latestRun?.claims || [],
+        verifications: latestRun?.verification || [],
         criticisms: combinedCriticisms,
-        evidence: latestEvidence,
+        evidence: latestRun?.evidence || [],
       });
       dispatch({ type: 'RUN_SET_ROUTING', routing });
     } catch (err) {
@@ -1745,7 +1747,7 @@ function App() {
                           const renderGroup = (items) => {
                             const shared = findSharedReasons(items);
                             const cards = items.slice(0, 12).map((item) => renderCard(item, shared)).filter(Boolean);
-                            return { shared, cards, hiddenCount: items.length - cards.length };
+                            return { shared, cards };
                           };
 
                           const renderSharedBanner = (shared, total) => {

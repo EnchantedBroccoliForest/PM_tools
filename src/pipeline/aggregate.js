@@ -114,19 +114,12 @@ function applyMajority(checklist) {
     }
     const max = Math.max(tally.yes, tally.no, tally.unsure);
     const winners = Object.entries(tally).filter(([, c]) => c === max).map(([k]) => k);
-    let decision;
-    if (winners.length === 1) {
-      decision =
-        winners[0] === 'yes' ? 'pass' : winners[0] === 'no' ? 'fail' : 'escalate';
-    } else if (winners.includes('unsure')) {
-      decision = 'escalate';
-    } else if (winners.includes('yes') && winners.includes('no')) {
-      // Pure yes/no tie → escalate rather than silently passing; this
-      // surfaces the disagreement to the human instead of hiding it.
-      decision = 'escalate';
-    } else {
-      decision = 'escalate';
-    }
+    // Single winner → decide by its verdict. Any tie (pure yes/no or anything
+    // involving unsure) escalates so the disagreement reaches the human
+    // instead of being silently resolved.
+    const decision = winners.length === 1
+      ? (winners[0] === 'yes' ? 'pass' : winners[0] === 'no' ? 'fail' : 'escalate')
+      : 'escalate';
     return { ...item, decision };
   });
 }

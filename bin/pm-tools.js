@@ -221,7 +221,7 @@ async function cmdDraft(values, stdinConfig) {
       aggregation: values.aggregation || baseOptions.aggregation,
       escalation: values.escalation || baseOptions.escalation,
       humanFeedback: values.feedback || baseOptions.humanFeedback,
-      skipUpdate: values['no-review'] || baseOptions.skipUpdate,
+      skipReview: values['no-review'] || baseOptions.skipReview,
       skipFinalize: values['no-finalize'] || baseOptions.skipFinalize,
       xapiEnrich: values['xapi-enrich'] || baseOptions.xapiEnrich || false,
     },
