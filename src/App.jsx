@@ -23,8 +23,9 @@ import { gatherEvidence } from './pipeline/gatherEvidence';
 import { routeClaims, groupRoutingBySeverity } from './pipeline/route';
 import { checkResolutionSources } from './pipeline/checkSources';
 import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
-import { parseRun } from './types/run';
+import { parseRun, GLOBAL_CLAIM_ID } from './types/run';
 import { DRAFT_MAX_TOKENS } from './defaults';
+import { parseRiskLevel } from './util/riskLevel';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
@@ -239,16 +240,6 @@ function buildReferenceFromIdea(idea) {
   return (idea.rest || idea.rawText || '').trim();
 }
 
-// Parse the risk level out of the early-resolution analyst response. The
-// prompt instructs the model to begin with "Risk rating: Low/Medium/High" —
-// anything else falls back to 'unknown', which does NOT block the gate (only
-// confirmed HIGH blocks).
-function parseRiskLevel(text) {
-  if (typeof text !== 'string' || text.length === 0) return 'unknown';
-  const match = text.match(/risk\s*rating\s*[:-]?\s*(low|medium|high)/i);
-  return match ? match[1].toLowerCase() : 'unknown';
-}
-
 function toSimpleRoutingReason(reason) {
   if (!reason) return '';
   if (reason === 'verification hard_fail') return 'Failed a verification check';
@@ -285,7 +276,7 @@ function getSimpleBlockReasons(currentRun) {
     }
   }
 
-  if ((currentRun?.criticisms || []).some((c) => c.claimId === 'global' && c.severity === 'blocker')) {
+  if ((currentRun?.criticisms || []).some((c) => c.claimId === GLOBAL_CLAIM_ID && c.severity === 'blocker')) {
     reasons.add('a blocker applies to the whole run');
   }
   return Array.from(reasons);
@@ -415,7 +406,10 @@ function App() {
 
   const formatUTCDateHint = (dateString, suffix) => {
     if (!dateString) return null;
-    const parsed = new Date(`${dateString}T${suffix}`);
+    // Append 'Z' so the string is parsed as UTC, not local time. Without it
+    // `new Date('2026-06-01T00:00:00')` is taken as local time and the
+    // resulting ISO string shifts by the viewer's timezone offset.
+    const parsed = new Date(`${dateString}T${suffix}Z`);
     if (Number.isNaN(parsed.getTime())) return null;
     return parsed.toISOString().replace('T', ' ').slice(0, -5);
   };
@@ -1823,29 +1817,16 @@ function App() {
                   {hasUpdated && (loading === 'source-accessibility' || sourceAccessibility) && (() => {
                     const status = sourceAccessibility?.status || null;
                     const isChecking = loading === 'source-accessibility';
-                    const gateLevel =
-                      status === 'ok'
-                        ? 'low'
-                        : status === 'all_unreachable'
-                          ? 'high'
-                          : status === 'some_unreachable'
-                            ? 'medium'
-                            : status === 'error' || status === 'no_sources'
-                              ? 'unknown'
-                              : 'checking';
-                    const levelLabel = isChecking
-                      ? null
-                      : status === 'ok'
-                        ? 'REACHABLE'
-                        : status === 'all_unreachable'
-                          ? 'ALL UNREACHABLE'
-                          : status === 'some_unreachable'
-                            ? 'PARTIAL'
-                            : status === 'no_sources'
-                              ? 'NO SOURCES'
-                              : status === 'error'
-                                ? 'ERROR'
-                                : 'UNKNOWN';
+                    const STATUS_META = {
+                      ok:               { level: 'low',     label: 'REACHABLE' },
+                      some_unreachable: { level: 'medium',  label: 'PARTIAL' },
+                      all_unreachable:  { level: 'high',    label: 'ALL UNREACHABLE' },
+                      no_sources:       { level: 'unknown', label: 'NO SOURCES' },
+                      error:            { level: 'unknown', label: 'ERROR' },
+                    };
+                    const meta = STATUS_META[status] || { level: 'checking', label: 'UNKNOWN' };
+                    const gateLevel = meta.level;
+                    const levelLabel = isChecking ? null : meta.label;
                     const originLabel = (origin) => {
                       if (origin === 'source_claim') return 'source claim';
                       if (origin === 'resolution_section') return 'resolution section';

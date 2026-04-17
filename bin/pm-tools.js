@@ -295,7 +295,7 @@ async function cmdDraft(values, stdinConfig) {
 async function cmdIdeate(values) {
   const { queryModel } = await import('../src/api/openrouter.js');
   const { SYSTEM_PROMPTS, buildIdeatePrompt } = await import('../src/constants/prompts.js');
-  const { DEFAULT_DRAFTER_MODEL } = await import('../src/defaults.js');
+  const { DEFAULT_DRAFT_MODEL } = await import('../src/defaults.js');
 
   const direction = values.direction || values.question;
   if (!direction) {
@@ -304,7 +304,7 @@ async function cmdIdeate(values) {
     process.exit(2);
   }
 
-  const model = values.drafter || DEFAULT_DRAFTER_MODEL;
+  const model = values.drafter || DEFAULT_DRAFT_MODEL;
   if (values.verbose) {
     process.stderr.write(`[ideate] model=${model}\n`);
   }
@@ -323,7 +323,7 @@ async function cmdIdeate(values) {
 async function cmdValidate(values) {
   const { extractClaims } = await import('../src/pipeline/extractClaims.js');
   const { verifyClaims } = await import('../src/pipeline/verify.js');
-  const { DEFAULT_DRAFTER_MODEL } = await import('../src/defaults.js');
+  const { DEFAULT_DRAFT_MODEL } = await import('../src/defaults.js');
 
   // Read a Run from stdin or --output file.
   let runJson;
@@ -345,7 +345,7 @@ async function cmdValidate(values) {
     process.exit(2);
   }
 
-  const model = values.drafter || DEFAULT_DRAFTER_MODEL;
+  const model = values.drafter || DEFAULT_DRAFT_MODEL;
   if (values.verbose) {
     process.stderr.write(`[validate] extracting claims with ${model}...\n`);
   }

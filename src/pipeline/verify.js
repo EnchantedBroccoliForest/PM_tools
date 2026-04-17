@@ -42,21 +42,7 @@ import {
   buildStrictBatchEntailmentRetryPrompt,
 } from '../constants/prompts.js';
 import { BatchEntailmentResponseSchema } from '../types/run.js';
-
-/** Shared JSON salvage helper — same logic as other pipelines. */
-function tryParseJson(text) {
-  if (typeof text !== 'string') return null;
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  const candidate = fenced ? fenced[1] : trimmed;
-  const bracketed = candidate.match(/\[[\s\S]*\]/);
-  const final = bracketed ? bracketed[0] : candidate;
-  try {
-    return JSON.parse(final);
-  } catch {
-    return null;
-  }
-}
+import { tryParseJsonArray, createUsageAggregator } from './llmJson.js';
 
 /**
  * Structural verifier. Pure function, no I/O. Returns a partially-filled
@@ -220,13 +206,7 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
   }
 
   // Batched entailment pass.
-  const aggregate = { usage: { ...emptyUsage }, wallClockMs: 0 };
-  const accumulate = (r) => {
-    aggregate.usage.promptTokens += r.usage.promptTokens;
-    aggregate.usage.completionTokens += r.usage.completionTokens;
-    aggregate.usage.totalTokens += r.usage.totalTokens;
-    aggregate.wallClockMs += r.wallClockMs;
-  };
+  const { aggregate, accumulate } = createUsageAggregator();
 
   const buildStructuralOnlyFallback = (logEntry) => ({
     verifications: claims.map((c) => {
@@ -257,8 +237,13 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
     });
   }
 
-  let parsed = tryParseJson(raw);
-  let validated = parsed && BatchEntailmentResponseSchema.safeParse(parsed);
+  let parsed = tryParseJsonArray(raw);
+  // A truncation-recovered parse only contains the leading prefix of the
+  // entailment array; accepting it would silently mark every trailing
+  // claim as not_covered. Force the strict retry instead so the verifier
+  // gets a chance to return a complete response.
+  let validated = parsed && !parsed.recovered
+    && BatchEntailmentResponseSchema.safeParse(parsed.data);
 
   // Attempt 2 — strict retry
   if (!validated || !validated.success) {
@@ -275,8 +260,10 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
         { temperature: 0.05, maxTokens: 3000 }
       );
       accumulate(r2);
-      parsed = tryParseJson(r2.content);
-      validated = parsed && BatchEntailmentResponseSchema.safeParse(parsed);
+      parsed = tryParseJsonArray(r2.content);
+      // On the retry, a recovered prefix is better than nothing — but we
+      // still surface the drop via the log entry built below.
+      validated = parsed && BatchEntailmentResponseSchema.safeParse(parsed.data);
     } catch (err) {
       return buildStructuralOnlyFallback({
         level: 'error',

@@ -28,22 +28,7 @@ import {
   buildStrictStructuredReviewRetryPrompt,
 } from '../constants/prompts.js';
 import { StructuredReviewResponseSchema } from '../types/run.js';
-
-/** Same JSON salvage logic as the claim extractor — see extractClaims.js. */
-function tryParseJson(text) {
-  if (typeof text !== 'string') return null;
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  const candidate = fenced ? fenced[1] : trimmed;
-  // Salvage to the outermost { ... } if there is leading prose.
-  const braced = candidate.match(/\{[\s\S]*\}/);
-  const final = braced ? braced[0] : candidate;
-  try {
-    return JSON.parse(final);
-  } catch {
-    return null;
-  }
-}
+import { tryParseJsonObject, createUsageAggregator } from './llmJson.js';
 
 /**
  * @typedef {Object} StructuredReviewResult
@@ -71,16 +56,7 @@ function tryParseJson(text) {
  */
 export async function runStructuredReview(model, draftContent, rubric, numberOfOutcomes = '') {
   const rubricIds = new Set(rubric.map((r) => r.id));
-  const aggregate = {
-    usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-    wallClockMs: 0,
-  };
-  const accumulate = (result) => {
-    aggregate.usage.promptTokens += result.usage.promptTokens;
-    aggregate.usage.completionTokens += result.usage.completionTokens;
-    aggregate.usage.totalTokens += result.usage.totalTokens;
-    aggregate.wallClockMs += result.wallClockMs;
-  };
+  const { aggregate, accumulate } = createUsageAggregator();
 
   // Attempt 1
   let raw;
@@ -111,7 +87,7 @@ export async function runStructuredReview(model, draftContent, rubric, numberOfO
     };
   }
 
-  let parsed = tryParseJson(raw);
+  let parsed = tryParseJsonObject(raw);
   let validated = parsed && StructuredReviewResponseSchema.safeParse(parsed);
 
   // Attempt 2 — strict retry
@@ -129,7 +105,7 @@ export async function runStructuredReview(model, draftContent, rubric, numberOfO
         { temperature: 0.2, maxTokens: 3000 }
       );
       accumulate(r2);
-      parsed = tryParseJson(r2.content);
+      parsed = tryParseJsonObject(r2.content);
       validated = parsed && StructuredReviewResponseSchema.safeParse(parsed);
     } catch (err) {
       return {

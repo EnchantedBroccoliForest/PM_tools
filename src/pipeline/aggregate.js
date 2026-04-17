@@ -33,21 +33,7 @@ import {
   buildStrictJudgeAggregatorRetryPrompt,
 } from '../constants/prompts.js';
 import { JudgeAggregatorResponseSchema } from '../types/run.js';
-
-/** Best-effort JSON extraction; same helper as other pipelines. */
-function tryParseJson(text) {
-  if (typeof text !== 'string') return null;
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  const candidate = fenced ? fenced[1] : trimmed;
-  const braced = candidate.match(/\{[\s\S]*\}/);
-  const final = braced ? braced[0] : candidate;
-  try {
-    return JSON.parse(final);
-  } catch {
-    return null;
-  }
-}
+import { tryParseJsonObject, createUsageAggregator } from './llmJson.js';
 
 /**
  * Group reviewer votes by rubric id and build a ChecklistItem list in the
@@ -198,16 +184,7 @@ export function aggregateUnanimity(rubric, allVotes) {
  */
 export async function aggregateJudge(rubric, allVotes, judgeModelId) {
   const baseline = aggregateMajority(rubric, allVotes);
-  const aggregate = {
-    usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-    wallClockMs: 0,
-  };
-  const accumulate = (r) => {
-    aggregate.usage.promptTokens += r.usage.promptTokens;
-    aggregate.usage.completionTokens += r.usage.completionTokens;
-    aggregate.usage.totalTokens += r.usage.totalTokens;
-    aggregate.wallClockMs += r.wallClockMs;
-  };
+  const { aggregate, accumulate } = createUsageAggregator();
 
   let raw;
   try {
@@ -240,7 +217,7 @@ export async function aggregateJudge(rubric, allVotes, judgeModelId) {
     };
   }
 
-  let parsed = tryParseJson(raw);
+  let parsed = tryParseJsonObject(raw);
   let validated = parsed && JudgeAggregatorResponseSchema.safeParse(parsed);
 
   if (!validated || !validated.success) {
@@ -257,7 +234,7 @@ export async function aggregateJudge(rubric, allVotes, judgeModelId) {
         { temperature: 0.1, maxTokens: 1500 }
       );
       accumulate(r2);
-      parsed = tryParseJson(r2.content);
+      parsed = tryParseJsonObject(r2.content);
       validated = parsed && JudgeAggregatorResponseSchema.safeParse(parsed);
     } catch (err) {
       return {

@@ -559,5 +559,3 @@ function rehydrateFromRun(state, run) {
 export function useMarketReducer() {
   return useReducer(reducer, initialState);
 }
-
-export { initialState };
