@@ -14,18 +14,11 @@ const LEGACY_API_KEY_ENV = 'VITE_OPENAI_API_KEY';
 // Pull env variables from whatever environment we happen to be running in.
 // In Vite (browser) that's `import.meta.env`; when this module is imported
 // from Node (eval harness, CLI tools) `import.meta.env` is undefined and we
-// fall back to `process.env`. Guarded at access time so both environments
-// can `import` this module without throwing.
+// fall back to `process.env`.
 function readEnv(key) {
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key] != null) {
-      return import.meta.env[key];
-    }
-  } catch {
-    // `import.meta.env` access in some bundlers throws instead of returning
-    // undefined — swallow and fall through to process.env.
-  }
-  if (typeof process !== 'undefined' && process.env && process.env[key] != null) {
+  const viteEnv = import.meta.env;
+  if (viteEnv && viteEnv[key] != null) return viteEnv[key];
+  if (typeof process !== 'undefined' && process.env?.[key] != null) {
     return process.env[key];
   }
   return undefined;

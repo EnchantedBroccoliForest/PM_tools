@@ -29,12 +29,9 @@ const AT_MENTION_REGEX = /(?:^|\s)@([A-Za-z0-9_]{1,15})\b/g;
 // ------------------------------------------------------------------- env
 
 function readEnv(key) {
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key] != null) {
-      return import.meta.env[key];
-    }
-  } catch { /* swallow */ }
-  if (typeof process !== 'undefined' && process.env && process.env[key] != null) {
+  const viteEnv = import.meta.env;
+  if (viteEnv && viteEnv[key] != null) return viteEnv[key];
+  if (typeof process !== 'undefined' && process.env?.[key] != null) {
     return process.env[key];
   }
   return undefined;
@@ -56,10 +53,14 @@ function readConfigFile() {
     const fs = nodeRequire('fs');
     const path = nodeRequire('path');
     const home = process.env.HOME || process.env.USERPROFILE || '';
-    const raw = fs.readFileSync(path.join(home, '.xapi', 'config.json'), 'utf8');
+    const configPath = path.join(home, '.xapi', 'config.json');
+    if (!fs.existsSync(configPath)) return null;
+    const raw = fs.readFileSync(configPath, 'utf8');
     const cfg = JSON.parse(raw);
     if (cfg.apiKey) { _configFileKey = cfg.apiKey; return cfg.apiKey; }
-  } catch { /* swallow */ }
+  } catch (err) {
+    console.warn(`[xapi] failed to read ~/.xapi/config.json: ${err.message || err}`);
+  }
   return null;
 }
 
@@ -131,10 +132,17 @@ export async function xapiCall(actionId, input, options = {}) {
       body: JSON.stringify({ action_id: actionId, input }),
       signal: controller?.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[xapi] ${actionId} returned HTTP ${res.status}`);
+      return null;
+    }
     const json = await res.json();
     return json?.data ?? json ?? null;
-  } catch {
+  } catch (err) {
+    // Abort / timeout is expected; other errors (network, JSON parse) are worth surfacing.
+    if (err?.name !== 'AbortError') {
+      console.warn(`[xapi] ${actionId} call failed: ${err.message || err}`);
+    }
     return null;
   } finally {
     if (timer) clearTimeout(timer);

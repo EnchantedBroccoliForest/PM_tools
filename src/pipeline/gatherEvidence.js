@@ -63,6 +63,7 @@
  */
 
 import { resolveXUrl } from './xapi.js';
+import { GLOBAL_CLAIM_ID } from '../types/run.js';
 
 // Match bare http(s) URLs up to the next whitespace / closing punctuation.
 // Intentionally permissive — we want to catch URLs buried in markdown like
@@ -126,7 +127,7 @@ export function harvestUrls({ references, claims }) {
   // keeps its source-claim linkage from Pass 1.
   for (const url of extractUrls(references)) {
     if (!byUrl.has(url)) {
-      byUrl.set(url, { url, claimId: 'global' });
+      byUrl.set(url, { url, claimId: GLOBAL_CLAIM_ID });
     }
   }
 
@@ -142,7 +143,7 @@ export function harvestUrls({ references, claims }) {
       const existing = byUrl.get(url);
       if (!existing) {
         byUrl.set(url, { url, claimId: claim.id });
-      } else if (existing.claimId === 'global') {
+      } else if (existing.claimId === GLOBAL_CLAIM_ID) {
         existing.claimId = claim.id;
       }
     }

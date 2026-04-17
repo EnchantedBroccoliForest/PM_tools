@@ -19,6 +19,13 @@
 
 import { z } from 'zod';
 
+/**
+ * Sentinel claimId for criticisms / evidence that are not pinned to any
+ * specific claim. Used by the reviewer prompts (see prompts.js), the router
+ * (route.js), and the evidence harvester (gatherEvidence.js).
+ */
+export const GLOBAL_CLAIM_ID = 'global';
+
 // ------------------------------------------------------------------ typedefs
 
 /**
@@ -33,7 +40,7 @@ import { z } from 'zod';
  * @typedef {Object} Criticism
  * @property {string} id
  * @property {string} reviewerModel
- * @property {string} claimId             which claim this targets (or 'global')
+ * @property {string} claimId             which claim this targets (or GLOBAL_CLAIM_ID)
  * @property {'blocker'|'major'|'minor'|'nit'} severity
  * @property {'mece'|'objectivity'|'source'|'timing'|'ambiguity'|'manipulation'|'atomicity'|'other'} category
  * @property {string} rationale
@@ -154,8 +161,16 @@ export const ClaimCategoryEnum = z.enum([
   'other',
 ]);
 
+// Claim ids follow `claim.<category>.<slug>[.<slug>]*` — enforced here
+// rather than only in the prompt so malformed ids from the extractor fail
+// zod validation and surface in the run log, not silently downstream.
+// Slugs are alphanum + underscore so both numeric indices ("0", "1") and
+// named subfields ("start", "end", "win", "criterion") are valid.
+// Examples: "claim.outcome.0.win", "claim.timestamp.end", "claim.source.0".
+const CLAIM_ID_PATTERN = /^claim\.[a-z_]+\.[a-z0-9_]+(?:\.[a-z0-9_]+)*$/;
+
 export const ClaimSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().regex(CLAIM_ID_PATTERN, 'claim.id must match claim.<category>.<index>[.<subfield>]'),
   category: ClaimCategoryEnum,
   text: z.string().min(1),
   sourceRefs: z.array(z.string()).default([]),

@@ -28,6 +28,7 @@ import {
   buildEarlyResolutionPrompt,
 } from './constants/prompts.js';
 import { extractClaims } from './pipeline/extractClaims.js';
+import { tryParseJsonObject } from './pipeline/llmJson.js';
 import { verifyClaims, structuralCheck } from './pipeline/verify.js';
 import { gatherEvidence } from './pipeline/gatherEvidence.js';
 import { routeClaims } from './pipeline/route.js';
@@ -35,9 +36,10 @@ import { runStructuredReviewsParallel } from './pipeline/structuredReview.js';
 import { aggregate } from './pipeline/aggregate.js';
 import { RIGOR_RUBRIC } from './constants/rubric.js';
 import { enrichReferencesWithXData } from './pipeline/xapi.js';
+import { parseRiskLevel } from './util/riskLevel.js';
 import { createRun } from './types/run.js';
 import {
-  DEFAULT_DRAFTER_MODEL,
+  DEFAULT_DRAFT_MODEL,
   DEFAULT_REVIEWER_MODELS,
   DEFAULT_JUDGE_MODEL,
   DEFAULT_OPTIONS,
@@ -46,28 +48,42 @@ import {
 
 // ----------------------------------------------------------------- semaphore
 
-const MAX_CONCURRENT = 3;
-let _running = 0;
-const _queue = [];
+const DEFAULT_MAX_CONCURRENT = 3;
 
-function acquireSemaphore() {
-  if (_running < MAX_CONCURRENT) {
-    _running++;
-    return Promise.resolve();
-  }
-  return new Promise((resolve) => {
-    _queue.push(resolve);
-  });
+/**
+ * Bounded-concurrency semaphore. Used by orchestrate() to cap how many
+ * pipelines run in parallel in the same process. Exposed as a factory
+ * (rather than a module-level singleton) so tests and multi-tenant
+ * callers can spin up independent limits — a single shared module-level
+ * semaphore would silently serialise unrelated callers.
+ *
+ * A process-wide default is still exported below so single-process CLI
+ * usage keeps its previous behaviour without any explicit wiring.
+ */
+export function createSemaphore(maxConcurrent = DEFAULT_MAX_CONCURRENT) {
+  let running = 0;
+  const queue = [];
+  return {
+    acquire() {
+      if (running < maxConcurrent) {
+        running++;
+        return Promise.resolve();
+      }
+      return new Promise((resolve) => queue.push(resolve));
+    },
+    release() {
+      if (queue.length > 0) {
+        const next = queue.shift();
+        next();
+      } else {
+        running--;
+      }
+    },
+  };
 }
 
-function releaseSemaphore() {
-  if (_queue.length > 0) {
-    const next = _queue.shift();
-    next();
-  } else {
-    _running--;
-  }
-}
+/** Process-wide default semaphore used when the caller does not provide one. */
+const defaultSemaphore = createSemaphore();
 
 // --------------------------------------------------------- cost accounting
 
@@ -79,9 +95,9 @@ function createCostTracker() {
   return {
     record(stage, result) {
       if (!result) return;
-      const tokensIn = Number(result.usage?.promptTokens) || 0;
-      const tokensOut = Number(result.usage?.completionTokens) || 0;
-      const ms = Number(result.wallClockMs) || 0;
+      const tokensIn = result.usage?.promptTokens || 0;
+      const tokensOut = result.usage?.completionTokens || 0;
+      const ms = result.wallClockMs || 0;
       totalTokensIn += tokensIn;
       totalTokensOut += tokensOut;
       wallClockMs += ms;
@@ -287,7 +303,7 @@ async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks, 
 
 /**
  * Run the early-resolution risk analyst. Parses the risk level from the
- * response using the same regex as App.jsx.
+ * response via the shared parseRiskLevel helper.
  */
 async function runRiskStage(run, models, cost, callbacks) {
   const latestDraft = run.drafts[run.drafts.length - 1].content;
@@ -299,10 +315,7 @@ async function runRiskStage(run, models, cost, callbacks) {
     ],
   );
   cost.record('early_resolution', riskResult);
-  const match = typeof riskResult.content === 'string'
-    ? riskResult.content.match(/risk\s*rating\s*[:-]?\s*(low|medium|high)/i)
-    : null;
-  const level = match ? match[1].toLowerCase() : 'unknown';
+  const level = parseRiskLevel(riskResult.content);
   log(
     run, 'early_resolution',
     level === 'high' ? 'warn' : 'info',
@@ -348,14 +361,7 @@ async function runFinalizeStage(run, riskLevel, models, cost, callbacks) {
     { temperature: 0.3 },
   );
   cost.record('accept', finalResult);
-  let parsed;
-  try {
-    const match = finalResult.content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-    parsed = match ? JSON.parse(match[1]) : JSON.parse(finalResult.content);
-  } catch {
-    parsed = { raw: finalResult.content };
-  }
-  run.finalJson = parsed;
+  run.finalJson = tryParseJsonObject(finalResult.content) || { raw: finalResult.content };
   return gateResult;
 }
 
@@ -434,11 +440,12 @@ function buildGates(run, riskLevel) {
  * @returns {Promise<object>} the Run artifact
  */
 export async function orchestrate(config, signal) {
-  await acquireSemaphore();
+  const semaphore = config?.semaphore || defaultSemaphore;
+  await semaphore.acquire();
   try {
     return await _orchestrateInner(config, signal);
   } finally {
-    releaseSemaphore();
+    semaphore.release();
   }
 }
 
@@ -447,7 +454,7 @@ async function _orchestrateInner(config, signal) {
 
   // Resolve models with defaults.
   const models = {
-    drafter: modelsRaw?.drafter || DEFAULT_DRAFTER_MODEL,
+    drafter: modelsRaw?.drafter || DEFAULT_DRAFT_MODEL,
     reviewers: modelsRaw?.reviewers?.length > 0 ? modelsRaw.reviewers : DEFAULT_REVIEWER_MODELS,
     judge: modelsRaw?.judge || DEFAULT_JUDGE_MODEL,
   };
@@ -459,8 +466,9 @@ async function _orchestrateInner(config, signal) {
     evidence: optionsRaw?.evidence || DEFAULT_OPTIONS.evidence,
     verifiers: optionsRaw?.verifiers || DEFAULT_OPTIONS.verifiers,
     humanFeedback: optionsRaw?.humanFeedback || undefined,
-    skipReview: !!optionsRaw?.skipReview,
-    skipFinalize: !!optionsRaw?.skipFinalize,
+    skipReview: optionsRaw?.skipReview || false,
+    skipFinalize: optionsRaw?.skipFinalize || false,
+    xapiEnrich: optionsRaw?.xapiEnrich || false,
   };
 
   // Build the Run input. References may arrive as an array (CLI) or string (UI/harness).

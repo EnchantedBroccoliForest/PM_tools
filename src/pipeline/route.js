@@ -61,6 +61,8 @@
  * @typedef {import('../types/run').Routing} Routing
  */
 
+import { GLOBAL_CLAIM_ID } from '../types/run.js';
+
 /**
  * @typedef {Object} RouteClaimsInput
  * @property {Claim[]} claims
@@ -188,7 +190,7 @@ export function routeClaims(input) {
   const globalCriticisms = [];
   for (const c of criticisms) {
     if (!c) continue;
-    if (c.claimId === 'global') {
+    if (c.claimId === GLOBAL_CLAIM_ID) {
       globalCriticisms.push(c);
       continue;
     }

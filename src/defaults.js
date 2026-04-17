@@ -9,8 +9,9 @@
 
 import { DEFAULT_DRAFT_MODEL, DEFAULT_REVIEW_MODEL } from './constants/models.js';
 
-/** Default OpenRouter model ID for drafting. */
-export const DEFAULT_DRAFTER_MODEL = DEFAULT_DRAFT_MODEL;
+// DEFAULT_DRAFT_MODEL is re-exported from constants/models.js by pipeline
+// callers that want the drafter default; no alias needed here.
+export { DEFAULT_DRAFT_MODEL };
 
 /**
  * Default reviewer council. The UI starts with a single reviewer; the CLI

@@ -29,6 +29,7 @@ The draft is decomposed into atomic **claims** (outcome criteria, timestamps, th
 
 - **Evidence gathering** — URLs from the user's reference block and source-category claims are resolved in the browser to verify accessibility.
 - **Uncertainty routing** — each claim is assigned a severity (`ok`, `targeted_review`, or `blocking`) based on verification verdicts, entailment results, evidence resolution, and criticism severity. The routing rollup determines whether the draft can proceed, needs a targeted update, or is blocked.
+- **Optional xAPI enrichment (X / Twitter)** — references containing X/Twitter URLs or `@mentions` can be hydrated via the [xAPI](https://action.xapi.to) action API so the drafter and reviewers see real profile / tweet context instead of a bare handle. Enabled by setting `XAPI_KEY` (or `VITE_XAPI_KEY`) in the environment, or dropping an `apiKey` into `~/.xapi/config.json`; the CLI opts in per-run with `--xapi-enrich`. Fetched content is wrapped in an explicit "untrusted" block in the prompt so the model is told not to follow instructions embedded in third-party text. When the key is absent, the feature is a no-op.
 
 ### Stage 4: Structured Multi-Model Review
 
@@ -91,7 +92,9 @@ src/
 │   ├── route.js               # Uncertainty-based claim routing
 │   ├── structuredReview.js    # Rubric-based structured review per reviewer
 │   ├── aggregate.js           # Majority / unanimity / judge vote aggregation
-│   └── checkSources.js        # Pre-finalize resolution source accessibility check
+│   ├── checkSources.js        # Pre-finalize resolution source accessibility check
+│   ├── llmJson.js             # Shared JSON salvage + token-accumulator helpers
+│   └── xapi.js                # xAPI (X / Twitter) lookups + reference enrichment
 ├── types/
 │   └── run.js                 # Run artifact schema (JSDoc typedefs + zod)
 ├── hooks/
@@ -102,10 +105,12 @@ src/
 │   ├── ModelSelect.jsx        # Reusable model selection dropdown
 │   ├── LLMLoadingState.jsx    # Animated loading state with phase messages
 │   └── AmbientModeToggle.jsx  # Theme toggle component
-└── constants/
-    ├── models.js              # LLM model definitions, live-fetch, defaults
-    ├── prompts.js             # System prompts and prompt builders for each stage
-    └── rubric.js              # Six-item rigor rubric for 42.space markets
+├── constants/
+│   ├── models.js              # LLM model definitions, live-fetch, defaults
+│   ├── prompts.js             # System prompts and prompt builders for each stage
+│   └── rubric.js              # Six-item rigor rubric for 42.space markets
+└── util/
+    └── riskLevel.js           # Shared early-resolution risk-level parser
 eval/
 ├── harness.js                 # Eval harness entry point
 ├── run.js                     # CLI runner for eval suite
