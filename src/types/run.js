@@ -164,10 +164,14 @@ export const ClaimCategoryEnum = z.enum([
 // Claim ids follow `claim.<category>.<slug>[.<slug>]*` — enforced here
 // rather than only in the prompt so malformed ids from the extractor fail
 // zod validation and surface in the run log, not silently downstream.
-// Slugs are alphanum + underscore so both numeric indices ("0", "1") and
-// named subfields ("start", "end", "win", "criterion") are valid.
-// Examples: "claim.outcome.0.win", "claim.timestamp.end", "claim.source.0".
-const CLAIM_ID_PATTERN = /^claim\.[a-z_]+\.[a-z0-9_]+(?:\.[a-z0-9_]+)*$/;
+// Slugs allow letters (upper/lower), digits, and underscores so numeric
+// indices ("0"), lowercase subfields ("win"/"criterion"), and camelCase
+// subfields ("resolutionCriteria") are all accepted — the prompt picks
+// one convention but the schema is defensively permissive so a prompt
+// tweak does not start dropping valid claims.
+// Examples: "claim.outcome.0.win", "claim.timestamp.end",
+// "claim.outcome.0.resolutionCriteria".
+const CLAIM_ID_PATTERN = /^claim\.[a-z_]+\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$/;
 
 export const ClaimSchema = z.object({
   id: z.string().regex(CLAIM_ID_PATTERN, 'claim.id must match claim.<category>.<index>[.<subfield>]'),
