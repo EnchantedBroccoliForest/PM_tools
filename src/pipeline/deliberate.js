@@ -25,6 +25,8 @@
  *     votes after seeing peer reasoning, for diagnostics.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { queryModel } from '../api/openrouter.js';
 import { SYSTEM_PROMPTS } from '../constants/prompts.js';
 import { StructuredReviewResponseSchema } from '../types/run.js';
@@ -83,10 +85,9 @@ export function hasUnanimousAgreement(reviews) {
  *
  * @param {Array<import('./structuredReview.js').StructuredReviewResult>} reviews
  * @param {string} excludeModel  model id to exclude (the reviewer receiving this summary)
- * @param {import('../constants/rubric.js').RubricItem[]} rubric
  * @returns {string}
  */
-export function formatPeerSummary(reviews, excludeModel /* rubric */) {
+export function formatPeerSummary(reviews, excludeModel) {
   const peers = reviews.filter(
     (r) => r.model !== excludeModel && r.reviewProse !== null,
   );
@@ -204,7 +205,7 @@ export function trackMindChanges(initial, revised) {
  */
 export async function runDeliberationRound(model, draftContent, rubric, allInitialReviews) {
   const rubricIds = new Set(rubric.map((r) => r.id));
-  const peerSummary = formatPeerSummary(allInitialReviews, model.id, rubric);
+  const peerSummary = formatPeerSummary(allInitialReviews, model.id);
   const prompt = buildDeliberationReviewPrompt(draftContent, peerSummary, rubric);
 
   // Find the original review for this model
@@ -245,9 +246,8 @@ export async function runDeliberationRound(model, draftContent, rubric, allIniti
       rationale: v.rationale || '',
     }));
 
-    const now = Date.now();
-    const criticisms = data.criticisms.map((c, i) => ({
-      id: `criticism.delib.${now}.${model.id}.${i}`,
+    const criticisms = data.criticisms.map((c) => ({
+      id: `criticism.delib.${randomUUID()}`,
       reviewerModel: model.id,
       claimId: c.claimId,
       severity: c.severity,
@@ -268,6 +268,7 @@ export async function runDeliberationRound(model, draftContent, rubric, allIniti
       usage: r.usage,
       wallClockMs: r.wallClockMs,
       logEntry: null,
+      fromDeliberation: true,
     };
 
     return {
