@@ -26,7 +26,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  DEFAULT_DRAFTER_MODEL,
+  DEFAULT_DRAFT_MODEL,
   DEFAULT_REVIEWER_MODELS,
   DEFAULT_JUDGE_MODEL,
   DEFAULT_OPTIONS,
@@ -83,7 +83,7 @@ export function loadConfig(pathOrName) {
  */
 export function mergeWithDefaults(config) {
   const models = {
-    drafter: config?.models?.drafter || DEFAULT_DRAFTER_MODEL,
+    drafter: config?.models?.drafter || DEFAULT_DRAFT_MODEL,
     reviewers:
       Array.isArray(config?.models?.reviewers) && config.models.reviewers.length > 0
         ? config.models.reviewers
