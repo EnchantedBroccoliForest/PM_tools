@@ -30,6 +30,7 @@ DRAFT FLAGS
   --start            Start date, ISO 8601 (required)
   --end              End date, ISO 8601 (required)
   --references       Resolution source URLs (comma-separated)
+  --config           Pipeline config name (default, deliberation, fast) or path
   --drafter          OpenRouter model ID for drafting
   --reviewers        Comma-separated reviewer model IDs
   --aggregation      majority | unanimity | judge
@@ -71,6 +72,7 @@ function parseCliArgs() {
       start: { type: 'string' },
       end: { type: 'string' },
       references: { type: 'string' },
+      config: { type: 'string' },
       drafter: { type: 'string' },
       reviewers: { type: 'string' },
       aggregation: { type: 'string' },
@@ -170,11 +172,33 @@ function formatSummary(run) {
 async function cmdDraft(values, stdinConfig) {
   const { orchestrate } = await import('../src/orchestrate.js');
 
+  // Load named/file config if --config was given. Precedence (low → high):
+  // named config file → stdin JSON → CLI flags.
+  let fileConfig = null;
+  if (values.config) {
+    const { loadConfig, validateConfig } = await import('../src/configLoader.js');
+    try {
+      fileConfig = loadConfig(values.config);
+    } catch (err) {
+      process.stderr.write(`Error: failed to load config "${values.config}": ${err.message}\n`);
+      process.exit(2);
+    }
+    const errs = validateConfig(fileConfig);
+    if (errs) {
+      process.stderr.write(`Error: invalid config "${values.config}":\n  - ${errs.join('\n  - ')}\n`);
+      process.exit(2);
+    }
+  }
+
   // Merge stdin config with CLI flags (flags override).
-  const base = stdinConfig || {};
-  const baseInput = base.input || {};
-  const baseModels = base.models || {};
-  const baseOptions = base.options || {};
+  const base = {
+    input: { ...(fileConfig?.input || {}), ...(stdinConfig?.input || {}) },
+    models: { ...(fileConfig?.models || {}), ...(stdinConfig?.models || {}) },
+    options: { ...(fileConfig?.options || {}), ...(stdinConfig?.options || {}) },
+  };
+  const baseInput = base.input;
+  const baseModels = base.models;
+  const baseOptions = base.options;
 
   const question = values.question || baseInput.question;
   const startDate = values.start || baseInput.startDate;
@@ -217,6 +241,9 @@ async function cmdDraft(values, stdinConfig) {
     options: {
       aggregation: values.aggregation || baseOptions.aggregation,
       escalation: values.escalation || baseOptions.escalation,
+      evidence: baseOptions.evidence,
+      verifiers: baseOptions.verifiers,
+      deliberation: baseOptions.deliberation,
       humanFeedback: values.feedback || baseOptions.humanFeedback,
       skipUpdate: values['no-review'] || baseOptions.skipUpdate,
       skipFinalize: values['no-finalize'] || baseOptions.skipFinalize,

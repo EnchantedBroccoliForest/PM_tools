@@ -1,5 +1,4 @@
 {
-  "$schema": "./pipeline-config.schema.json",
   "description": "Default pipeline configuration. Mirrors the hardcoded defaults in src/defaults.js. Use this file as a template for custom configurations.",
 
   "models": {

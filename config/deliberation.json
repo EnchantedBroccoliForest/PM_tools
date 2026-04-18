@@ -1,5 +1,4 @@
 {
-  "$schema": "./pipeline-config.schema.json",
   "description": "Multi-model deliberation configuration. Uses diverse reviewer models and enables the deliberation round (Deliberate → Aggregate pattern from llm-council-governance research). Best for high-stakes markets where accuracy justifies the additional API cost.",
 
   "models": {
