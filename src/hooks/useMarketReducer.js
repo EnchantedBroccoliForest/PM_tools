@@ -11,6 +11,11 @@ const initialState = {
   startDate: '',
   endDate: '',
   references: '',
+  // Optional hard restriction on the outcome-set cardinality. Stored as a
+  // string because it comes straight from a text input; empty string means
+  // "no restriction — let the drafter choose". When non-empty, every
+  // drafter / reviewer / finalizer prompt receives it as a hard rule.
+  numberOfOutcomes: '',
   selectedModel: DEFAULT_DRAFT_MODEL,
   reviewModels: [DEFAULT_REVIEW_MODEL],
   humanReviewInput: '',
@@ -34,6 +39,9 @@ const initialState = {
 
   // Content
   draftContent: null,
+  draftVersions: [],     // Array of { content, timestamp, source: 'draft' | 'pasted' | 'update' }
+  viewingVersionIndex: 0, // Which version the user is currently viewing
+  draftJustUpdated: false, // Transient flag to trigger scroll + flash after an update
   reviews: [],           // Array of { model, modelName, content }
   deliberatedReview: null, // Synthesized review after deliberation
   finalContent: null,
@@ -142,6 +150,9 @@ function reducer(state, action) {
       return clearEarlyResolution({
         ...state,
         draftContent: action.content,
+        draftVersions: [{ content: action.content, timestamp: Date.now(), source: 'pasted' }],
+        viewingVersionIndex: 0,
+        draftJustUpdated: false,
         reviews: [],
         deliberatedReview: null,
         humanReviewInput: '',
@@ -155,6 +166,9 @@ function reducer(state, action) {
         loading: null,
         loadingMeta: null,
         draftContent: action.content,
+        draftVersions: [{ content: action.content, timestamp: Date.now(), source: 'draft' }],
+        viewingVersionIndex: 0,
+        draftJustUpdated: false,
         reviews: [],
         deliberatedReview: null,
         humanReviewInput: '',
@@ -171,16 +185,30 @@ function reducer(state, action) {
         deliberatedReview: action.deliberatedReview || null,
       };
 
-    case 'UPDATE_SUCCESS':
+    case 'UPDATE_SUCCESS': {
       // Clear stale risk from any previous update; handleUpdate immediately
       // chains into START_EARLY_RESOLUTION to recompute against the new draft.
+      const newVersions = [
+        ...state.draftVersions,
+        { content: action.content, timestamp: Date.now(), source: 'update' },
+      ];
       return clearEarlyResolution({
         ...state,
         loading: null,
         loadingMeta: null,
         draftContent: action.content,
+        draftVersions: newVersions,
+        viewingVersionIndex: newVersions.length - 1,
+        draftJustUpdated: true,
         hasUpdated: true,
       });
+    }
+
+    case 'SET_VIEWING_VERSION':
+      return { ...state, viewingVersionIndex: action.index };
+
+    case 'CLEAR_DRAFT_JUST_UPDATED':
+      return { ...state, draftJustUpdated: false };
 
     case 'FINALIZE_SUCCESS':
       return { ...state, loading: null, loadingMeta: null, finalContent: action.content };
@@ -499,11 +527,19 @@ function rehydrateFromRun(state, run) {
     startDate: run.input?.startDate || '',
     endDate: run.input?.endDate || '',
     references: run.input?.references || '',
+    numberOfOutcomes: run.input?.numberOfOutcomes || '',
     // View-state rebuild. Criticisms/aggregation are Phase 2 concerns so we
     // don't try to map them back to the legacy `reviews[]` shape here — the
     // run-trace panel is the authoritative view of imported runs. The main
     // UI still renders the latest draft and final JSON.
     draftContent: lastDraft ? lastDraft.content : null,
+    draftVersions: drafts.map((d) => ({
+      content: d.content,
+      timestamp: d.timestamp || 0,
+      source: d.kind === 'updated' ? 'update' : 'draft',
+    })),
+    viewingVersionIndex: Math.max(0, drafts.length - 1),
+    draftJustUpdated: false,
     reviews: [],
     deliberatedReview: null,
     finalContent: run.finalJson || null,
@@ -523,5 +559,3 @@ function rehydrateFromRun(state, run) {
 export function useMarketReducer() {
   return useReducer(reducer, initialState);
 }
-
-export { initialState };

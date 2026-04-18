@@ -19,6 +19,13 @@
 
 import { z } from 'zod';
 
+/**
+ * Sentinel claimId for criticisms / evidence that are not pinned to any
+ * specific claim. Used by the reviewer prompts (see prompts.js), the router
+ * (route.js), and the evidence harvester (gatherEvidence.js).
+ */
+export const GLOBAL_CLAIM_ID = 'global';
+
 // ------------------------------------------------------------------ typedefs
 
 /**
@@ -33,7 +40,7 @@ import { z } from 'zod';
  * @typedef {Object} Criticism
  * @property {string} id
  * @property {string} reviewerModel
- * @property {string} claimId             which claim this targets (or 'global')
+ * @property {string} claimId             which claim this targets (or GLOBAL_CLAIM_ID)
  * @property {'blocker'|'major'|'minor'|'nit'} severity
  * @property {'mece'|'objectivity'|'source'|'timing'|'ambiguity'|'manipulation'|'atomicity'|'other'} category
  * @property {string} rationale
@@ -154,8 +161,20 @@ export const ClaimCategoryEnum = z.enum([
   'other',
 ]);
 
+// Claim ids follow `claim.<category>.<slug>[.<slug>]*` — enforced here
+// rather than only in the prompt so malformed ids from the extractor fail
+// zod validation and surface in the run log, not silently downstream.
+// Slugs allow letters (upper/lower), digits, and underscores so numeric
+// indices ("0"), lowercase subfields ("win"/"criterion"), and camelCase
+// subfields ("resolutionCriteria") are all accepted — the prompt picks
+// one convention but the schema is defensively permissive so a prompt
+// tweak does not start dropping valid claims.
+// Examples: "claim.outcome.0.win", "claim.timestamp.end",
+// "claim.outcome.0.resolutionCriteria".
+const CLAIM_ID_PATTERN = /^claim\.[a-z_]+\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$/;
+
 export const ClaimSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().regex(CLAIM_ID_PATTERN, 'claim.id must match claim.<category>.<index>[.<subfield>]'),
   category: ClaimCategoryEnum,
   text: z.string().min(1),
   sourceRefs: z.array(z.string()).default([]),
@@ -334,6 +353,10 @@ export const RunSchema = z.object({
     startDate: z.string(),
     endDate: z.string(),
     references: z.string(),
+    // Optional hard restriction on outcome-set cardinality. Absent (or empty)
+    // on runs exported before this field existed — defaulted to '' so older
+    // run files still validate against this schema.
+    numberOfOutcomes: z.string().optional().default(''),
   }),
   drafts: z.array(DraftRecordSchema),
   criticisms: z.array(CriticismSchema),
@@ -380,7 +403,7 @@ export function createEmptyCost() {
 
 /**
  * Construct a fresh Run from the drafting inputs.
- * @param {{question:string, startDate:string, endDate:string, references:string}} input
+ * @param {{question:string, startDate:string, endDate:string, references:string, numberOfOutcomes?:string}} input
  * @returns {Run}
  */
 export function createRun(input) {
@@ -392,6 +415,7 @@ export function createRun(input) {
       startDate: input?.startDate || '',
       endDate: input?.endDate || '',
       references: input?.references || '',
+      numberOfOutcomes: input?.numberOfOutcomes || '',
     },
     drafts: [],
     criticisms: [],

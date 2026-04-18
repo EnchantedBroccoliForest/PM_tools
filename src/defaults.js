@@ -9,8 +9,9 @@
 
 import { DEFAULT_DRAFT_MODEL, DEFAULT_REVIEW_MODEL } from './constants/models.js';
 
-/** Default OpenRouter model ID for drafting. */
-export const DEFAULT_DRAFTER_MODEL = DEFAULT_DRAFT_MODEL;
+// DEFAULT_DRAFT_MODEL is re-exported from constants/models.js by pipeline
+// callers that want the drafter default; no alias needed here.
+export { DEFAULT_DRAFT_MODEL };
 
 /**
  * Default reviewer council. The UI starts with a single reviewer; the CLI
@@ -25,6 +26,13 @@ export const DEFAULT_REVIEWER_MODELS = [
  * review model as the judge, so we mirror that here.
  */
 export const DEFAULT_JUDGE_MODEL = DEFAULT_REVIEW_MODEL;
+
+/**
+ * Max output tokens for draft and update calls. 3000 (the API default) is
+ * too low for complex markets — edge cases and resolution criteria get
+ * truncated. 8000 matches the claim-extraction budget.
+ */
+export const DRAFT_MAX_TOKENS = 8000;
 
 /**
  * Default pipeline options. Mirrors the initial state in useMarketReducer

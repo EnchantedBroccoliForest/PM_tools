@@ -34,72 +34,72 @@
   --surface-3: rgba(139, 119, 90, 0.15);
   --surface-draft: rgba(180, 80, 50, 0.08);
   --surface-review: rgba(60, 120, 120, 0.08);
-  --border: rgba(139, 119, 90, 0.25);
-  --border-hover: rgba(139, 119, 90, 0.4);
-  --border-focus: rgba(180, 80, 50, 0.5);
+  --border: rgba(107, 93, 72, 0.35);
+  --border-hover: rgba(107, 93, 72, 0.55);
+  --border-focus: rgba(168, 68, 46, 0.6);
   --text-1: #1a1408;
-  --text-2: #3d3120;
-  --text-3: #6b5d48;
+  --text-2: #2d2410;
+  --text-3: #564733;
   --accent: #a8442e;
-  --accent-light: #d4745e;
-  --accent-glow: rgba(192, 83, 58, 0.15);
-  --blue: #2a7d8c;
-  --blue-hover: #1f5f6b;
-  --blue-glow: rgba(42, 125, 140, 0.15);
-  --teal: #3a8a5c;
-  --teal-light: #4da870;
-  --teal-glow: rgba(58, 138, 92, 0.12);
-  --red: #c0392b;
-  --red-bg: rgba(192, 57, 43, 0.08);
-  --red-border: rgba(192, 57, 43, 0.25);
-  --neon-cyan: #2a7d8c;
-  --neon-magenta: #c0533a;
-  --neon-green: #3a8a5c;
-  --neon-yellow: #b8960c;
-  --neon-purple: #7c5cbf;
+  --accent-light: #c0533a;
+  --accent-glow: rgba(168, 68, 46, 0.18);
+  --blue: #1f5f6b;
+  --blue-hover: #17474f;
+  --blue-glow: rgba(31, 95, 107, 0.18);
+  --teal: #2c6a45;
+  --teal-light: #3a8a5c;
+  --teal-glow: rgba(44, 106, 69, 0.15);
+  --red: #a8322a;
+  --red-bg: rgba(168, 50, 42, 0.1);
+  --red-border: rgba(168, 50, 42, 0.35);
+  --neon-cyan: #1f5f6b;
+  --neon-magenta: #a8442e;
+  --neon-green: #2c6a45;
+  --neon-yellow: #7a6205;
+  --neon-purple: #5d3d9a;
   background: #f5f0e8;
 }
 
 /* Light-mode component overrides */
 .App.ambient-light .input {
-  background: rgba(255, 252, 245, 0.65);
+  background: rgba(255, 253, 248, 0.95);
   color: var(--text-1);
   border-color: var(--border);
 }
 .App.ambient-light .input:focus {
-  background: rgba(255, 253, 248, 0.85);
-  box-shadow: 0 0 0 1px rgba(42, 125, 140, 0.3);
+  background: #fffdf8;
+  box-shadow: 0 0 0 2px rgba(31, 95, 107, 0.35);
 }
 .App.ambient-light .input::placeholder { color: var(--text-3); }
 
 .App.ambient-light .panel {
-  background: rgba(255, 252, 245, 0.6);
+  background: rgba(255, 253, 248, 0.88);
   border-color: var(--border);
 }
 .App.ambient-light .panel--active {
-  border-color: rgba(42, 125, 140, 0.4);
+  border-color: rgba(31, 95, 107, 0.55);
 }
 
 .App.ambient-light .content-box {
-  background: rgba(255, 252, 245, 0.7);
-  border-color: rgba(139, 119, 90, 0.22);
+  background: rgba(255, 253, 248, 0.94);
+  border-color: rgba(107, 93, 72, 0.3);
   color: var(--text-1);
 }
 .App.ambient-light .content-box--rich .md-heading,
-.App.ambient-light .content-box--rich strong { color: #120a02; }
+.App.ambient-light .content-box--rich strong { color: #0d0702; }
 
 .App.ambient-light .panel-placeholder p { color: var(--text-2); }
 .App.ambient-light .action-toolbar {
-  background: rgba(245, 240, 232, 0.8);
+  background: rgba(245, 240, 232, 0.95);
   border-color: var(--border);
 }
 .App.ambient-light .toolbar-select {
-  background: rgba(255, 252, 245, 0.65);
+  background: rgba(255, 253, 248, 0.95);
   color: var(--text-1);
 }
 .App.ambient-light .toolbar-select option,
 .App.ambient-light select.input option {
-  background: #f5f0e8;
+  background: #fffdf8;
   color: var(--text-1);
 }
 
@@ -114,18 +114,19 @@
   color: #fff;
 }
 .App.ambient-light .draft-button:hover:not(:disabled) {
-  background: #c0533a;
+  background: #8a3622;
+  border-color: #8a3622;
 }
 
 .App.ambient-light .spinner {
-  border-color: rgba(42, 125, 140, 0.2);
+  border-color: rgba(31, 95, 107, 0.22);
   border-top-color: var(--neon-cyan);
 }
 
 .App.ambient-light .model-badge,
 .App.ambient-light .llm-loading__model-tag {
-  background: rgba(42, 125, 140, 0.08);
-  border-color: rgba(42, 125, 140, 0.2);
+  background: rgba(31, 95, 107, 0.1);
+  border-color: rgba(31, 95, 107, 0.3);
   color: var(--neon-cyan);
 }
 
@@ -138,74 +139,77 @@
 }
 
 .App.ambient-light .copy-btn {
-  background: rgba(42, 125, 140, 0.08);
-  border-color: rgba(42, 125, 140, 0.2);
+  background: rgba(31, 95, 107, 0.1);
+  border-color: rgba(31, 95, 107, 0.3);
   color: var(--neon-cyan);
 }
 .App.ambient-light .copy-btn:hover {
-  background: rgba(42, 125, 140, 0.15);
-  border-color: rgba(42, 125, 140, 0.35);
+  background: rgba(31, 95, 107, 0.18);
+  border-color: rgba(31, 95, 107, 0.5);
 }
 
 .App.ambient-light .ambient-bar__inner {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(139, 119, 90, 0.15);
+  background: rgba(255, 253, 248, 0.7);
+  border-color: rgba(107, 93, 72, 0.25);
 }
-.App.ambient-light .ambient-btn { color: var(--text-3); }
+.App.ambient-light .ambient-btn { color: var(--text-2); }
 .App.ambient-light .ambient-btn:hover:not(.ambient-btn--active) {
-  background: rgba(0, 0, 0, 0.04);
-  color: var(--text-2);
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-1);
 }
 
 .App.ambient-light .skeleton {
-  background: rgba(139, 119, 90, 0.08);
+  background: rgba(107, 93, 72, 0.12);
 }
 
 .App.ambient-light .error-message {
-  background: rgba(192, 57, 43, 0.06);
-  border-color: rgba(192, 57, 43, 0.2);
+  background: rgba(168, 50, 42, 0.1);
+  border-color: rgba(168, 50, 42, 0.35);
+  color: var(--text-1);
 }
 
 .App.ambient-light .human-review-section {
   border-color: var(--border);
-  background: rgba(255, 252, 245, 0.4);
+  background: rgba(255, 253, 248, 0.7);
 }
 
 .App.ambient-light .time-display {
   color: var(--text-2);
-  background: rgba(139, 119, 90, 0.06);
+  background: rgba(107, 93, 72, 0.1);
   border-color: var(--border);
 }
 
 .App.ambient-light .ideate-idea {
-  background: rgba(42, 125, 140, 0.05);
-  border-color: rgba(42, 125, 140, 0.2);
+  background: rgba(31, 95, 107, 0.07);
+  border-color: rgba(31, 95, 107, 0.3);
 }
 .App.ambient-light .ideate-idea:hover {
-  background: rgba(42, 125, 140, 0.09);
+  background: rgba(31, 95, 107, 0.12);
 }
 .App.ambient-light .ideate-idea__use-btn {
-  border-color: rgba(42, 125, 140, 0.7);
-  background: rgba(42, 125, 140, 0.1);
-  color: #2a7d8c;
+  border-color: rgba(31, 95, 107, 0.75);
+  background: rgba(31, 95, 107, 0.12);
+  color: #1f5f6b;
 }
 .App.ambient-light .ideate-idea__use-btn:hover {
-  background: rgba(42, 125, 140, 0.2);
+  background: rgba(31, 95, 107, 0.22);
 }
 
 .App.ambient-light .run-trace {
-  border-color: rgba(139, 119, 90, 0.15);
-  background: rgba(139, 119, 90, 0.03);
+  border-color: rgba(107, 93, 72, 0.25);
+  background: rgba(255, 253, 248, 0.55);
 }
 .App.ambient-light .run-trace__body {
-  border-top-color: rgba(139, 119, 90, 0.1);
+  border-top-color: rgba(107, 93, 72, 0.2);
 }
 .App.ambient-light .run-trace__button {
-  border-color: rgba(139, 119, 90, 0.2);
-  background: rgba(255, 255, 255, 0.4);
+  border-color: rgba(107, 93, 72, 0.3);
+  background: rgba(255, 253, 248, 0.85);
+  color: var(--text-2);
 }
 .App.ambient-light .run-trace__button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.7);
+  background: #fffdf8;
+  color: var(--text-1);
 }
 
 /* ================================================

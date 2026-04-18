@@ -42,21 +42,7 @@ import {
   buildStrictBatchEntailmentRetryPrompt,
 } from '../constants/prompts.js';
 import { BatchEntailmentResponseSchema } from '../types/run.js';
-
-/** Shared JSON salvage helper — same logic as other pipelines. */
-function tryParseJson(text) {
-  if (typeof text !== 'string') return null;
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  const candidate = fenced ? fenced[1] : trimmed;
-  const bracketed = candidate.match(/\[[\s\S]*\]/);
-  const final = bracketed ? bracketed[0] : candidate;
-  try {
-    return JSON.parse(final);
-  } catch {
-    return null;
-  }
-}
+import { tryParseJsonArray, createUsageAggregator } from './llmJson.js';
 
 /**
  * Structural verifier. Pure function, no I/O. Returns a partially-filled
@@ -84,8 +70,13 @@ export function structuralCheck(claim) {
     case 'timestamp': {
       // Require an ISO-8601-ish date OR a time-of-day pattern. We allow
       // both because start/end claims can legitimately be just a date.
-      const hasIsoDate = /\d{4}-\d{2}-\d{2}/.test(claim.text);
-      const hasTime = /\d{1,2}:\d{2}/.test(claim.text);
+      // Components are range-checked (months 01-12, days 01-31, hours
+      // 00-23, minutes/seconds 00-59) so obvious garbage like "1234-99-99"
+      // or "ratio 3:14" fails structurally. Word boundaries are avoided
+      // because real ISO strings run digits straight into the `T` (e.g.
+      // "2027-01-01T00:00:00Z"), which isn't a regex word boundary.
+      const hasIsoDate = /\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])/.test(claim.text);
+      const hasTime = /([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?/.test(claim.text);
       if (!hasIsoDate && !hasTime) {
         return {
           ...base,
@@ -215,13 +206,7 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
   }
 
   // Batched entailment pass.
-  const aggregate = { usage: { ...emptyUsage }, wallClockMs: 0 };
-  const accumulate = (r) => {
-    aggregate.usage.promptTokens += r.usage.promptTokens;
-    aggregate.usage.completionTokens += r.usage.completionTokens;
-    aggregate.usage.totalTokens += r.usage.totalTokens;
-    aggregate.wallClockMs += r.wallClockMs;
-  };
+  const { aggregate, accumulate } = createUsageAggregator();
 
   const buildStructuralOnlyFallback = (logEntry) => ({
     verifications: claims.map((c) => {
@@ -252,8 +237,13 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
     });
   }
 
-  let parsed = tryParseJson(raw);
-  let validated = parsed && BatchEntailmentResponseSchema.safeParse(parsed);
+  let parsed = tryParseJsonArray(raw);
+  // A truncation-recovered parse only contains the leading prefix of the
+  // entailment array; accepting it would silently mark every trailing
+  // claim as not_covered. Force the strict retry instead so the verifier
+  // gets a chance to return a complete response.
+  let validated = parsed && !parsed.recovered
+    && BatchEntailmentResponseSchema.safeParse(parsed.data);
 
   // Attempt 2 — strict retry
   if (!validated || !validated.success) {
@@ -270,8 +260,10 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
         { temperature: 0.05, maxTokens: 3000 }
       );
       accumulate(r2);
-      parsed = tryParseJson(r2.content);
-      validated = parsed && BatchEntailmentResponseSchema.safeParse(parsed);
+      parsed = tryParseJsonArray(r2.content);
+      // On the retry, a recovered prefix is better than nothing — but we
+      // still surface the drop via the log entry built below.
+      validated = parsed && BatchEntailmentResponseSchema.safeParse(parsed.data);
     } catch (err) {
       return buildStructuralOnlyFallback({
         level: 'error',

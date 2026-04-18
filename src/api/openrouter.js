@@ -14,18 +14,11 @@ const LEGACY_API_KEY_ENV = 'VITE_OPENAI_API_KEY';
 // Pull env variables from whatever environment we happen to be running in.
 // In Vite (browser) that's `import.meta.env`; when this module is imported
 // from Node (eval harness, CLI tools) `import.meta.env` is undefined and we
-// fall back to `process.env`. Guarded at access time so both environments
-// can `import` this module without throwing.
+// fall back to `process.env`.
 function readEnv(key) {
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key] != null) {
-      return import.meta.env[key];
-    }
-  } catch {
-    // `import.meta.env` access in some bundlers throws instead of returning
-    // undefined — swallow and fall through to process.env.
-  }
-  if (typeof process !== 'undefined' && process.env && process.env[key] != null) {
+  const viteEnv = import.meta.env;
+  if (viteEnv && viteEnv[key] != null) return viteEnv[key];
+  if (typeof process !== 'undefined' && process.env?.[key] != null) {
     return process.env[key];
   }
   return undefined;
@@ -247,40 +240,3 @@ export async function fetchAvailableModels() {
   return Array.isArray(data?.data) ? data.data : [];
 }
 
-/**
- * Query multiple models in parallel (like llm-council's query_models_parallel).
- *
- * Phase 1: return shape is now
- * `{model, modelName, content, usage, wallClockMs, error}` — `content` is
- * `null` when the call failed, and `error` holds the failure message.
- * Successful entries always carry `usage` and `wallClockMs`.
- *
- * @returns {Promise<Array<{model:string, modelName:string, content:string|null, usage:Usage|null, wallClockMs:number|null, error?:string}>>}
- */
-export async function queryModelsParallel(models, messages, options = {}) {
-  const results = await Promise.allSettled(
-    models.map((m) =>
-      queryModel(m.id, messages, options).then((result) => ({
-        model: m.id,
-        modelName: m.name,
-        content: result.content,
-        usage: result.usage,
-        wallClockMs: result.wallClockMs,
-      }))
-    )
-  );
-
-  return results.map((result, i) => {
-    if (result.status === 'fulfilled') {
-      return result.value;
-    }
-    return {
-      model: models[i].id,
-      modelName: models[i].name,
-      content: null,
-      usage: null,
-      wallClockMs: null,
-      error: result.reason?.message || 'Unknown error',
-    };
-  });
-}

@@ -40,6 +40,7 @@ DRAFT FLAGS
   --verbose          Print stage progress to stderr
   --no-finalize      Stop after update (skip finalize)
   --no-review        Stop after initial draft + claim pipeline
+  --xapi-enrich      Enrich references with X/Twitter data via xAPI
   --timeout          Max seconds before aborting (default: 300)
 
 IDEATE FLAGS
@@ -49,6 +50,7 @@ IDEATE FLAGS
 ENVIRONMENT
   OPENROUTER_API_KEY         API key (preferred)
   VITE_OPENROUTER_API_KEY    API key (Vite fallback)
+  XAPI_KEY                   xAPI key for X/Twitter enrichment (optional)
 
 STDIN
   If stdin is not a TTY, it is read as JSON matching the orchestrate config
@@ -81,6 +83,7 @@ function parseCliArgs() {
       verbose: { type: 'boolean', default: false },
       'no-finalize': { type: 'boolean', default: false },
       'no-review': { type: 'boolean', default: false },
+      'xapi-enrich': { type: 'boolean', default: false },
       timeout: { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
       // ideate
@@ -218,8 +221,9 @@ async function cmdDraft(values, stdinConfig) {
       aggregation: values.aggregation || baseOptions.aggregation,
       escalation: values.escalation || baseOptions.escalation,
       humanFeedback: values.feedback || baseOptions.humanFeedback,
-      skipUpdate: values['no-review'] || baseOptions.skipUpdate,
+      skipReview: values['no-review'] || baseOptions.skipReview,
       skipFinalize: values['no-finalize'] || baseOptions.skipFinalize,
+      xapiEnrich: values['xapi-enrich'] || baseOptions.xapiEnrich || false,
     },
   };
 
@@ -291,7 +295,7 @@ async function cmdDraft(values, stdinConfig) {
 async function cmdIdeate(values) {
   const { queryModel } = await import('../src/api/openrouter.js');
   const { SYSTEM_PROMPTS, buildIdeatePrompt } = await import('../src/constants/prompts.js');
-  const { DEFAULT_DRAFTER_MODEL } = await import('../src/defaults.js');
+  const { DEFAULT_DRAFT_MODEL } = await import('../src/defaults.js');
 
   const direction = values.direction || values.question;
   if (!direction) {
@@ -300,7 +304,7 @@ async function cmdIdeate(values) {
     process.exit(2);
   }
 
-  const model = values.drafter || DEFAULT_DRAFTER_MODEL;
+  const model = values.drafter || DEFAULT_DRAFT_MODEL;
   if (values.verbose) {
     process.stderr.write(`[ideate] model=${model}\n`);
   }
@@ -319,7 +323,7 @@ async function cmdIdeate(values) {
 async function cmdValidate(values) {
   const { extractClaims } = await import('../src/pipeline/extractClaims.js');
   const { verifyClaims } = await import('../src/pipeline/verify.js');
-  const { DEFAULT_DRAFTER_MODEL } = await import('../src/defaults.js');
+  const { DEFAULT_DRAFT_MODEL } = await import('../src/defaults.js');
 
   // Read a Run from stdin or --output file.
   let runJson;
@@ -341,7 +345,7 @@ async function cmdValidate(values) {
     process.exit(2);
   }
 
-  const model = values.drafter || DEFAULT_DRAFTER_MODEL;
+  const model = values.drafter || DEFAULT_DRAFT_MODEL;
   if (values.verbose) {
     process.stderr.write(`[validate] extracting claims with ${model}...\n`);
   }

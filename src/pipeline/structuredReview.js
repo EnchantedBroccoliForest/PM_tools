@@ -28,22 +28,7 @@ import {
   buildStrictStructuredReviewRetryPrompt,
 } from '../constants/prompts.js';
 import { StructuredReviewResponseSchema } from '../types/run.js';
-
-/** Same JSON salvage logic as the claim extractor — see extractClaims.js. */
-function tryParseJson(text) {
-  if (typeof text !== 'string') return null;
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  const candidate = fenced ? fenced[1] : trimmed;
-  // Salvage to the outermost { ... } if there is leading prose.
-  const braced = candidate.match(/\{[\s\S]*\}/);
-  const final = braced ? braced[0] : candidate;
-  try {
-    return JSON.parse(final);
-  } catch {
-    return null;
-  }
-}
+import { tryParseJsonObject, createUsageAggregator } from './llmJson.js';
 
 /**
  * @typedef {Object} StructuredReviewResult
@@ -63,20 +48,15 @@ function tryParseJson(text) {
  * @param {{id:string, name:string}} model        reviewer
  * @param {string} draftContent                   the draft being reviewed
  * @param {import('../constants/rubric').RubricItem[]} rubric
+ * @param {string} [numberOfOutcomes]             optional hard restriction on
+ *                                                the outcome-set cardinality;
+ *                                                empty string means no
+ *                                                restriction (default).
  * @returns {Promise<StructuredReviewResult>}
  */
-export async function runStructuredReview(model, draftContent, rubric) {
+export async function runStructuredReview(model, draftContent, rubric, numberOfOutcomes = '') {
   const rubricIds = new Set(rubric.map((r) => r.id));
-  const aggregate = {
-    usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-    wallClockMs: 0,
-  };
-  const accumulate = (result) => {
-    aggregate.usage.promptTokens += result.usage.promptTokens;
-    aggregate.usage.completionTokens += result.usage.completionTokens;
-    aggregate.usage.totalTokens += result.usage.totalTokens;
-    aggregate.wallClockMs += result.wallClockMs;
-  };
+  const { aggregate, accumulate } = createUsageAggregator();
 
   // Attempt 1
   let raw;
@@ -85,7 +65,7 @@ export async function runStructuredReview(model, draftContent, rubric) {
       model.id,
       [
         { role: 'system', content: SYSTEM_PROMPTS.structuredReviewer },
-        { role: 'user', content: buildStructuredReviewPrompt(draftContent, rubric) },
+        { role: 'user', content: buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes) },
       ],
       { temperature: 0.4, maxTokens: 3000 }
     );
@@ -107,7 +87,7 @@ export async function runStructuredReview(model, draftContent, rubric) {
     };
   }
 
-  let parsed = tryParseJson(raw);
+  let parsed = tryParseJsonObject(raw);
   let validated = parsed && StructuredReviewResponseSchema.safeParse(parsed);
 
   // Attempt 2 — strict retry
@@ -119,13 +99,13 @@ export async function runStructuredReview(model, draftContent, rubric) {
           { role: 'system', content: SYSTEM_PROMPTS.structuredReviewer },
           {
             role: 'user',
-            content: buildStrictStructuredReviewRetryPrompt(draftContent, rubric),
+            content: buildStrictStructuredReviewRetryPrompt(draftContent, rubric, numberOfOutcomes),
           },
         ],
         { temperature: 0.2, maxTokens: 3000 }
       );
       accumulate(r2);
-      parsed = tryParseJson(r2.content);
+      parsed = tryParseJsonObject(r2.content);
       validated = parsed && StructuredReviewResponseSchema.safeParse(parsed);
     } catch (err) {
       return {
@@ -219,11 +199,15 @@ export async function runStructuredReview(model, draftContent, rubric) {
  * @param {Array<{id:string, name:string}>} models
  * @param {string} draftContent
  * @param {import('../constants/rubric').RubricItem[]} rubric
+ * @param {string} [numberOfOutcomes]  optional hard restriction on the
+ *                                     outcome-set cardinality (propagated to
+ *                                     every reviewer); empty string = no
+ *                                     restriction.
  * @returns {Promise<StructuredReviewResult[]>}
  */
-export async function runStructuredReviewsParallel(models, draftContent, rubric) {
+export async function runStructuredReviewsParallel(models, draftContent, rubric, numberOfOutcomes = '') {
   const settled = await Promise.allSettled(
-    models.map((m) => runStructuredReview(m, draftContent, rubric))
+    models.map((m) => runStructuredReview(m, draftContent, rubric, numberOfOutcomes))
   );
   return settled.map((s, i) => {
     if (s.status === 'fulfilled') return s.value;

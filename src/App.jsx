@@ -23,7 +23,9 @@ import { gatherEvidence } from './pipeline/gatherEvidence';
 import { routeClaims, groupRoutingBySeverity } from './pipeline/route';
 import { checkResolutionSources } from './pipeline/checkSources';
 import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
-import { parseRun } from './types/run';
+import { parseRun, GLOBAL_CLAIM_ID } from './types/run';
+import { DRAFT_MAX_TOKENS } from './defaults';
+import { parseRiskLevel } from './util/riskLevel';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
@@ -75,6 +77,17 @@ function renderContent(text) {
   }
 
   return elements;
+}
+
+function formatRelativeTime(timestamp) {
+  if (!timestamp) return '';
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
 }
 
 function formatInline(text) {
@@ -227,29 +240,30 @@ function buildReferenceFromIdea(idea) {
   return (idea.rest || idea.rawText || '').trim();
 }
 
-// Parse the risk level out of the early-resolution analyst response. The
-// prompt instructs the model to begin with "Risk rating: Low/Medium/High" —
-// anything else falls back to 'unknown', which does NOT block the gate (only
-// confirmed HIGH blocks).
-function parseRiskLevel(text) {
-  if (typeof text !== 'string' || text.length === 0) return 'unknown';
-  const match = text.match(/risk\s*rating\s*[:-]?\s*(low|medium|high)/i);
-  return match ? match[1].toLowerCase() : 'unknown';
-}
-
 function toSimpleRoutingReason(reason) {
   if (!reason) return '';
-  if (reason === 'verification hard_fail') return 'the checks found a serious failure';
-  if (reason === 'verification soft_fail') return 'the checks found a possible issue';
-  if (reason === 'draft contradicts claim') return 'the draft says the opposite of this claim';
-  if (reason === 'not covered by draft') return 'the draft does not clearly address this claim';
-  if (reason === 'cited URL did not resolve') return 'a cited link could not be opened';
-  if (reason === 'run has a global blocker criticism') return 'there is a run-level blocker that must be fixed';
+  if (reason === 'verification hard_fail') return 'Failed a verification check';
+  if (reason === 'verification soft_fail') return 'Flagged as a potential issue during verification';
+  if (reason === 'draft contradicts claim') return 'The draft contradicts this claim';
+  if (reason === 'not covered by draft') return 'Not clearly addressed in the draft';
+  if (reason === 'cited URL did not resolve') return 'A linked source could not be reached';
+  if (reason === 'run has a global blocker criticism') return 'A reviewer flagged a market-wide issue';
   const blockerMatch = reason.match(/^(\d+)\s+blocker criticism\(s\)$/);
-  if (blockerMatch) return `${blockerMatch[1]} blocker concern(s) were raised about this claim`;
+  if (blockerMatch) return `Reviewers raised ${blockerMatch[1]} blocking concern${blockerMatch[1] === '1' ? '' : 's'}`;
   const majorMatch = reason.match(/^(\d+)\s+major criticism\(s\)$/);
-  if (majorMatch) return `${majorMatch[1]} major concern(s) were raised about this claim`;
+  if (majorMatch) return `Reviewers raised ${majorMatch[1]} major concern${majorMatch[1] === '1' ? '' : 's'}`;
   return reason;
+}
+
+function humanReadableClaimCategory(claimId) {
+  if (!claimId) return '';
+  if (claimId.startsWith('claim.source')) return 'Resolution source';
+  if (claimId.startsWith('claim.threshold')) return 'Resolution rule';
+  if (claimId.startsWith('claim.mece')) return 'Outcome coverage';
+  if (claimId.startsWith('claim.edge')) return 'Edge case';
+  if (claimId.startsWith('claim.timing')) return 'Timing / deadline';
+  if (claimId.startsWith('claim.oracle')) return 'Oracle / data source';
+  return 'Claim';
 }
 
 function getSimpleBlockReasons(currentRun) {
@@ -262,7 +276,7 @@ function getSimpleBlockReasons(currentRun) {
     }
   }
 
-  if ((currentRun?.criticisms || []).some((c) => c.claimId === 'global' && c.severity === 'blocker')) {
+  if ((currentRun?.criticisms || []).some((c) => c.claimId === GLOBAL_CLAIM_ID && c.severity === 'blocker')) {
     reasons.add('a blocker applies to the whole run');
   }
   return Array.from(reasons);
@@ -277,6 +291,7 @@ function App() {
   useModels();
   const panel2Ref = useRef(null);
   const panel3Ref = useRef(null);
+  const draftOutputRef = useRef(null);
   // Phase 5: a mirror of `currentRun` kept in a ref so async handlers that
   // fire successive dispatches (claim extract → verify → evidence → route)
   // can read the latest criticism/claim set synchronously without waiting
@@ -289,6 +304,7 @@ function App() {
     startDate,
     endDate,
     references,
+    numberOfOutcomes,
     selectedModel,
     reviewModels,
     aggregationProtocol,
@@ -302,6 +318,9 @@ function App() {
     error,
     dateError,
     draftContent,
+    draftVersions,
+    viewingVersionIndex,
+    draftJustUpdated,
     reviews,
     deliberatedReview,
     finalContent,
@@ -316,6 +335,11 @@ function App() {
     runTraceOpen,
     copiedId,
   } = state;
+
+  const latestVersionIndex = draftVersions.length - 1;
+  const displayedVersion = draftVersions[viewingVersionIndex];
+  const displayedDraftContent = displayedVersion ? displayedVersion.content : draftContent;
+  const isViewingLatest = viewingVersionIndex === latestVersionIndex;
 
   // Phase 0 gate: Accept & Finalize is blocked when the early-resolution
   // analyst has flagged the updated draft as HIGH risk and the user has not
@@ -355,6 +379,16 @@ function App() {
     }
   }, [currentStep]);
 
+  // After an update, scroll the refreshed draft into view and clear the flash flag
+  useEffect(() => {
+    if (!draftJustUpdated) return;
+    if (draftOutputRef.current) {
+      draftOutputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    const timer = setTimeout(() => dispatch({ type: 'CLEAR_DRAFT_JUST_UPDATED' }), 1800);
+    return () => clearTimeout(timer);
+  }, [draftJustUpdated, dispatch]);
+
   // Keep the ref mirror of `currentRun` up to date so async pipelines can
   // read the latest criticism/claim set without closing over stale state.
   useEffect(() => {
@@ -372,7 +406,10 @@ function App() {
 
   const formatUTCDateHint = (dateString, suffix) => {
     if (!dateString) return null;
-    const parsed = new Date(`${dateString}T${suffix}`);
+    // Append 'Z' so the string is parsed as UTC, not local time. Without it
+    // `new Date('2026-06-01T00:00:00')` is taken as local time and the
+    // resulting ISO string shifts by the viewer's timezone offset.
+    const parsed = new Date(`${dateString}T${suffix}Z`);
     if (Number.isNaN(parsed.getTime())) return null;
     return parsed.toISOString().replace('T', ' ').slice(0, -5);
   };
@@ -529,13 +566,13 @@ function App() {
     // Start a fresh Run artifact; previous run (if any) is discarded.
     dispatch({
       type: 'RUN_START',
-      input: { question, startDate, endDate, references },
+      input: { question, startDate, endDate, references, numberOfOutcomes },
     });
     try {
       const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildDraftPrompt(question, startDate, endDate, references) },
-      ]);
+        { role: 'user', content: buildDraftPrompt(question, startDate, endDate, references, numberOfOutcomes) },
+      ], { maxTokens: DRAFT_MAX_TOKENS });
       dispatch({ type: 'DRAFT_SUCCESS', content: result.content });
       recordCost('draft', result);
       dispatch({
@@ -592,7 +629,8 @@ function App() {
       const structuredResults = await runStructuredReviewsParallel(
         reviewerModels,
         draftContent,
-        RIGOR_RUBRIC
+        RIGOR_RUBRIC,
+        numberOfOutcomes,
       );
 
       // Per-reviewer cost + log accounting.
@@ -629,7 +667,7 @@ function App() {
       // when we have 2+ reviewers.
       let deliberatedReview = null;
       if (legacyReviews.length > 1) {
-        const deliberationPrompt = buildDeliberationPrompt(draftContent, legacyReviews);
+        const deliberationPrompt = buildDeliberationPrompt(draftContent, legacyReviews, numberOfOutcomes);
         const delibResult = await queryModel(legacyReviews[0].model, [
           { role: 'system', content: SYSTEM_PROMPTS.reviewer },
           { role: 'user', content: deliberationPrompt },
@@ -684,18 +722,20 @@ function App() {
       // off an empty criticism list; recomputing here lets blocker/major
       // criticisms promote a claim into 'blocking' or 'targeted_review'
       // so the Accept gate sees them immediately.
+      //
+      // Read claims/verification/evidence from the freshest ref, not a
+      // pre-await snapshot — a background runClaimExtractorAndRecord
+      // started by handleDraft/handleUpdate may have finished during the
+      // aggregate() await above and published new verify/evidence state.
+      // Union allCriticisms in explicitly because the RUN_APPEND_CRITICISMS
+      // dispatched above may not have flushed through to the ref yet.
       const latestRun = currentRunRef.current;
-      const latestClaims = latestRun?.claims || [];
-      const latestVerifs = latestRun?.verification || [];
-      const latestEvidence = latestRun?.evidence || [];
-      // The newly-appended criticisms aren't yet on the ref (dispatch is
-      // async w.r.t. re-render), so union them in explicitly.
       const combinedCriticisms = [...(latestRun?.criticisms || []), ...allCriticisms];
       const routing = routeClaims({
-        claims: latestClaims,
-        verifications: latestVerifs,
+        claims: latestRun?.claims || [],
+        verifications: latestRun?.verification || [],
         criticisms: combinedCriticisms,
-        evidence: latestEvidence,
+        evidence: latestRun?.evidence || [],
       });
       dispatch({ type: 'RUN_SET_ROUTING', routing });
     } catch (err) {
@@ -731,8 +771,8 @@ function App() {
       );
       const result = await queryModel(selectedModel, [
         { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildUpdatePrompt(draftContent, reviewText, humanReviewInput, focusBlock) },
-      ]);
+        { role: 'user', content: buildUpdatePrompt(displayedDraftContent, reviewText, humanReviewInput, focusBlock, numberOfOutcomes, references) },
+      ], { maxTokens: DRAFT_MAX_TOKENS });
       updatedDraft = result.content;
       dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });
       recordCost('update', result);
@@ -844,7 +884,7 @@ function App() {
         selectedModel,
         [
           { role: 'system', content: SYSTEM_PROMPTS.finalizer },
-          { role: 'user', content: buildFinalizePrompt(draftContent, startDate, endDate) },
+          { role: 'user', content: buildFinalizePrompt(draftContent, startDate, endDate, numberOfOutcomes) },
         ],
         { temperature: 0.3 }
       );
@@ -1090,6 +1130,23 @@ function App() {
                 </div>
 
                 <div className="form-group">
+                  <label htmlFor="numberOfOutcomes">
+                    Number of Outcomes <span className="label-hint">(optional)</span>
+                  </label>
+                  <input
+                    id="numberOfOutcomes"
+                    type="number"
+                    min="2"
+                    step="1"
+                    value={numberOfOutcomes}
+                    onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'numberOfOutcomes', value: e.target.value })}
+                    placeholder="Leave blank to let the drafter choose"
+                    className="input"
+                    disabled={loading === 'draft'}
+                  />
+                </div>
+
+                <div className="form-group">
                   <label htmlFor="model">Drafting Model</label>
                   <ModelSelect
                     id="model"
@@ -1231,6 +1288,17 @@ function App() {
                         <div className="col-panel-actions">
                           <span className="model-badge" data-tooltip={getModelName(ideatingModel)}>{getModelAbbrev(ideatingModel)}</span>
                           <button
+                            type="button"
+                            className="copy-btn"
+                            onClick={handleIdeate}
+                            disabled={!ideatingInput.trim() || loading === 'ideate'}
+                            title="Generate a fresh batch of 3 ideas"
+                            aria-label="Refresh ideas"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-1px', marginRight: 4 }}><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" /><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" /></svg>
+                            Refresh
+                          </button>
+                          <button
                             className={`copy-btn ${copiedId === 'ideating' ? 'copy-btn--copied' : ''}`}
                             onClick={() => handleCopy(ideatingContent, 'ideating')}
                           >
@@ -1298,22 +1366,72 @@ function App() {
                 </div>
               )}
               {mode !== 'ideating' && draftContent && (
-                <div className="draft-output-section fade-in">
-                  <div className="col-panel col-panel--draft">
+                <div className="draft-output-section fade-in" ref={draftOutputRef}>
+                  <div className={`col-panel col-panel--draft ${draftJustUpdated ? 'col-panel--just-updated' : ''}`}>
                     <div className="col-panel-header">
-                      <h2>Draft</h2>
+                      <div className="draft-title-group">
+                        <h2>Draft</h2>
+                        {draftVersions.length > 0 && (
+                          <span className="version-badge" title={`Version ${viewingVersionIndex + 1} of ${draftVersions.length}`}>
+                            v{viewingVersionIndex + 1}
+                            {draftVersions.length > 1 && <span className="version-badge__total">/{draftVersions.length}</span>}
+                          </span>
+                        )}
+                        {displayedVersion && (
+                          <span className="version-timestamp">
+                            {isViewingLatest && displayedVersion.source === 'update' ? 'Updated ' : ''}
+                            {formatRelativeTime(displayedVersion.timestamp)}
+                          </span>
+                        )}
+                      </div>
                       <div className="col-panel-actions">
+                        {draftVersions.length > 1 && (
+                          <div className="version-switcher" role="group" aria-label="Draft version history">
+                            <button
+                              type="button"
+                              className="version-switcher__btn"
+                              disabled={viewingVersionIndex === 0}
+                              onClick={() => dispatch({ type: 'SET_VIEWING_VERSION', index: viewingVersionIndex - 1 })}
+                              aria-label="Previous version"
+                              title="Previous version"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="version-switcher__btn"
+                              disabled={isViewingLatest}
+                              onClick={() => dispatch({ type: 'SET_VIEWING_VERSION', index: viewingVersionIndex + 1 })}
+                              aria-label="Next version"
+                              title="Next version"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                            </button>
+                          </div>
+                        )}
                         <span className="model-badge" data-tooltip={getModelName(selectedModel)}>{getModelAbbrev(selectedModel)}</span>
                         <button
                           className={`copy-btn ${copiedId === 'draft' ? 'copy-btn--copied' : ''}`}
-                          onClick={() => handleCopy(draftContent, 'draft')}
+                          onClick={() => handleCopy(displayedDraftContent, 'draft')}
                         >
                           {copiedId === 'draft' ? 'Copied!' : 'Copy'}
                         </button>
                       </div>
                     </div>
+                    {!isViewingLatest && (
+                      <div className="version-banner">
+                        <span>Viewing an earlier version (v{viewingVersionIndex + 1} of {draftVersions.length})</span>
+                        <button
+                          type="button"
+                          className="version-banner__btn"
+                          onClick={() => dispatch({ type: 'SET_VIEWING_VERSION', index: latestVersionIndex })}
+                        >
+                          Jump to latest
+                        </button>
+                      </div>
+                    )}
                     <div className="content-box content-box--rich">
-                      {renderContent(draftContent)}
+                      {renderContent(displayedDraftContent)}
                     </div>
                   </div>
                 </div>
@@ -1569,38 +1687,96 @@ function App() {
                       </div>
                       <div className="risk-gate__body">
                         <p className="risk-gate__hint">
-                          Rigor routing is a quick safety check that sorts claims into: okay, needs more review, or blocks finalize.
+                          These checks verify that the draft's claims — resolution sources, rules, edge cases — are consistent and well-supported.
                         </p>
                         {(() => {
                           const grouped = groupRoutingBySeverity(currentRun.routing);
                           const claimsById = new Map(currentRun.claims.map((c) => [c.id, c]));
-                          const render = (items) =>
-                            items.slice(0, 8).map((item) => {
-                              const claim = claimsById.get(item.claimId);
-                              return (
-                                <li key={item.claimId}>
-                                  <code>{item.claimId}</code>
-                                  {claim ? ` — ${claim.text}` : ''}
-                                  {item.reasons.length > 0 && (
-                                    <span className="risk-gate__reasons">
-                                      {' '}({item.reasons.map(toSimpleRoutingReason).join('; ')})
-                                    </span>
-                                  )}
-                                </li>
-                              );
-                            });
+
+                          // Pull out reasons that appear on EVERY item in a group —
+                          // these are universal signals (e.g. a global blocker
+                          // criticism) and are far more useful surfaced once at
+                          // the top than repeated on every card.
+                          const findSharedReasons = (items) => {
+                            if (items.length < 2) return new Set();
+                            const first = new Set(items[0].reasons || []);
+                            for (let i = 1; i < items.length; i++) {
+                              const cur = new Set(items[i].reasons || []);
+                              for (const r of first) {
+                                if (!cur.has(r)) first.delete(r);
+                              }
+                            }
+                            return first;
+                          };
+
+                          const renderCard = (item, shared) => {
+                            const claim = claimsById.get(item.claimId);
+                            const category = humanReadableClaimCategory(item.claimId);
+                            const uniqueReasons = (item.reasons || []).filter((r) => !shared.has(r));
+                            const hasText = claim && claim.text && claim.text.trim();
+                            // Drop cards that add nothing specific — no claim text AND no unique reasons.
+                            // The shared reasons banner already tells the user why they're flagged.
+                            if (!hasText && uniqueReasons.length === 0) return null;
+                            return (
+                              <li key={item.claimId} className="risk-gate__item">
+                                <span className="risk-gate__category">{category}</span>
+                                {hasText ? (
+                                  <span className="risk-gate__claim-text">{claim.text}</span>
+                                ) : (
+                                  <span className="risk-gate__claim-text risk-gate__claim-text--faint">
+                                    <code>{item.claimId}</code> (claim text unavailable)
+                                  </span>
+                                )}
+                                {uniqueReasons.length > 0 && (
+                                  <ul className="risk-gate__reason-list">
+                                    {uniqueReasons.map((r, i) => (
+                                      <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </li>
+                            );
+                          };
+
+                          const renderGroup = (items) => {
+                            const shared = findSharedReasons(items);
+                            const cards = items.slice(0, 12).map((item) => renderCard(item, shared)).filter(Boolean);
+                            return { shared, cards };
+                          };
+
+                          const renderSharedBanner = (shared, total) => {
+                            if (shared.size === 0) return null;
+                            return (
+                              <div className="risk-gate__shared-banner">
+                                <span className="risk-gate__shared-title">
+                                  Affecting all {total} flagged claim{total === 1 ? '' : 's'}:
+                                </span>
+                                <ul className="risk-gate__reason-list">
+                                  {Array.from(shared).map((r, i) => (
+                                    <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          };
+
+                          const blocking = renderGroup(grouped.blocking);
+                          const targeted = renderGroup(grouped.targeted_review);
+
                           return (
                             <>
                               {grouped.blocking.length > 0 && (
                                 <>
-                                  <p className="risk-gate__subheading">Blocking ({grouped.blocking.length}):</p>
-                                  <ul className="risk-gate__list">{render(grouped.blocking)}</ul>
+                                  <p className="risk-gate__subheading risk-gate__subheading--blocking">Must fix before finalizing ({grouped.blocking.length}):</p>
+                                  {renderSharedBanner(blocking.shared, grouped.blocking.length)}
+                                  {blocking.cards.length > 0 && <ul className="risk-gate__list">{blocking.cards}</ul>}
                                 </>
                               )}
                               {grouped.targeted_review.length > 0 && (
                                 <>
-                                  <p className="risk-gate__subheading">Needs targeted review ({grouped.targeted_review.length}):</p>
-                                  <ul className="risk-gate__list">{render(grouped.targeted_review)}</ul>
+                                  <p className="risk-gate__subheading risk-gate__subheading--review">Worth reviewing ({grouped.targeted_review.length}):</p>
+                                  {renderSharedBanner(targeted.shared, grouped.targeted_review.length)}
+                                  {targeted.cards.length > 0 && <ul className="risk-gate__list">{targeted.cards}</ul>}
                                 </>
                               )}
                             </>
@@ -1641,29 +1817,16 @@ function App() {
                   {hasUpdated && (loading === 'source-accessibility' || sourceAccessibility) && (() => {
                     const status = sourceAccessibility?.status || null;
                     const isChecking = loading === 'source-accessibility';
-                    const gateLevel =
-                      status === 'ok'
-                        ? 'low'
-                        : status === 'all_unreachable'
-                          ? 'high'
-                          : status === 'some_unreachable'
-                            ? 'medium'
-                            : status === 'error' || status === 'no_sources'
-                              ? 'unknown'
-                              : 'checking';
-                    const levelLabel = isChecking
-                      ? null
-                      : status === 'ok'
-                        ? 'REACHABLE'
-                        : status === 'all_unreachable'
-                          ? 'ALL UNREACHABLE'
-                          : status === 'some_unreachable'
-                            ? 'PARTIAL'
-                            : status === 'no_sources'
-                              ? 'NO SOURCES'
-                              : status === 'error'
-                                ? 'ERROR'
-                                : 'UNKNOWN';
+                    const STATUS_META = {
+                      ok:               { level: 'low',     label: 'REACHABLE' },
+                      some_unreachable: { level: 'medium',  label: 'PARTIAL' },
+                      all_unreachable:  { level: 'high',    label: 'ALL UNREACHABLE' },
+                      no_sources:       { level: 'unknown', label: 'NO SOURCES' },
+                      error:            { level: 'unknown', label: 'ERROR' },
+                    };
+                    const meta = STATUS_META[status] || { level: 'checking', label: 'UNKNOWN' };
+                    const gateLevel = meta.level;
+                    const levelLabel = isChecking ? null : meta.label;
                     const originLabel = (origin) => {
                       if (origin === 'source_claim') return 'source claim';
                       if (origin === 'resolution_section') return 'resolution section';
