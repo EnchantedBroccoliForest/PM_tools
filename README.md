@@ -1,22 +1,28 @@
-# PM_tools — AI-Assisted Prediction Market Creator
+# 42_creator_tool — Rigor Pipeline for 42.space Market Drafts
 
-A web application and CLI that uses multiple LLMs via the OpenRouter API to help users design well-defined prediction market questions for [42.space](https://42.space). Markets are produced through a claim-level drafting, verification, review, and refinement pipeline.
+`42_creator_tool` (formerly `PM_tools`) is a web app and headless CLI that drafts, verifies, critiques, and finalizes market proposals for [42.space](https://42.space) — an **Events Futures** protocol whose parimutuel-on-bonding-curve settlement is unforgiving of ambiguity. A market with overlapping outcomes, a missing edge case, an interpretive source, or a drifting deadline can permanently strand real collateral, so drafts are not trusted on their first pass. Instead, every draft is decomposed into atomic claims, hit with structural and entailment verifiers, checked against its cited sources, critiqued in parallel by multiple reviewer LLMs against a 42-specific rigor rubric, and only then refined and finalized into the JSON shape that spawns Outcome Tokens.
+
+The repository is both a **product** — a deterministic pipeline that a market creator can run end-to-end from the browser or CI — and a **research harness**: the same orchestrator drives a regression eval over 35+ adversarial fixtures (ambiguity, factual traps, RAG traps, numerical/date edge cases) with a committed baseline, a deterministic mock LLM, and a CI gate that fails any change that weakens accuracy, citation coverage, or verifier pass rate by more than 10%.
+
+## Why This Exists
+
+42.space is **not** a Polymarket / Kalshi / CTF-style binary market. Every outcome gets its own Outcome Token on its own bonding curve, trading halts at a hard UTC deadline, one winner is declared by predefined objective rules, and all losing collateral is pooled and paid pro-rata to the winning holders. That mechanism imposes design constraints that ordinary LLM drafting gets wrong by default: outcomes must be MECE (overlap breaks pro-rata math, gaps strand collateral), sources must be machine-readable and non-interpretive, scalar questions must be discretized into named buckets, and every edge case (postponement, ties, source unavailability) must route to a named fallback outcome rather than "resolver discretion." The pipeline encodes those rules as machine-checkable gates instead of hoping the model remembers them.
 
 ## How It Works
 
-PM_tools guides users through a multi-stage pipeline to produce unambiguous, objectively resolvable prediction markets:
+The app guides the user through a multi-stage pipeline. Each stage emits structured artifacts into a canonical `Run` record (see `src/types/run.js`) that is zod-validated, replayable, and the basis for both the UI, the CLI output, and the eval harness's regression checks.
 
 ### Stage 1: Draft
 
-The user provides a prediction market question, start/end dates, reference URLs, and selects a drafting model. The LLM generates a comprehensive market draft that includes:
+The user provides a question, start/end dates (UTC), reference URLs, and a drafting model. The drafter — prompted with the full 42.space protocol context block (see `src/constants/prompts.js`) — produces:
 
 - A refined, unambiguous question
-- Detailed resolution criteria mapped to an objective data source
-- A complete MECE (mutually exclusive, collectively exhaustive) outcome set
-- Edge case handling
+- Detailed resolution criteria mapped to an objective, machine-readable data source
+- A complete MECE outcome set (with an explicit `Other / None` catch-all unless the outcome space is provably closed)
+- Named fallback routing for every edge case (postponement, ties, source unavailability, "no listed outcome occurred")
 - Potential resolution sources
 
-An **Ideate** mode is also available: the user provides a topic direction and the model brainstorms market ideas.
+An **Ideate** mode is available: given a topic direction, the model brainstorms multiple candidate markets — each constrained by the same protocol rules — and the user picks one to draft.
 
 ### Stage 2: Claim Extraction & Verification
 
@@ -33,24 +39,25 @@ The draft is decomposed into atomic **claims** (outcome criteria, timestamps, th
 
 ### Stage 4: Structured Multi-Model Review
 
-Multiple reviewer models critique the draft against a **six-item rigor rubric** tailored to 42.space's parimutuel-on-bonding-curve mechanism:
+Multiple reviewer models — prompted as adversarial, skeptical red-team auditors rather than graders — critique the draft against a **six-item rigor rubric** (`src/constants/rubric.js`) targeting real failure modes of the Outcome Token mechanism: MECE outcomes, objective/machine-readable sources, unambiguous UTC timing, manipulation resistance, meaningful trade phase, and named edge-case fallbacks.
 
 1. **Parallel structured reviews** — each reviewer returns prose critique, per-rubric-item votes (`yes`/`no`/`unsure` with rationale), and typed criticisms (blocker/major/minor/nit).
-2. **Aggregation** — reviewer votes are aggregated via one of three protocols: `majority`, `unanimity`, or `judge` (an additional LLM renders the final verdict).
+2. **Aggregation** — reviewer votes are aggregated via one of three protocols: `majority`, `unanimity`, or `judge` (an additional LLM renders the final verdict and resolves ties / overrides).
 3. **Human feedback** — the user can optionally add their own critiques before proceeding.
 
 ### Stage 5: Update
 
 The original drafting model incorporates the aggregated review, claim-level routing focus, and any human feedback to produce an improved draft. The claim pipeline (extraction → verification → evidence → routing) re-runs on the updated draft.
 
-### Stage 6: Source Accessibility Check & Finalize
+### Stage 6: Source Accessibility Check, Early-Resolution Risk & Finalize
 
 - **Pre-finalize source check** — resolution sources named in the draft are probed for accessibility so the user sees a clear per-source pass/fail list before committing.
-- **Finalize** — the final draft is converted into structured JSON containing an array of outcomes (each with resolution criteria), market start/end times in UTC, short description, full resolution rules, and edge cases. All sections are copyable to clipboard.
+- **Early-resolution risk analysis** — a lightweight analyst pass (`src/util/riskLevel.js` + prompts) estimates whether the market could collapse to certainty well before the end date, since 42.space's bonding curve depends on a meaningful trade phase.
+- **Finalize** — the draft is converted into structured JSON matching the Outcome Token spawn shape: an array of outcomes (each with its own resolution criteria), start/end times in UTC, short description, full resolution rules, and edge cases. All sections are copyable to clipboard.
 
 ## CLI
 
-PM_tools ships a headless CLI (`bin/pm-tools.js`) that runs the full pipeline without the React UI:
+The repository ships a headless CLI (`bin/pm-tools.js`, exposed as `pm-tools`) that runs the full pipeline — including claim extraction, verification, evidence, review, aggregation, update, risk analysis, and finalization — without the React UI. It shares its orchestrator (`src/orchestrate.js`) with the eval harness, so CLI runs are byte-identical in behavior to CI runs.
 
 ```bash
 # Run the full pipeline
@@ -127,21 +134,23 @@ eval/
 
 ### Key Design Decisions
 
-- **State management** uses React's `useReducer` (via the `useMarketReducer` custom hook) rather than an external state library, keeping the dependency footprint minimal.
-- **Claim-level pipeline** — every draft passes through extraction, verification, evidence gathering, and routing before review. This catches structural problems, hallucinated claims, and broken sources before expensive reviewer LLM calls.
-- **Run artifact** (`src/types/run.js`) is the canonical record of a pipeline run: drafts, claims, criticisms, evidence, verification results, aggregation decisions, final JSON, cost accounting, and a structured event log. Validated with zod at parse time.
-- **Prompt engineering** is centralized in `src/constants/prompts.js` with distinct system prompts for the drafter, reviewer, and finalizer roles, plus builder functions for each stage's user prompt. Prompts are tailored to 42.space's parimutuel-on-bonding-curve settlement mechanism.
-- **Rigor rubric** (`src/constants/rubric.js`) — a six-item checklist targeting real failure modes of 42.space's Outcome Token mechanism (MECE outcomes, objective sources, unambiguous timing, manipulation resistance, etc.).
-- **API resilience** — The OpenRouter client (`src/api/openrouter.js`) implements automatic retries with exponential backoff (3 retries at 1s/2s/4s intervals).
-- **Live model list** — the app fetches available models from the OpenRouter API at startup and caches them for one hour; a static fallback list covers offline / failure scenarios. The default drafting and review models are declared in `src/constants/models.js` as `DEFAULT_DRAFT_MODEL` and `DEFAULT_REVIEW_MODEL`; these are revised in lock-step with OpenRouter model availability, so this README intentionally does not pin specific IDs.
+- **Single protocol context block** — `PROTOCOL_CONTEXT` in `src/constants/prompts.js` is the single source of truth for 42.space's mechanism rules and is injected into every drafter, reviewer, finalizer, ideator, judge, and verifier prompt. Role preambles set identity and output discipline only; they never restate the rules, so updates to the protocol propagate to every stage at once.
+- **Claim-level pipeline** — every draft passes through extraction, verification, evidence gathering, and routing before review. This catches structural problems, hallucinated claims, and broken sources **before** expensive reviewer LLM calls.
+- **Run artifact** (`src/types/run.js`) is the canonical record of a pipeline run: drafts, claims, criticisms, evidence, verification results, aggregation decisions, routing rollups, final JSON, cost accounting, and a structured event log. Zod-validated at parse time, so any regression in the orchestrator surfaces as a schema error rather than silent data corruption.
+- **Rigor rubric** (`src/constants/rubric.js`) — a six-item checklist targeting real failure modes of the Outcome Token mechanism (MECE outcomes, objective sources, unambiguous timing, manipulation resistance, meaningful trade phase, named edge-case fallbacks).
 - **Headless orchestrator** (`src/orchestrate.js`) — runs the full pipeline without React, shared by the CLI and eval harness. Supports abort via `AbortSignal`, lifecycle callbacks, concurrency limiting, and cost accounting.
+- **State management** uses React's `useReducer` (via the `useMarketReducer` custom hook) rather than an external state library, keeping the dependency footprint minimal (just `react`, `react-dom`, and `zod` at runtime).
+- **API resilience** — the OpenRouter client (`src/api/openrouter.js`) implements automatic retries with exponential backoff (3 retries at 1s/2s/4s intervals) and a shared JSON salvage helper (`src/pipeline/llmJson.js`) that recovers from truncated or fenced LLM output without losing the run.
+- **Live model list** — the app fetches available models from the OpenRouter API at startup and caches them for one hour; a static fallback list covers offline / failure scenarios. Default models (`DEFAULT_DRAFT_MODEL`, `DEFAULT_REVIEW_MODEL` in `src/constants/models.js`) are revised in lock-step with OpenRouter availability, so this README intentionally does not pin specific IDs.
+- **Prompt-injection defense** for third-party content — xAPI-fetched profile / tweet text is wrapped in an explicit `untrusted` block in the prompt with instructions for the model to treat any embedded directives as data, not instructions.
 
 ## Tech Stack
 
-- **React 19** with **Vite** for development and bundling
-- **OpenRouter API** for LLM inference
-- **Zod** for runtime schema validation (LLM JSON output, Run artifacts)
-- **Vitest** for unit testing
+- **React 19** with **Vite 7** for development and bundling
+- **OpenRouter API** as the single LLM gateway (any model on OpenRouter can be used as drafter, reviewer, or judge)
+- **Zod 4** for runtime schema validation of LLM JSON output and Run artifacts
+- **Vitest 4** for unit tests; the eval harness for end-to-end regression tests
+- **Node.js 20+** for the CLI and eval harness
 
 ## Getting Started
 
@@ -189,11 +198,12 @@ npm run test:watch   # interactive mode
 
 ### Regression eval harness
 
-The eval harness runs the full PM_tools pipeline (draft → extract claims →
+The eval harness runs the full pipeline (draft → extract claims →
 verify → gather evidence → route → review → aggregate → update → risk →
-finalize) against 30+ fixtures without the UI, using a deterministic mock
+finalize) against 35+ fixtures without the UI, using a deterministic mock
 LLM and mock URL fetcher so the run is reproducible and requires no API
-key.
+key. It is the same orchestrator the CLI uses — there is no eval-only
+code path that could drift from production behavior.
 
 ```bash
 # Run the full suite against the default ablation
@@ -230,8 +240,8 @@ coverage, or verifier pass rate by more than 10%) fails CI.
 
 ## Attribution
 
-PM_tools' multi-reviewer deliberation stage is **inspired by** the "Structure D" pattern from [`karpathy/llm-council`](https://github.com/karpathy/llm-council) and has been re-implemented from scratch here. Because `karpathy/llm-council` ships without a licence, no code has been copied from that repository — only the high-level pattern (independent parallel reviews followed by a synthesis pass) has been borrowed. Any resemblance beyond that is coincidental.
+The multi-reviewer deliberation stage is **inspired by** the "Structure D" pattern from [`karpathy/llm-council`](https://github.com/karpathy/llm-council) and has been re-implemented from scratch here. Because `karpathy/llm-council` ships without a licence, no code has been copied from that repository — only the high-level pattern (independent parallel reviews followed by a synthesis pass) has been borrowed. Any resemblance beyond that is coincidental.
 
 ## Licence
 
-PM_tools is released under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE).
