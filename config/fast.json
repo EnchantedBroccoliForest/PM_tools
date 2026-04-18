@@ -1,5 +1,4 @@
 {
-  "$schema": "./pipeline-config.schema.json",
   "description": "Fast, low-cost configuration. Skips evidence gathering and uses partial verification. Suitable for rapid iteration on draft wording before committing to a full review.",
 
   "models": {

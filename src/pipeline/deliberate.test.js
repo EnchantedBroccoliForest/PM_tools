@@ -115,7 +115,7 @@ describe('formatPeerSummary', () => {
       makeReview('model-a', 'Model A', [{ ruleId: 'mece', verdict: 'yes' }]),
       makeReview('model-b', 'Model B', [{ ruleId: 'mece', verdict: 'no' }]),
     ];
-    const summary = formatPeerSummary(reviews, 'model-a', RUBRIC);
+    const summary = formatPeerSummary(reviews, 'model-a');
     expect(summary).toContain('Model B');
     expect(summary).not.toContain('Model A');
   });
@@ -124,7 +124,7 @@ describe('formatPeerSummary', () => {
     const reviews = [
       makeReview('model-a', 'Model A', [{ ruleId: 'mece', verdict: 'yes' }]),
     ];
-    const summary = formatPeerSummary(reviews, 'model-a', RUBRIC);
+    const summary = formatPeerSummary(reviews, 'model-a');
     expect(summary).toMatch(/no peer reviews/i);
   });
 
@@ -139,7 +139,7 @@ describe('formatPeerSummary', () => {
       makeReview('model-a', 'Model A', [{ ruleId: 'mece', verdict: 'yes' }]),
       review,
     ];
-    const summary = formatPeerSummary(reviews, 'model-a', RUBRIC);
+    const summary = formatPeerSummary(reviews, 'model-a');
     expect(summary).toContain('Outcomes overlap');
     expect(summary).toContain('blocker');
     expect(summary).toContain('MECE violation');

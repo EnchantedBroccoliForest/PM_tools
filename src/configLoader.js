@@ -23,7 +23,7 @@
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_DRAFT_MODEL,
@@ -42,7 +42,7 @@ const CONFIG_DIR = resolve(__dirname, '..', 'config');
 export function listConfigs() {
   try {
     return readdirSync(CONFIG_DIR)
-      .filter((f) => f.endsWith('.json') && !f.endsWith('.schema.json'))
+      .filter((f) => f.endsWith('.json'))
       .map((f) => f.replace(/\.json$/, ''));
   } catch {
     return [];
@@ -66,7 +66,7 @@ export function loadConfig(pathOrName) {
   }
 
   // Resolve relative paths
-  if (!filePath.startsWith('/')) {
+  if (!isAbsolute(filePath)) {
     filePath = resolve(process.cwd(), filePath);
   }
 
