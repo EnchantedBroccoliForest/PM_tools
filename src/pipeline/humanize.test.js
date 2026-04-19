@@ -25,7 +25,7 @@ describe('mergeHumanized', () => {
         { name: 'Other', winCondition: 'Neither listed team wins.', resolutionCriteria: 'Official box score shows no listed team.' },
       ],
     };
-    const merged = mergeHumanized(SAMPLE_FINAL, humanized);
+    const { merged } = mergeHumanized(SAMPLE_FINAL, humanized);
     expect(merged.outcomes.map((o) => o.name)).toEqual(['Team A', 'Team B', 'Other / None']);
     expect(merged.outcomes[0].winCondition).toBe('Team A is the champion.');
     expect(merged.outcomes[0].resolutionCriteria).toBe('Official box score names Team A.');
@@ -37,22 +37,25 @@ describe('mergeHumanized', () => {
       marketStartTimeUTC: '2026-05-01T00:00:01Z',
       marketEndTimeUTC: '2026-06-16T00:00:00Z',
     };
-    const merged = mergeHumanized(SAMPLE_FINAL, humanized);
+    const { merged } = mergeHumanized(SAMPLE_FINAL, humanized);
     expect(merged.marketStartTimeUTC).toBe(SAMPLE_FINAL.marketStartTimeUTC);
     expect(merged.marketEndTimeUTC).toBe(SAMPLE_FINAL.marketEndTimeUTC);
   });
 
-  it('adopts humanized refinedQuestion / shortDescription / rules / edgeCases when non-empty', () => {
+  it('adopts humanized refinedQuestion / shortDescription / rules / edgeCases when non-empty and structurally stable', () => {
     const humanized = {
       refinedQuestion: 'Does Team A win the 2026 finals?',
       shortDescription: 'Tracks the 2026 finals winner.',
+      // URL preserved verbatim.
       fullResolutionRules: '1. Read https://example.com/boxscore. 2. Map winner.',
+      // Right-hand outcome name "Other / None" preserved verbatim.
       edgeCases: '1. Series postponed past end date → Other / None',
       outcomes: SAMPLE_FINAL.outcomes,
     };
-    const merged = mergeHumanized(SAMPLE_FINAL, humanized);
+    const { merged, rejectedFields } = mergeHumanized(SAMPLE_FINAL, humanized);
     expect(merged.refinedQuestion).toBe('Does Team A win the 2026 finals?');
     expect(merged.shortDescription).toBe('Tracks the 2026 finals winner.');
+    expect(rejectedFields).toEqual([]);
   });
 
   it('falls back to the original string when humanized field is empty or wrong type', () => {
@@ -65,7 +68,7 @@ describe('mergeHumanized', () => {
         { name: 'ignored', winCondition: 'Neither listed team wins.', resolutionCriteria: 'Official box score shows no listed team.' },
       ],
     };
-    const merged = mergeHumanized(SAMPLE_FINAL, humanized);
+    const { merged } = mergeHumanized(SAMPLE_FINAL, humanized);
     expect(merged.refinedQuestion).toBe(SAMPLE_FINAL.refinedQuestion);
     expect(merged.shortDescription).toBe(SAMPLE_FINAL.shortDescription);
     expect(merged.outcomes[0].winCondition).toBe(SAMPLE_FINAL.outcomes[0].winCondition);
@@ -73,9 +76,129 @@ describe('mergeHumanized', () => {
   });
 
   it('returns the original when humanized input is not a plain object', () => {
-    expect(mergeHumanized(SAMPLE_FINAL, null)).toBe(SAMPLE_FINAL);
-    expect(mergeHumanized(SAMPLE_FINAL, 'string')).toBe(SAMPLE_FINAL);
-    expect(mergeHumanized(SAMPLE_FINAL, [])).toBe(SAMPLE_FINAL);
+    expect(mergeHumanized(SAMPLE_FINAL, null).merged).toBe(SAMPLE_FINAL);
+    expect(mergeHumanized(SAMPLE_FINAL, 'string').merged).toBe(SAMPLE_FINAL);
+    expect(mergeHumanized(SAMPLE_FINAL, []).merged).toBe(SAMPLE_FINAL);
+  });
+
+  it('rejects a humanized winCondition that drops a numeric threshold', () => {
+    const original = {
+      ...SAMPLE_FINAL,
+      outcomes: [
+        { name: 'Team A', winCondition: 'Team A scores at least 30 points.', resolutionCriteria: 'Official box score.' },
+        ...SAMPLE_FINAL.outcomes.slice(1),
+      ],
+    };
+    const humanized = {
+      outcomes: [
+        // Threshold dropped to "many".
+        { name: 'Team A', winCondition: 'Team A scores many points.', resolutionCriteria: 'Official box score.' },
+        ...SAMPLE_FINAL.outcomes.slice(1),
+      ],
+    };
+    const { merged, rejectedFields } = mergeHumanized(original, humanized);
+    expect(merged.outcomes[0].winCondition).toBe(original.outcomes[0].winCondition);
+    expect(rejectedFields).toContain('outcomes[0].winCondition');
+  });
+
+  it('rejects a humanized resolutionCriteria that rewrites a percentage threshold', () => {
+    const original = {
+      ...SAMPLE_FINAL,
+      outcomes: [
+        { name: 'Team A', winCondition: 'Team A wins.', resolutionCriteria: 'Settlement share > 50%.' },
+        ...SAMPLE_FINAL.outcomes.slice(1),
+      ],
+    };
+    const humanized = {
+      outcomes: [
+        // "50%" silently mutated to "a majority".
+        { name: 'Team A', winCondition: 'Team A wins.', resolutionCriteria: 'Settlement share exceeds a majority.' },
+        ...SAMPLE_FINAL.outcomes.slice(1),
+      ],
+    };
+    const { merged, rejectedFields } = mergeHumanized(original, humanized);
+    expect(merged.outcomes[0].resolutionCriteria).toBe(original.outcomes[0].resolutionCriteria);
+    expect(rejectedFields).toContain('outcomes[0].resolutionCriteria');
+  });
+
+  it('rejects a humanized fullResolutionRules that rewrites the resolver URL', () => {
+    const humanized = {
+      // URL silently changed to a different host.
+      fullResolutionRules: '1. Read https://evil.example.com/boxscore. 2. Map winner.',
+    };
+    const { merged, rejectedFields } = mergeHumanized(SAMPLE_FINAL, humanized);
+    expect(merged.fullResolutionRules).toBe(SAMPLE_FINAL.fullResolutionRules);
+    expect(rejectedFields).toContain('fullResolutionRules');
+  });
+
+  it('rejects a humanized edgeCases that drops a referenced outcome name', () => {
+    const humanized = {
+      // Right-hand side renamed from "Other / None" to "Other".
+      edgeCases: '1. Series postponed past end date → Other',
+    };
+    const { merged, rejectedFields } = mergeHumanized(SAMPLE_FINAL, humanized);
+    expect(merged.edgeCases).toBe(SAMPLE_FINAL.edgeCases);
+    expect(rejectedFields).toContain('edgeCases');
+  });
+
+  it('rejects a humanized winCondition that drops a ticker-style symbol', () => {
+    const original = {
+      ...SAMPLE_FINAL,
+      outcomes: [
+        { name: 'Above', winCondition: 'NASDAQ:AAPL closes above $200.', resolutionCriteria: 'Official close price.' },
+        ...SAMPLE_FINAL.outcomes.slice(1),
+      ],
+    };
+    const humanized = {
+      outcomes: [
+        // Ticker dropped, dollar amount also rephrased to $200.
+        { name: 'Above', winCondition: 'Apple closes above $200.', resolutionCriteria: 'Official close price.' },
+        ...SAMPLE_FINAL.outcomes.slice(1),
+      ],
+    };
+    const { merged, rejectedFields } = mergeHumanized(original, humanized);
+    expect(merged.outcomes[0].winCondition).toBe(original.outcomes[0].winCondition);
+    expect(rejectedFields).toContain('outcomes[0].winCondition');
+  });
+
+  it('rejects a humanized resolutionCriteria that rewrites an ISO date', () => {
+    const original = {
+      ...SAMPLE_FINAL,
+      outcomes: [
+        { name: 'Team A', winCondition: 'Team A wins.', resolutionCriteria: 'Box score published by 2026-06-15.' },
+        ...SAMPLE_FINAL.outcomes.slice(1),
+      ],
+    };
+    const humanized = {
+      outcomes: [
+        // ISO date dropped in favor of natural language.
+        { name: 'Team A', winCondition: 'Team A wins.', resolutionCriteria: 'Box score published by mid-June.' },
+        ...SAMPLE_FINAL.outcomes.slice(1),
+      ],
+    };
+    const { merged, rejectedFields } = mergeHumanized(original, humanized);
+    expect(merged.outcomes[0].resolutionCriteria).toBe(original.outcomes[0].resolutionCriteria);
+    expect(rejectedFields).toContain('outcomes[0].resolutionCriteria');
+  });
+
+  it('rejects a humanized winCondition that drops a comparator', () => {
+    const original = {
+      ...SAMPLE_FINAL,
+      outcomes: [
+        { name: 'Over', winCondition: 'Final viewership >= 10M.', resolutionCriteria: 'Nielsen ratings.' },
+        ...SAMPLE_FINAL.outcomes.slice(1),
+      ],
+    };
+    const humanized = {
+      outcomes: [
+        // ">= 10M" silently rewritten to "at least ten million".
+        { name: 'Over', winCondition: 'Final viewership at least ten million.', resolutionCriteria: 'Nielsen ratings.' },
+        ...SAMPLE_FINAL.outcomes.slice(1),
+      ],
+    };
+    const { merged, rejectedFields } = mergeHumanized(original, humanized);
+    expect(merged.outcomes[0].winCondition).toBe(original.outcomes[0].winCondition);
+    expect(rejectedFields).toContain('outcomes[0].winCondition');
   });
 });
 
@@ -137,5 +260,29 @@ describe('humanizeFinalJson', () => {
     expect(result.humanizedJson.outcomes[0].winCondition).toBe('Team A is the champion.');
     expect(result.humanizedJson.marketStartTimeUTC).toBe(SAMPLE_FINAL.marketStartTimeUTC);
     expect(result.humanizedJson.marketEndTimeUTC).toBe(SAMPLE_FINAL.marketEndTimeUTC);
+  });
+
+  it('logs a warning listing the drifted fields when the merge rejects any', async () => {
+    const humanized = {
+      ...SAMPLE_FINAL,
+      // URL silently changed — must be rejected.
+      fullResolutionRules: '1. Read https://evil.example.com/boxscore. 2. Map winner.',
+      // Outcome reference renamed — must be rejected.
+      edgeCases: '1. Series postponed past end date → Other',
+      outcomes: SAMPLE_FINAL.outcomes,
+    };
+    const query = vi.fn().mockResolvedValue({
+      content: JSON.stringify(humanized),
+      usage: { promptTokens: 50, completionTokens: 80, totalTokens: 130 },
+      wallClockMs: 90,
+    });
+
+    const result = await humanizeFinalJson('m', SAMPLE_FINAL, { queryModel: query });
+
+    expect(result.humanizedJson.fullResolutionRules).toBe(SAMPLE_FINAL.fullResolutionRules);
+    expect(result.humanizedJson.edgeCases).toBe(SAMPLE_FINAL.edgeCases);
+    expect(result.logEntry.level).toBe('warn');
+    expect(result.logEntry.message).toMatch(/fullResolutionRules/);
+    expect(result.logEntry.message).toMatch(/edgeCases/);
   });
 });
