@@ -63,6 +63,29 @@ export const SYSTEM_PROMPTS = {
 
   entailmentVerifier:
     'You are a precise entailment verifier for 42.space market drafts. Given a draft and a list of atomic claims extracted from it, decide for each claim whether the draft entails it, contradicts it, fails to cover it, or is not applicable. Be strict: a claim is only "entailed" when its content is clearly present in the draft, not merely plausible or consistent. Output strictly valid JSON and nothing else.',
+
+  humanizer:
+    `You are a careful editor who removes signs of AI-generated writing from text. You are editing the prose text fields of a 42.space market spec JSON that real traders will read on the market card, so the result must stay natural, specific, and decisive.
+
+REMOVE THESE AI TELLS:
+  - Significance inflation ("it's important to note", "this is a testament to", vague gestures at importance).
+  - Name-dropping with no purpose; vague attributions ("experts say", "many believe").
+  - AI vocabulary: "actually", "testament", "indeed", "moreover", "furthermore", "navigate the landscape", "delve into".
+  - Copula avoidance: rewrite "serves as" / "functions as" / "acts as" to plain "is".
+  - Excessive hedging and double-hedges ("may potentially", "it seems that").
+  - Em dash overuse — especially as a filler replacement for commas, colons, or parentheses.
+  - Chatbot artifacts: "I hope this helps", "Feel free to…", "Please note that…", preambles, sign-offs.
+  - Title Case Headings. Use sentence case.
+
+PRESERVE EXACTLY — these are structural and cannot be rewritten:
+  - Outcome Token names (outcomes[i].name) must be byte-for-byte identical to the input. Every edge-case reference points to one of these names and will silently break if a name drifts.
+  - URLs, ISO timestamps (YYYY-MM-DDTHH:MM:SSZ), numerical thresholds, dollar amounts, percentages, ticker symbols.
+  - The JSON shape: every input field reappears under the same key, in the same order, with the same type.
+
+CONSTRAINTS:
+  - Stay concise. This is a market card, not an essay. Short declarative sentences; fragments OK. Do not reinflate text the finalizer already compressed.
+  - Edit only. Do not add new outcomes, edge cases, sources, or claims; do not delete substantive content.
+  - Output strictly valid JSON. No prose, preamble, explanation, or markdown fences.`,
 };
 
 /**
@@ -270,6 +293,32 @@ Generate a JSON response with exactly these fields:
   "fullResolutionRules": "Compact numbered rules — no redundancy with outcome-level criteria",
   "edgeCases": "Numbered list: scenario → named outcome from the outcomes array"
 }`;
+}
+
+// Post-finalize humanizer pass. Runs silently after handleAccept has produced
+// structured JSON from the finalizer: rewrites the prose text fields to strip
+// AI-writing tells while keeping structural fields (outcome names, URLs,
+// timestamps) byte-for-byte stable so edge-case references still resolve.
+export function buildHumanizerPrompt(finalJson) {
+  return `Rewrite the text fields in the 42.space market spec JSON below following the editing discipline in your system prompt.
+
+HUMANIZE THESE FIELDS:
+  - refinedQuestion
+  - outcomes[i].winCondition
+  - outcomes[i].resolutionCriteria
+  - shortDescription
+  - fullResolutionRules
+  - edgeCases   (keep the "scenario → outcome name" format; the right-hand outcome name must match outcomes[i].name exactly)
+
+DO NOT TOUCH:
+  - outcomes[i].name — preserve byte-for-byte.
+  - marketStartTimeUTC, marketEndTimeUTC — preserve byte-for-byte.
+  - Any URL, numerical threshold, percentage, dollar amount, or ticker.
+
+OUTPUT: the FULL JSON object with every original field present, same shape, same key order. Output only the JSON — no prose, no markdown fences. First character "{", last character "}".
+
+SPEC JSON:
+${JSON.stringify(finalJson, null, 2)}`;
 }
 
 export function buildIdeatePrompt(direction) {

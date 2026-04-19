@@ -22,6 +22,7 @@ import { verifyClaims } from './pipeline/verify';
 import { gatherEvidence } from './pipeline/gatherEvidence';
 import { routeClaims, groupRoutingBySeverity } from './pipeline/route';
 import { checkResolutionSources } from './pipeline/checkSources';
+import { humanizeFinalJson } from './pipeline/humanize';
 import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
 import { parseRun, GLOBAL_CLAIM_ID } from './types/run';
 import { DRAFT_MAX_TOKENS } from './defaults';
@@ -902,8 +903,23 @@ function App() {
         parsedContent = { raw: result.content };
       }
 
-      dispatch({ type: 'FINALIZE_SUCCESS', content: parsedContent });
-      dispatch({ type: 'RUN_SET_FINAL', finalJson: parsedContent });
+      // Silent post-finalize humanizer pass. Runs under the existing
+      // 'accept' spinner so the user never sees an un-humanized flash of the
+      // market card. Any failure (thrown, malformed JSON, etc.) falls back
+      // to the un-humanized content — humanization is a polish step and
+      // must never block Finalize.
+      const humResult = await humanizeFinalJson(selectedModel, parsedContent);
+      recordCost('humanize', humResult);
+      dispatch({
+        type: 'RUN_LOG',
+        stage: 'humanize',
+        level: humResult.logEntry.level,
+        message: humResult.logEntry.message,
+      });
+      const finalContent = humResult.humanizedJson;
+
+      dispatch({ type: 'FINALIZE_SUCCESS', content: finalContent });
+      dispatch({ type: 'RUN_SET_FINAL', finalJson: finalContent });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to finalize market' });
       dispatch({ type: 'RUN_LOG', stage: 'accept', level: 'error', message: err.message || 'Finalize failed' });
