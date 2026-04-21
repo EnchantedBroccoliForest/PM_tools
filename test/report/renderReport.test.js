@@ -62,6 +62,27 @@ describe('renderReport — line-count targets', () => {
   });
 });
 
+describe('renderReport — does not mutate its input', () => {
+  it('renders twice on the same object and prints the same hash both times', () => {
+    const run = loadRun('clean.json');
+    const before = JSON.stringify(run);
+    const a = renderReport(run, { level: 'headline' });
+    const b = renderReport(run, { level: 'headline' });
+    expect(JSON.stringify(run)).toBe(before);
+    const hashA = /Run: ([0-9a-f]+)/.exec(a)[1];
+    const hashB = /Run: ([0-9a-f]+)/.exec(b)[1];
+    expect(hashA).toBe(hashB);
+  });
+
+  it('text and HTML renderers agree on the hash for the same input', () => {
+    const run = loadRun('clean.json');
+    const text = renderReport(run, { level: 'report' });
+    const html = renderHtml(run, { level: 'report' });
+    const hash = /Run: ([0-9a-f]+)/.exec(text)[1];
+    expect(html).toContain(hash);
+  });
+});
+
 describe('renderReport — determinism', () => {
   for (const fx of ['clean.json', 'two-minor-issues.json', 'blocked.json']) {
     it(`${fx}: renders byte-identical output twice`, () => {

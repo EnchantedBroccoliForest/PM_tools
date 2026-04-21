@@ -18,7 +18,7 @@
  * structural: headings, icons, severity ordering, collapse/expand.
  */
 
-import { assignShortIds, claimShortIdMap } from './shortIds.js';
+import { claimShortIdMap } from './shortIds.js';
 import { computeRunHash } from './runHash.js';
 import { aggregateReviewerFindings, rubricForReviewer } from './aggregateReviews.js';
 import {
@@ -124,7 +124,14 @@ function topRisk(run) {
 
 function modelMix(run) {
   const drafter = run.drafts?.[0]?.model || '?';
-  const reviewers = Array.from(new Set((run.criticisms || []).map((c) => c.reviewerModel))).length;
+  // Reviewer count must include reviewers who voted but raised no
+  // criticisms — which is the common case on a clean run. Pulling only
+  // from `criticisms` under-reports who actually participated.
+  const reviewerSet = new Set((run.criticisms || []).map((c) => c.reviewerModel));
+  for (const item of run.aggregation?.checklist || []) {
+    for (const v of item.votes || []) reviewerSet.add(v.reviewerModel);
+  }
+  const reviewers = reviewerSet.size;
   const judge = run.aggregation?.protocol === 'judge' ? ' +judge' : '';
   const reviewerSuffix = reviewers > 0 ? ` +${reviewers}r` : '';
   return `${drafter}${reviewerSuffix}${judge}`;
@@ -496,7 +503,12 @@ export function renderReport(run, options = {}) {
   const minRank = minSeverityRank(options.minSeverity || defaultMinSeverity);
   const expand = new Set(options.expand || []);
 
-  assignShortIds(run);
+  // Hash the artifact AS RECEIVED — the footer's `Run: <hash>` is a
+  // contract that the hash identifies the source JSON. We deliberately do
+  // NOT mutate the input here: every render site falls back to array-index
+  // short ids when `shortId` is absent, so legacy Runs render identically
+  // without needing a write-back. Production-time stamping happens in
+  // orchestrate.js for canonical Runs.
   const hash = computeRunHash(run);
   const verdict = computeVerdict(run);
   const { totalTokens, wallSec } = costSummary(run.cost);

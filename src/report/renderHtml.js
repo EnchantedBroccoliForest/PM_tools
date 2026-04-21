@@ -11,7 +11,7 @@
  * the same structural primitives in HTML.
  */
 
-import { assignShortIds, claimShortIdMap } from './shortIds.js';
+import { claimShortIdMap } from './shortIds.js';
 import { computeRunHash } from './runHash.js';
 import { aggregateReviewerFindings, rubricForReviewer } from './aggregateReviews.js';
 import { diffLines, countChanges, parseDraftSections, classifySection } from './diff.js';
@@ -277,7 +277,8 @@ export function renderHtml(run, options = {}) {
   const minRank = minSeverityRank(options.minSeverity || defaultMinSeverity);
   const expand = new Set(options.expand || []);
 
-  assignShortIds(run);
+  // Hash the artifact AS RECEIVED; never mutate the input — see the
+  // matching note in renderReport.js.
   const hash = computeRunHash(run);
   const verdict = computeVerdict(run);
   const question = run.input?.question || '(no question)';
@@ -367,11 +368,16 @@ export function renderHtml(run, options = {}) {
 
 function renderFooterHtml(run, hash, totalTokens, wallSec) {
   // Hash is copyable by click-select; rendered in a <code> for monospace.
-  const modelMix = (run.drafts?.[0]?.model || '?')
-    + (new Set((run.criticisms || []).map((c) => c.reviewerModel)).size > 0
-      ? ` +${new Set((run.criticisms || []).map((c) => c.reviewerModel)).size}r`
-      : '')
-    + (run.aggregation?.protocol === 'judge' ? ' +judge' : '');
+  // Reviewer count includes anyone who voted via aggregation.checklist —
+  // not only the subset that left criticisms — so clean runs still credit
+  // every participating reviewer.
+  const reviewerSet = new Set((run.criticisms || []).map((c) => c.reviewerModel));
+  for (const item of run.aggregation?.checklist || []) {
+    for (const v of item.votes || []) reviewerSet.add(v.reviewerModel);
+  }
+  const reviewerSuffix = reviewerSet.size > 0 ? ` +${reviewerSet.size}r` : '';
+  const judgeSuffix = run.aggregation?.protocol === 'judge' ? ' +judge' : '';
+  const modelMix = (run.drafts?.[0]?.model || '?') + reviewerSuffix + judgeSuffix;
   return `<footer class="pm-footer">
     <span>Run: <code class="pm-hash">${escapeHtml(hash)}</code></span>
     <span>cost: ${totalTokens} tok</span>

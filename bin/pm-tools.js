@@ -38,6 +38,8 @@ DRAFT FLAGS
   --escalation       always | selective
   --feedback         Human feedback string (injected before update stage)
   --output, -o       Write Run JSON to file instead of stdout
+  --input, -i        For 'report' only: read Run JSON from this path
+                     (alternative to piping it on stdin)
   --format           json | report | html (default: json unless --level set)
   --level            headline | report | full (text report tier)
   --min-severity     info | minor | targeted_review | blocking
@@ -90,6 +92,7 @@ function parseCliArgs() {
       escalation: { type: 'string' },
       feedback: { type: 'string' },
       output: { type: 'string', short: 'o' },
+      input: { type: 'string', short: 'i' },
       format: { type: 'string' },
       level: { type: 'string' },
       'min-severity': { type: 'string' },
@@ -319,11 +322,16 @@ async function cmdIdeate(values) {
 
 async function cmdReport(values) {
   let raw;
-  if (values.output && !process.stdin.isTTY === false) {
-    // no-op guard
-  }
-  // Primary path: stdin.
-  if (!process.stdin.isTTY) {
+  // Primary path: --input <file>. Falls back to stdin so existing
+  // pipelines like `cat run.json | pm-tools report` still work.
+  if (values.input) {
+    try {
+      raw = readFileSync(values.input, 'utf8');
+    } catch (err) {
+      process.stderr.write(`Error: failed to read ${values.input}: ${err.message}\n`);
+      process.exit(2);
+    }
+  } else if (!process.stdin.isTTY) {
     try {
       raw = readFileSync(0, 'utf8');
     } catch {
@@ -331,7 +339,7 @@ async function cmdReport(values) {
       process.exit(2);
     }
   } else {
-    process.stderr.write('Error: pipe a Run JSON into stdin for `report`.\n');
+    process.stderr.write('Error: pass --input <file.json> or pipe a Run JSON into stdin for `report`.\n');
     process.exit(2);
   }
   let run;
