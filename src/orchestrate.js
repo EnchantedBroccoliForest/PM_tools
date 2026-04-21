@@ -38,6 +38,7 @@ import { RIGOR_RUBRIC } from './constants/rubric.js';
 import { enrichReferencesWithXData } from './pipeline/xapi.js';
 import { parseRiskLevel } from './util/riskLevel.js';
 import { createRun } from './types/run.js';
+import { assignShortIds } from './report/shortIds.js';
 import {
   DEFAULT_DRAFT_MODEL,
   DEFAULT_REVIEWER_MODELS,
@@ -443,7 +444,12 @@ export async function orchestrate(config, signal) {
   const semaphore = config?.semaphore || defaultSemaphore;
   await semaphore.acquire();
   try {
-    return await _orchestrateInner(config, signal);
+    const run = await _orchestrateInner(config, signal);
+    // Stamp stable short ids (C1..Cn, R1..Rn, S1..Sn, E1..En) at production
+    // time so the report renderer and any downstream consumers reference the
+    // same ids without re-deriving them at render time.
+    assignShortIds(run);
+    return run;
   } finally {
     semaphore.release();
   }

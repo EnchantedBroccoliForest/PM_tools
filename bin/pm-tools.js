@@ -24,6 +24,8 @@ COMMANDS
   draft      Run the full pipeline (draft → review → update → finalize)
   ideate     Brainstorm market ideas from a direction prompt
   validate   Re-run claim extraction + verification on an existing Run
+  report     Re-render an existing Run JSON (from stdin or --input) into the
+             narrative report. No network, no LLM calls.
 
 DRAFT FLAGS
   --question, -q     Market question (required)
@@ -36,7 +38,12 @@ DRAFT FLAGS
   --escalation       always | selective
   --feedback         Human feedback string (injected before update stage)
   --output, -o       Write Run JSON to file instead of stdout
-  --format           json | summary (default: json)
+  --format           json | report | html (default: json unless --level set)
+  --level            headline | report | full (text report tier)
+  --min-severity     info | minor | targeted_review | blocking
+                     (default: targeted_review at --level report)
+  --expand           repeatable: reviewers | claims | evidence | events |
+                     costs | updates — pull full content for that section
   --verbose          Print stage progress to stderr
   --no-finalize      Stop after update (skip finalize)
   --no-review        Stop after initial draft + claim pipeline
@@ -58,8 +65,12 @@ STDIN
 
 EXAMPLES
   npx pm-tools draft -q "Will BTC exceed 100k?" --start 2026-06-01 --end 2026-09-01
-  npx pm-tools draft -q "..." --start ... --end ... --verbose --format summary
-  echo '{"input":{"question":"...","startDate":"...","endDate":"..."}}' | npx pm-tools draft
+  npx pm-tools draft -q "..." --start ... --end ... --level report
+  npx pm-tools draft -q "..." --start ... --end ... --level headline
+  npx pm-tools draft -q "..." --start ... --end ... --level report --expand reviewers
+  cat run.json | npx pm-tools report --level report
+  cat run.json | npx pm-tools report --level report --min-severity blocking
+  cat run.json | npx pm-tools report --format html --level full > report.html
   npx pm-tools ideate -d "AI regulation in the EU"
 `;
 
@@ -80,6 +91,9 @@ function parseCliArgs() {
       feedback: { type: 'string' },
       output: { type: 'string', short: 'o' },
       format: { type: 'string' },
+      level: { type: 'string' },
+      'min-severity': { type: 'string' },
+      expand: { type: 'string', multiple: true },
       verbose: { type: 'boolean', default: false },
       'no-finalize': { type: 'boolean', default: false },
       'no-review': { type: 'boolean', default: false },
@@ -106,66 +120,50 @@ function readStdinJson() {
   }
 }
 
-// ----------------------------------------------------- summary formatter
+// --------------------------------------------------- report dispatcher
 
-function formatSummary(run) {
-  const lines = [];
-  lines.push(`Question: ${run.input?.question || '(none)'}`);
-  lines.push(`Status:   ${run.status || 'unknown'}`);
-  lines.push(`Run ID:   ${run.runId}`);
-  lines.push('');
+const VALID_LEVELS = new Set(['headline', 'report', 'full']);
+const VALID_MIN_SEVERITY = new Set(['info', 'minor', 'targeted_review', 'blocking']);
+const VALID_EXPAND = new Set(['reviewers', 'claims', 'evidence', 'events', 'costs', 'updates']);
 
-  if (run.gates) {
-    lines.push('Gates:');
-    const g = run.gates;
-    lines.push(`  Risk:          ${g.risk.level}${g.risk.blocked ? ' [BLOCKED]' : ''}`);
-    lines.push(`  Routing:       ${g.routing.overall}${g.routing.blocked ? ' [BLOCKED]' : ''}`);
-    lines.push(`  Verification:  ${g.verification.hasHardFail ? 'hard_fail' : 'ok'}${g.verification.blocked ? ' [BLOCKED]' : ''}`);
-    lines.push(`  Sources:       ${g.sources.status}${g.sources.blocked ? ' [BLOCKED]' : ''}`);
-    lines.push('');
+/**
+ * Decide how to render the Run based on CLI flags. `--format json` always
+ * wins; otherwise `--level` selects the text-report tier (default 'report'
+ * when any --level / --min-severity / --expand flag is present).
+ */
+async function formatRun(run, values) {
+  const format = values.format || (values.level || values['min-severity'] || values.expand ? 'report' : 'json');
+  if (format === 'json') {
+    return JSON.stringify(run, null, 2);
   }
+  if (format === 'html') {
+    const { renderHtml } = await import('../src/report/renderHtml.js');
+    return renderHtml(run, buildRenderOptions(values));
+  }
+  // text report
+  const { renderReport } = await import('../src/report/renderReport.js');
+  return renderReport(run, buildRenderOptions(values));
+}
 
-  if (run.drafts?.length > 0) {
-    lines.push(`Drafts:   ${run.drafts.length} (model: ${run.drafts[0].model})`);
+function buildRenderOptions(values) {
+  const level = values.level || 'report';
+  if (!VALID_LEVELS.has(level)) {
+    process.stderr.write(`Error: --level must be one of ${[...VALID_LEVELS].join(', ')}\n`);
+    process.exit(2);
   }
-  if (run.claims?.length > 0) {
-    lines.push(`Claims:   ${run.claims.length}`);
+  const minSeverity = values['min-severity'];
+  if (minSeverity && !VALID_MIN_SEVERITY.has(minSeverity)) {
+    process.stderr.write(`Error: --min-severity must be one of ${[...VALID_MIN_SEVERITY].join(', ')}\n`);
+    process.exit(2);
   }
-  if (run.verification?.length > 0) {
-    const hf = run.verification.filter((v) => v.verdict === 'hard_fail').length;
-    const sf = run.verification.filter((v) => v.verdict === 'soft_fail').length;
-    lines.push(`Verify:   ${run.verification.length} (${hf} hard_fail, ${sf} soft_fail)`);
-  }
-  if (run.aggregation) {
-    lines.push(`Review:   ${run.aggregation.protocol} → ${run.aggregation.overall}`);
-  }
-  if (run.finalJson) {
-    const prob = run.finalJson.probability ?? run.finalJson.initialProbability;
-    if (prob != null) {
-      lines.push(`Probability: ${prob}`);
+  const expand = values.expand || [];
+  for (const section of expand) {
+    if (!VALID_EXPAND.has(section)) {
+      process.stderr.write(`Error: --expand must be one of ${[...VALID_EXPAND].join(', ')}\n`);
+      process.exit(2);
     }
   }
-  lines.push('');
-
-  if (run.cost) {
-    lines.push(`Tokens:   ${run.cost.totalTokensIn + run.cost.totalTokensOut} (in: ${run.cost.totalTokensIn}, out: ${run.cost.totalTokensOut})`);
-    lines.push(`Wall:     ${(run.cost.wallClockMs / 1000).toFixed(1)}s`);
-  }
-
-  // Key warnings from log
-  const warnings = (run.log || []).filter((l) => l.level === 'warn' || l.level === 'error');
-  if (warnings.length > 0) {
-    lines.push('');
-    lines.push('Warnings/Errors:');
-    for (const w of warnings.slice(0, 10)) {
-      lines.push(`  [${w.stage}] ${w.level}: ${w.message}`);
-    }
-    if (warnings.length > 10) {
-      lines.push(`  ... and ${warnings.length - 10} more`);
-    }
-  }
-
-  return lines.join('\n');
+  return { level, minSeverity, expand };
 }
 
 // ---------------------------------------------------- command: draft
@@ -271,11 +269,10 @@ async function cmdDraft(values, stdinConfig) {
     process.off('SIGINT', sigHandler);
   }
 
-  // Output.
-  const fmt = values.format || 'json';
-  const output = fmt === 'summary'
-    ? formatSummary(run)
-    : JSON.stringify(run, null, 2);
+  // Output. JSON by default (machine consumption); switch to the narrative
+  // report renderer when --level / --min-severity / --expand are present
+  // or --format=report|html.
+  const output = await formatRun(run, values);
 
   if (values.output) {
     writeFileSync(values.output, output + '\n', 'utf8');
@@ -315,6 +312,46 @@ async function cmdIdeate(values) {
   ]);
 
   process.stdout.write(result.content + '\n');
+  process.exit(0);
+}
+
+// ----------------------------------------------------- command: report
+
+async function cmdReport(values) {
+  let raw;
+  if (values.output && !process.stdin.isTTY === false) {
+    // no-op guard
+  }
+  // Primary path: stdin.
+  if (!process.stdin.isTTY) {
+    try {
+      raw = readFileSync(0, 'utf8');
+    } catch {
+      process.stderr.write('Error: failed to read Run JSON from stdin.\n');
+      process.exit(2);
+    }
+  } else {
+    process.stderr.write('Error: pipe a Run JSON into stdin for `report`.\n');
+    process.exit(2);
+  }
+  let run;
+  try {
+    run = JSON.parse(raw);
+  } catch (err) {
+    process.stderr.write(`Error: stdin is not valid JSON: ${err.message}\n`);
+    process.exit(2);
+  }
+
+  // Force non-json format: the whole point of `report` is the narrative
+  // renderer. Respect --format=html if provided, otherwise text.
+  if (!values.format || values.format === 'json') values.format = 'report';
+  const output = await formatRun(run, values);
+  if (values.output) {
+    writeFileSync(values.output, output + '\n', 'utf8');
+    process.stderr.write(`Report written to ${values.output}\n`);
+  } else {
+    process.stdout.write(output + '\n');
+  }
   process.exit(0);
 }
 
@@ -395,18 +432,21 @@ async function main() {
     process.exit(2);
   }
 
-  // Check for API key early.
-  const hasKey = !!(
-    process.env.OPENROUTER_API_KEY ||
-    process.env.VITE_OPENROUTER_API_KEY ||
-    process.env.VITE_OPENAI_API_KEY
-  );
-  if (!hasKey) {
-    process.stderr.write(
-      'Error: No API key found. Set OPENROUTER_API_KEY in your environment.\n' +
-      '  export OPENROUTER_API_KEY=sk-or-...\n'
+  // Check for API key early — but `report` is offline-only and must work
+  // without one (that's the whole point: re-render a saved Run from disk).
+  if (command !== 'report') {
+    const hasKey = !!(
+      process.env.OPENROUTER_API_KEY ||
+      process.env.VITE_OPENROUTER_API_KEY ||
+      process.env.VITE_OPENAI_API_KEY
     );
-    process.exit(2);
+    if (!hasKey) {
+      process.stderr.write(
+        'Error: No API key found. Set OPENROUTER_API_KEY in your environment.\n' +
+        '  export OPENROUTER_API_KEY=sk-or-...\n'
+      );
+      process.exit(2);
+    }
   }
 
   // Read stdin config for commands that support it.
@@ -421,6 +461,9 @@ async function main() {
       break;
     case 'validate':
       await cmdValidate(values);
+      break;
+    case 'report':
+      await cmdReport(values);
       break;
     default:
       process.stderr.write(`Unknown command: ${command}\n\n`);
