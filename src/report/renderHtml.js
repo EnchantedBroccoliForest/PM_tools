@@ -156,7 +156,7 @@ function renderAttentionHtml(run, minRank) {
     if (c.claimId !== 'global') return;
     const mapped = c.severity === 'blocker' ? 3 : c.severity === 'major' ? 2 : c.severity === 'minor' ? 1 : 0;
     if (mapped < minRank) return;
-    const sid = c.shortId || `R${i + 1}`;
+    const sid = c.shortId || `CR${i + 1}`;
     items.push({ rank: mapped, html: `<li>${severityChip(c.severity)} <b>${escapeHtml(sid)}</b>: ${escapeHtml((c.rationale || '').slice(0, 140))}${ref(`run.criticisms[${i}]`)}</li>` });
   });
   items.sort((a, b) => b.rank - a.rank);
@@ -223,7 +223,7 @@ function renderReviewersFullHtml(run) {
     if (crits.length > 0) {
       parts.push('<ul>');
       for (const { c, i } of crits) {
-        const sid = c.shortId || `R${i + 1}`;
+        const sid = c.shortId || `CR${i + 1}`;
         parts.push(`<li>${severityChip(c.severity)} <b>${escapeHtml(sid)}</b> ${escapeHtml(c.category)}: ${escapeHtml(c.rationale.slice(0, 200))}${ref(`run.criticisms[${i}]`)}</li>`);
       }
       parts.push('</ul>');

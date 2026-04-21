@@ -203,7 +203,10 @@ export const CriticismSchema = z.object({
     'other',
   ]),
   rationale: z.string(),
-  // Short, human-readable id (R1..Rn) for report rendering.
+  // Short, human-readable id (CR1..CRn) for report rendering. Uses a
+  // different prefix from reviewer short ids (RV#) so text output
+  // unambiguously distinguishes reviewer identities from the findings
+  // they raised.
   shortId: z.string().optional(),
 });
 

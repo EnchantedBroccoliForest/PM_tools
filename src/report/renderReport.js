@@ -111,7 +111,7 @@ function topRisk(run) {
     .sort((a, b) => CRITICISM_SEVERITY_RANK[b.c.severity] - CRITICISM_SEVERITY_RANK[a.c.severity]);
   if (blockers.length > 0) {
     const { c, i } = blockers[0];
-    const sid = c.shortId || `R${i + 1}`;
+    const sid = c.shortId || `CR${i + 1}`;
     return {
       text: `${sid}: ${c.severity} — ${c.rationale.slice(0, 120)}`,
       path: `run.criticisms[${i}]`,
@@ -269,7 +269,7 @@ function renderAttentionList(run, minRank) {
     const mapped = c.severity === 'blocker' ? 3 : c.severity === 'major' ? 2 : c.severity === 'minor' ? 1 : 0;
     if (mapped < minRank) return;
     if (c.claimId !== 'global') return; // claim-pinned ones are surfaced via routing
-    const sid = c.shortId || `R${i + 1}`;
+    const sid = c.shortId || `CR${i + 1}`;
     const reason = (c.rationale || '').slice(0, 120);
     attentionItems.push({
       rank: mapped,
@@ -429,7 +429,7 @@ function renderReviewersFull(run) {
       .map((c, i) => ({ c, i }))
       .filter(({ c }) => c.reviewerModel === r.modelId);
     for (const { c, i } of crits) {
-      const sid = c.shortId || `R${i + 1}`;
+      const sid = c.shortId || `CR${i + 1}`;
       lines.push(trailingRef(
         `    ${sid} ${c.severity}/${c.category}: ${c.rationale.slice(0, 160)}`,
         `run.criticisms[${i}]`,

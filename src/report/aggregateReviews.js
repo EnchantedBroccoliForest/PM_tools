@@ -18,7 +18,7 @@
 /**
  * @typedef {Object} ReviewerInfo
  * @property {string} modelId
- * @property {string} shortId  R1, R2, ...
+ * @property {string} shortId  RV1, RV2, ...
  */
 
 /**
@@ -29,8 +29,8 @@
  * @property {string} category        criticism category
  * @property {string} severity        worst severity observed
  * @property {string} rationale       representative rationale text
- * @property {string[]} reviewers     reviewer short ids that raised it
- * @property {string[]} criticismShortIds   the R<n> ids of the underlying criticism records
+ * @property {string[]} reviewers     reviewer short ids (RV<n>) that raised it
+ * @property {string[]} criticismShortIds   CR<n> ids of the underlying criticism records
  */
 
 /**
@@ -88,11 +88,11 @@ function fingerprint(criticism) {
  * the criticism stream. When no criticisms are present, fall back to
  * `aggregation.checklist[*].votes[*].reviewerModel`.
  *
- * The `RV` prefix keeps the reviewer namespace disjoint from the `R#`
- * namespace used for criticisms (reviewer findings) in the Run JSON.
- * Mixing them collides in disambiguation-poor contexts like plain-text
- * attention lines (`R1 vs. R3`) where the reader cannot tell whether a
- * token means a reviewer or one of the criticisms they raised.
+ * The `RV` prefix keeps the reviewer namespace disjoint from the `CR#`
+ * namespace used for criticisms. Every render-time / production-time
+ * prefix — `C`, `CR`, `RV`, `S`, `E` — is lexically unique so a token
+ * in rendered output unambiguously identifies one entity kind without
+ * relying on surrounding context.
  *
  * @param {import('../types/run.js').Run} run
  * @returns {ReviewerInfo[]}
@@ -139,15 +139,13 @@ export function aggregateReviewerFindings(run) {
   criticisms.forEach((c, i) => {
     const key = fingerprint(c);
     const reviewerShort = reviewerShortById.get(c.reviewerModel) || c.reviewerModel;
-    const criticismShort = c.shortId || `R${i + 1}`;
-    // Note: reviewer short id and criticism short id can collide in the
-    // R<n> namespace — criticisms number up from R1 independently of
-    // reviewer numbering. The renderer disambiguates with context.
+    const criticismShort = c.shortId || `CR${i + 1}`;
     const bucket = groups.get(key) || [];
     // Reviewer short ids use the `RV` namespace and criticism short ids
-    // use `R` — disjoint by design, so a line like `RV1 vs. RV3 — R2, R5`
-    // parses unambiguously: the `RV`s are reviewers, the `R`s are the
-    // underlying criticism findings they produced.
+    // use `CR` — disjoint by design, so a line like
+    // `RV1 vs. RV3 — CR2, CR5` parses unambiguously: the `RV`s are
+    // reviewers, the `CR`s are the underlying criticism findings they
+    // produced.
     bucket.push({ criticism: { ...c, shortId: criticismShort }, reviewer: reviewerShort });
     groups.set(key, bucket);
   });

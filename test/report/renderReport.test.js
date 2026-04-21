@@ -171,7 +171,7 @@ describe('short-id namespaces are disjoint', () => {
   // unambiguously identifies one kind.
   const PREFIXES = {
     claims: 'C',
-    criticisms: 'R',
+    criticisms: 'CR',
     evidence: 'S',
     log: 'E',
     reviewers: 'RV',
@@ -207,25 +207,29 @@ describe('short-id namespaces are disjoint', () => {
     });
   }
 
-  it('reviewer ids rendered in the report do not overlap with criticism ids', () => {
-    // Synthetic fixture that packs many reviewers AND many criticisms
-    // into the same run, so any "R1 means reviewer vs. criticism"
-    // ambiguity would surface. The fixture has 3 reviewers and 4
-    // criticisms: if reviewers were still `R1..R3` they'd collide with
-    // criticisms `R1..R4` at positions 1..3.
+  it('reviewer ids and criticism ids rendered in a report never share a token', () => {
+    // The two-minor-issues fixture has 2 criticisms from 3 reviewers,
+    // so if reviewers used the same prefix as criticisms the tokens
+    // `R1..R3` (reviewers) and `R1..R2` (criticisms) would overlap at
+    // R1 and R2. With disjoint namespaces (RV / CR) no token should
+    // appear in both roles.
     const run = loadRun('two-minor-issues.json');
     const out = renderReport(run, { level: 'full' });
-    // Reviewer tokens appear in the rubric header lines.
-    const reviewerTokens = [...out.matchAll(/\bRV\d+\b/g)].map((m) => m[0]);
-    const criticismTokens = [...out.matchAll(/(?<!R)(?<!V)\bR\d+\b/g)].map((m) => m[0]);
-    const reviewerSet = new Set(reviewerTokens);
-    const criticismSet = new Set(criticismTokens);
-    for (const t of reviewerSet) {
-      expect(criticismSet.has(t), `reviewer token ${t} also appears as criticism`).toBe(false);
+    const reviewerTokens = new Set([...out.matchAll(/\bRV\d+\b/g)].map((m) => m[0]));
+    const criticismTokens = new Set([...out.matchAll(/\bCR\d+\b/g)].map((m) => m[0]));
+    // Sanity: both namespaces actually appear — otherwise this test
+    // would trivially pass on an empty set.
+    expect(reviewerTokens.size).toBeGreaterThan(0);
+    expect(criticismTokens.size).toBeGreaterThan(0);
+    for (const t of reviewerTokens) {
+      expect(criticismTokens.has(t), `reviewer token ${t} also appears as criticism`).toBe(false);
     }
-    // Sanity: we actually observed reviewer tokens in the output, so the
-    // regex isn't silently matching nothing.
-    expect(reviewerSet.size).toBeGreaterThan(0);
+    // There should be zero bare `R<digit>` tokens in the output — every
+    // R-prefixed short id has been upgraded to `RV` or `CR`. This
+    // catches future regressions where code reintroduces the old
+    // `R${i + 1}` fallback path.
+    const bareRTokens = [...out.matchAll(/(?<![A-Z])R\d+\b/g)].map((m) => m[0]);
+    expect(bareRTokens).toEqual([]);
   });
 });
 
