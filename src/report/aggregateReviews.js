@@ -84,9 +84,15 @@ function fingerprint(criticism) {
 }
 
 /**
- * Assign reviewer short ids (R1..Rn) based on first-appearance order in
+ * Assign reviewer short ids (RV1..RVn) based on first-appearance order in
  * the criticism stream. When no criticisms are present, fall back to
  * `aggregation.checklist[*].votes[*].reviewerModel`.
+ *
+ * The `RV` prefix keeps the reviewer namespace disjoint from the `R#`
+ * namespace used for criticisms (reviewer findings) in the Run JSON.
+ * Mixing them collides in disambiguation-poor contexts like plain-text
+ * attention lines (`R1 vs. R3`) where the reader cannot tell whether a
+ * token means a reviewer or one of the criticisms they raised.
  *
  * @param {import('../types/run.js').Run} run
  * @returns {ReviewerInfo[]}
@@ -108,7 +114,7 @@ export function reviewerList(run) {
       }
     }
   }
-  return order.map((modelId, i) => ({ modelId, shortId: `R${i + 1}` }));
+  return order.map((modelId, i) => ({ modelId, shortId: `RV${i + 1}` }));
 }
 
 /**
@@ -138,6 +144,10 @@ export function aggregateReviewerFindings(run) {
     // R<n> namespace — criticisms number up from R1 independently of
     // reviewer numbering. The renderer disambiguates with context.
     const bucket = groups.get(key) || [];
+    // Reviewer short ids use the `RV` namespace and criticism short ids
+    // use `R` — disjoint by design, so a line like `RV1 vs. RV3 — R2, R5`
+    // parses unambiguously: the `RV`s are reviewers, the `R`s are the
+    // underlying criticism findings they produced.
     bucket.push({ criticism: { ...c, shortId: criticismShort }, reviewer: reviewerShort });
     groups.set(key, bucket);
   });

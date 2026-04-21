@@ -150,7 +150,7 @@ describe('renderReport — --expand surfaces full content without dragging in ot
   it('--expand reviewers prints rubric but not full claims', () => {
     const run = loadRun('clean.json');
     const out = renderReport(run, { level: 'report', expand: ['reviewers'] });
-    expect(out).toMatch(/R\d+ \(mock\/reviewer/);
+    expect(out).toMatch(/RV\d+ \(mock\/reviewer/);
     // 'Claims (full):' heading only appears under --expand claims / level full
     expect(out).not.toMatch(/Claims \(full\):/);
   });
@@ -160,7 +160,72 @@ describe('renderReport — --expand surfaces full content without dragging in ot
     const out = renderReport(run, { level: 'report', expand: ['claims'] });
     expect(out).toMatch(/Claims \(full\):/);
     // rubric block from reviewer expansion is absent
-    expect(out).not.toMatch(/R1 \(mock\/reviewer/);
+    expect(out).not.toMatch(/RV1 \(mock\/reviewer/);
+  });
+});
+
+describe('short-id namespaces are disjoint', () => {
+  // Prefixes assigned at production time (assignShortIds) plus the
+  // reviewer namespace assigned at render time (aggregateReviews). Each
+  // entity kind uses a unique prefix so a token in report output
+  // unambiguously identifies one kind.
+  const PREFIXES = {
+    claims: 'C',
+    criticisms: 'R',
+    evidence: 'S',
+    log: 'E',
+    reviewers: 'RV',
+  };
+
+  it('every prefix is unique', () => {
+    const values = Object.values(PREFIXES);
+    const unique = new Set(values);
+    expect(unique.size).toBe(values.length);
+  });
+
+  for (const fx of ['clean.json', 'two-minor-issues.json', 'blocked.json']) {
+    it(`${fx}: no two short ids collide across entity kinds`, async () => {
+      const run = loadRun(fx);
+      const { assignShortIds } = await import('../../src/report/shortIds.js');
+      const { reviewerList } = await import('../../src/report/aggregateReviews.js');
+      assignShortIds(run);
+      const seen = new Map(); // id -> kind
+      const collisions = [];
+      const register = (id, kind) => {
+        if (!id) return;
+        if (seen.has(id) && seen.get(id) !== kind) {
+          collisions.push({ id, kinds: [seen.get(id), kind] });
+        }
+        seen.set(id, kind);
+      };
+      for (const c of run.claims || []) register(c.shortId, 'claims');
+      for (const c of run.criticisms || []) register(c.shortId, 'criticisms');
+      for (const e of run.evidence || []) register(e.shortId, 'evidence');
+      for (const l of run.log || []) register(l.shortId, 'log');
+      for (const r of reviewerList(run)) register(r.shortId, 'reviewers');
+      expect(collisions).toEqual([]);
+    });
+  }
+
+  it('reviewer ids rendered in the report do not overlap with criticism ids', () => {
+    // Synthetic fixture that packs many reviewers AND many criticisms
+    // into the same run, so any "R1 means reviewer vs. criticism"
+    // ambiguity would surface. The fixture has 3 reviewers and 4
+    // criticisms: if reviewers were still `R1..R3` they'd collide with
+    // criticisms `R1..R4` at positions 1..3.
+    const run = loadRun('two-minor-issues.json');
+    const out = renderReport(run, { level: 'full' });
+    // Reviewer tokens appear in the rubric header lines.
+    const reviewerTokens = [...out.matchAll(/\bRV\d+\b/g)].map((m) => m[0]);
+    const criticismTokens = [...out.matchAll(/(?<!R)(?<!V)\bR\d+\b/g)].map((m) => m[0]);
+    const reviewerSet = new Set(reviewerTokens);
+    const criticismSet = new Set(criticismTokens);
+    for (const t of reviewerSet) {
+      expect(criticismSet.has(t), `reviewer token ${t} also appears as criticism`).toBe(false);
+    }
+    // Sanity: we actually observed reviewer tokens in the output, so the
+    // regex isn't silently matching nothing.
+    expect(reviewerSet.size).toBeGreaterThan(0);
   });
 });
 
