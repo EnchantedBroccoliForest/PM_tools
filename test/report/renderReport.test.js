@@ -1,0 +1,252 @@
+/**
+ * Snapshot + invariant tests for the report renderer.
+ *
+ * - Line-count targets at each tier (Task 2 acceptance criteria).
+ * - Determinism: same Run JSON renders byte-identical output.
+ * - Traceability: every `run.<path>` reference resolves in the Run JSON.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { renderReport } from '../../src/report/renderReport.js';
+import { renderHtml } from '../../src/report/renderHtml.js';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const FIXTURES = join(HERE, '..', 'fixtures', 'runs');
+
+function loadRun(name) {
+  return JSON.parse(readFileSync(join(FIXTURES, name), 'utf8'));
+}
+
+function lineCount(text) {
+  return text.split('\n').length;
+}
+
+describe('renderReport — line-count targets', () => {
+  it('clean run fits ≤10 lines at --level headline', () => {
+    const run = loadRun('clean.json');
+    const out = renderReport(run, { level: 'headline' });
+    expect(lineCount(out)).toBeLessThanOrEqual(10);
+  });
+
+  it('clean run fits in ~50 lines at --level report', () => {
+    const run = loadRun('clean.json');
+    const out = renderReport(run, { level: 'report' });
+    expect(lineCount(out)).toBeLessThanOrEqual(50);
+  });
+
+  it('two-minor-issues run only grows by the attention list', () => {
+    const clean = renderReport(loadRun('clean.json'), { level: 'report' });
+    const minors = renderReport(loadRun('two-minor-issues.json'), { level: 'report' });
+    // Minor run should be longer (has attention items + disagreement), but
+    // still bounded — we tolerate up to 25 extra lines for the two-issue
+    // fixture.
+    const delta = lineCount(minors) - lineCount(clean);
+    expect(delta).toBeGreaterThanOrEqual(0);
+    expect(delta).toBeLessThanOrEqual(25);
+  });
+
+  it('blocked run surfaces BLOCKED on line 1', () => {
+    const run = loadRun('blocked.json');
+    const out = renderReport(run, { level: 'headline' });
+    expect(out.split('\n')[0]).toBe('BLOCKED');
+  });
+
+  it('--min-severity blocking collapses non-blocking items', () => {
+    const run = loadRun('two-minor-issues.json');
+    const out = renderReport(run, { level: 'report', minSeverity: 'blocking' });
+    // Attention section should report "(none — ... below threshold)"
+    expect(out).toMatch(/\(none — \d+ claim\(s\) below threshold\)/);
+  });
+});
+
+describe('renderReport — does not mutate its input', () => {
+  it('renders twice on the same object and prints the same hash both times', () => {
+    const run = loadRun('clean.json');
+    const before = JSON.stringify(run);
+    const a = renderReport(run, { level: 'headline' });
+    const b = renderReport(run, { level: 'headline' });
+    expect(JSON.stringify(run)).toBe(before);
+    const hashA = /Run: ([0-9a-f]+)/.exec(a)[1];
+    const hashB = /Run: ([0-9a-f]+)/.exec(b)[1];
+    expect(hashA).toBe(hashB);
+  });
+
+  it('text and HTML renderers agree on the hash for the same input', () => {
+    const run = loadRun('clean.json');
+    const text = renderReport(run, { level: 'report' });
+    const html = renderHtml(run, { level: 'report' });
+    const hash = /Run: ([0-9a-f]+)/.exec(text)[1];
+    expect(html).toContain(hash);
+  });
+});
+
+describe('renderReport — determinism', () => {
+  for (const fx of ['clean.json', 'two-minor-issues.json', 'blocked.json']) {
+    it(`${fx}: renders byte-identical output twice`, () => {
+      const run = loadRun(fx);
+      // Important: pass a deep-cloned run each time so mutation doesn't
+      // leak between renders.
+      const a = renderReport(JSON.parse(JSON.stringify(run)), { level: 'report' });
+      const b = renderReport(JSON.parse(JSON.stringify(run)), { level: 'report' });
+      expect(a).toBe(b);
+    });
+  }
+
+  it('clean.json produces identical hash across two renders', () => {
+    const run = loadRun('clean.json');
+    const a = renderReport(JSON.parse(JSON.stringify(run)), { level: 'headline' });
+    const b = renderReport(JSON.parse(JSON.stringify(run)), { level: 'headline' });
+    const hashA = /Run: ([0-9a-f]+)/.exec(a)[1];
+    const hashB = /Run: ([0-9a-f]+)/.exec(b)[1];
+    expect(hashA).toBe(hashB);
+    expect(hashA.length).toBe(12);
+  });
+});
+
+describe('renderReport — traceability', () => {
+  /**
+   * Given a dot-path like "run.claims[0].verification", walk the Run
+   * object and return true iff the path resolves. Paths mentioning
+   * parenthesised label text (e.g. "run.criticisms (R1, R2)") are
+   * trimmed to their root reference.
+   */
+  function pathResolves(run, path) {
+    // Strip anything after a space — we treat "run.foo (label)" as "run.foo"
+    const stripped = path.replace(/\s.*/, '');
+    if (!stripped.startsWith('run')) return false;
+    const parts = stripped.slice(3).split(/\.|\[|\]/).filter(Boolean);
+    let cur = run;
+    for (const p of parts) {
+      if (cur == null) return false;
+      if (/^\d+$/.test(p)) {
+        cur = cur[Number(p)];
+      } else {
+        cur = cur[p];
+      }
+    }
+    return cur !== undefined;
+  }
+
+  for (const fx of ['clean.json', 'two-minor-issues.json', 'blocked.json']) {
+    it(`${fx}: every run.<path> reference resolves`, () => {
+      const run = loadRun(fx);
+      const out = renderReport(run, { level: 'full' });
+      // Extract everything after the `·  ` muted separator as the path.
+      const pathRegex = /·\s+(run\.[A-Za-z_][\w.[\]() ,]*?)(?=$|\n)/gm;
+      const paths = [];
+      for (const m of out.matchAll(pathRegex)) paths.push(m[1]);
+      expect(paths.length).toBeGreaterThan(0);
+      for (const p of paths) {
+        expect(pathResolves(run, p), `path did not resolve: ${p}`).toBe(true);
+      }
+    });
+  }
+});
+
+describe('renderReport — --expand surfaces full content without dragging in others', () => {
+  it('--expand reviewers prints rubric but not full claims', () => {
+    const run = loadRun('clean.json');
+    const out = renderReport(run, { level: 'report', expand: ['reviewers'] });
+    expect(out).toMatch(/RV\d+ \(mock\/reviewer/);
+    // 'Claims (full):' heading only appears under --expand claims / level full
+    expect(out).not.toMatch(/Claims \(full\):/);
+  });
+
+  it('--expand claims prints full claims but not rubric', () => {
+    const run = loadRun('clean.json');
+    const out = renderReport(run, { level: 'report', expand: ['claims'] });
+    expect(out).toMatch(/Claims \(full\):/);
+    // rubric block from reviewer expansion is absent
+    expect(out).not.toMatch(/RV1 \(mock\/reviewer/);
+  });
+});
+
+describe('short-id namespaces are disjoint', () => {
+  // Prefixes assigned at production time (assignShortIds) plus the
+  // reviewer namespace assigned at render time (aggregateReviews). Each
+  // entity kind uses a unique prefix so a token in report output
+  // unambiguously identifies one kind.
+  const PREFIXES = {
+    claims: 'C',
+    criticisms: 'CR',
+    evidence: 'S',
+    log: 'E',
+    reviewers: 'RV',
+  };
+
+  it('every prefix is unique', () => {
+    const values = Object.values(PREFIXES);
+    const unique = new Set(values);
+    expect(unique.size).toBe(values.length);
+  });
+
+  for (const fx of ['clean.json', 'two-minor-issues.json', 'blocked.json']) {
+    it(`${fx}: no two short ids collide across entity kinds`, async () => {
+      const run = loadRun(fx);
+      const { assignShortIds } = await import('../../src/report/shortIds.js');
+      const { reviewerList } = await import('../../src/report/aggregateReviews.js');
+      assignShortIds(run);
+      const seen = new Map(); // id -> kind
+      const collisions = [];
+      const register = (id, kind) => {
+        if (!id) return;
+        if (seen.has(id) && seen.get(id) !== kind) {
+          collisions.push({ id, kinds: [seen.get(id), kind] });
+        }
+        seen.set(id, kind);
+      };
+      for (const c of run.claims || []) register(c.shortId, 'claims');
+      for (const c of run.criticisms || []) register(c.shortId, 'criticisms');
+      for (const e of run.evidence || []) register(e.shortId, 'evidence');
+      for (const l of run.log || []) register(l.shortId, 'log');
+      for (const r of reviewerList(run)) register(r.shortId, 'reviewers');
+      expect(collisions).toEqual([]);
+    });
+  }
+
+  it('reviewer ids and criticism ids rendered in a report never share a token', () => {
+    // The two-minor-issues fixture has 2 criticisms from 3 reviewers,
+    // so if reviewers used the same prefix as criticisms the tokens
+    // `R1..R3` (reviewers) and `R1..R2` (criticisms) would overlap at
+    // R1 and R2. With disjoint namespaces (RV / CR) no token should
+    // appear in both roles.
+    const run = loadRun('two-minor-issues.json');
+    const out = renderReport(run, { level: 'full' });
+    const reviewerTokens = new Set([...out.matchAll(/\bRV\d+\b/g)].map((m) => m[0]));
+    const criticismTokens = new Set([...out.matchAll(/\bCR\d+\b/g)].map((m) => m[0]));
+    // Sanity: both namespaces actually appear — otherwise this test
+    // would trivially pass on an empty set.
+    expect(reviewerTokens.size).toBeGreaterThan(0);
+    expect(criticismTokens.size).toBeGreaterThan(0);
+    for (const t of reviewerTokens) {
+      expect(criticismTokens.has(t), `reviewer token ${t} also appears as criticism`).toBe(false);
+    }
+    // There should be zero bare `R<digit>` tokens in the output — every
+    // R-prefixed short id has been upgraded to `RV` or `CR`. This
+    // catches future regressions where code reintroduces the old
+    // `R${i + 1}` fallback path.
+    const bareRTokens = [...out.matchAll(/(?<![A-Z])R\d+\b/g)].map((m) => m[0]);
+    expect(bareRTokens).toEqual([]);
+  });
+});
+
+describe('renderHtml — parity', () => {
+  it('clean.json: HTML includes all facts the text report asserts', () => {
+    const run = loadRun('clean.json');
+    const text = renderReport(run, { level: 'report' });
+    const html = renderHtml(run, { level: 'report' });
+    // Hash + question appear in both.
+    const hash = /Run: ([0-9a-f]+)/.exec(text)[1];
+    expect(html).toContain(hash);
+    expect(html).toContain(run.input.question);
+  });
+
+  it('HTML uses <details> for collapsible sections', () => {
+    const run = loadRun('clean.json');
+    const html = renderHtml(run, { level: 'report', expand: ['claims'] });
+    expect(html).toContain('<details');
+  });
+});

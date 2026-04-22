@@ -178,6 +178,11 @@ export const ClaimSchema = z.object({
   category: ClaimCategoryEnum,
   text: z.string().min(1),
   sourceRefs: z.array(z.string()).default([]),
+  // Short, human-readable id (C1..Cn) assigned by the report layer so the
+  // narrative report can refer to claims without printing the long path id.
+  // Optional for backward compatibility with runs exported before the
+  // report layer existed.
+  shortId: z.string().optional(),
 });
 
 export const ClaimArraySchema = z.array(ClaimSchema);
@@ -198,6 +203,11 @@ export const CriticismSchema = z.object({
     'other',
   ]),
   rationale: z.string(),
+  // Short, human-readable id (CR1..CRn) for report rendering. Uses a
+  // different prefix from reviewer short ids (RV#) so text output
+  // unambiguously distinguishes reviewer identities from the findings
+  // they raised.
+  shortId: z.string().optional(),
 });
 
 export const VoteSchema = z.object({
@@ -237,6 +247,8 @@ export const EvidenceSchema = z.object({
   excerpt: z.string(),
   fetchedAt: z.number(),
   rank: z.number(),
+  // Short, human-readable id (S1..Sn) for report rendering.
+  shortId: z.string().optional(),
 });
 
 // Phase 5: per-claim routing record. Produced deterministically from
@@ -275,6 +287,8 @@ export const LogEntrySchema = z.object({
   level: z.enum(['info', 'warn', 'error']),
   message: z.string(),
   ts: z.number(),
+  // Short, human-readable id (E1..En) for report rendering.
+  shortId: z.string().optional(),
 });
 
 // ------------------------------ Phase 2 prompt-response schemas ------------

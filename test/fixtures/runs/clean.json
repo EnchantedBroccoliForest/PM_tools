@@ -1,0 +1,106 @@
+{
+  "runId": "run_fixture_clean",
+  "startedAt": 1700000000000,
+  "status": "complete",
+  "input": {
+    "question": "Will the referenced event occur by 2027-12-31?",
+    "startDate": "2027-01-01T00:00:00Z",
+    "endDate": "2027-12-31T23:59:59Z",
+    "references": "https://example.com/feed",
+    "numberOfOutcomes": ""
+  },
+  "drafts": [
+    {
+      "model": "mock/drafter",
+      "content": "# Prediction Market Draft\n\n## Refined Question\nWill the referenced event occur by 2027-12-31?\n\n## Outcomes\n1. Yes — event occurs before cutoff.\n2. No — event does not occur before cutoff.\n\n## Full Resolution Rules\n1. Source: https://example.com/feed.\n2. Cutoff: 2027-12-31T23:59:59Z.\n",
+      "timestamp": 1700000001000,
+      "kind": "initial"
+    },
+    {
+      "model": "mock/drafter",
+      "content": "# Prediction Market Draft\n\n## Refined Question\nWill the referenced event occur by 2027-12-31?\n\n## Outcomes\n1. Yes — event occurs before cutoff.\n2. No — event does not occur before cutoff.\n\n## Full Resolution Rules\n1. Source: https://example.com/feed.\n2. Cutoff: 2027-12-31T23:59:59Z.\n",
+      "timestamp": 1700000005000,
+      "kind": "updated"
+    }
+  ],
+  "claims": [
+    { "id": "claim.question.0", "category": "question", "text": "Will the referenced event occur by 2027-12-31?", "sourceRefs": [] },
+    { "id": "claim.timestamp.start", "category": "timestamp", "text": "Market starts 2027-01-01T00:00:00Z.", "sourceRefs": [] },
+    { "id": "claim.timestamp.end", "category": "timestamp", "text": "Market ends 2027-12-31T23:59:59Z.", "sourceRefs": [] },
+    { "id": "claim.source.0", "category": "source", "text": "https://example.com/feed", "sourceRefs": [] }
+  ],
+  "criticisms": [],
+  "evidence": [
+    {
+      "id": "ev.0",
+      "claimId": "claim.source.0",
+      "url": "https://example.com/feed",
+      "title": "Example feed",
+      "excerpt": "",
+      "fetchedAt": 1700000002000,
+      "rank": 0
+    }
+  ],
+  "verification": [
+    { "claimId": "claim.question.0", "entailment": "entailed", "consistencyScore": null, "toolOutput": null, "citationResolves": true, "verdict": "pass" },
+    { "claimId": "claim.timestamp.start", "entailment": "entailed", "consistencyScore": null, "toolOutput": null, "citationResolves": true, "verdict": "pass" },
+    { "claimId": "claim.timestamp.end", "entailment": "entailed", "consistencyScore": null, "toolOutput": null, "citationResolves": true, "verdict": "pass" },
+    { "claimId": "claim.source.0", "entailment": "entailed", "consistencyScore": null, "toolOutput": null, "citationResolves": true, "verdict": "pass" }
+  ],
+  "routing": {
+    "items": [
+      { "claimId": "claim.question.0", "severity": "ok", "uncertainty": 0, "reasons": [] },
+      { "claimId": "claim.timestamp.start", "severity": "ok", "uncertainty": 0, "reasons": [] },
+      { "claimId": "claim.timestamp.end", "severity": "ok", "uncertainty": 0, "reasons": [] },
+      { "claimId": "claim.source.0", "severity": "ok", "uncertainty": 0, "reasons": [] }
+    ],
+    "overall": "clean",
+    "hasBlocking": false,
+    "hasTargetedReview": false,
+    "focusClaimIds": []
+  },
+  "aggregation": {
+    "protocol": "majority",
+    "checklist": [
+      { "id": "mece", "question": "MECE?", "votes": [
+        { "reviewerModel": "mock/reviewer-a", "verdict": "yes", "rationale": "outcomes partition the space" },
+        { "reviewerModel": "mock/reviewer-b", "verdict": "yes", "rationale": "yes/no is complete" },
+        { "reviewerModel": "mock/reviewer-c", "verdict": "yes", "rationale": "clean" }
+      ], "decision": "pass" },
+      { "id": "objective_source", "question": "Objective source?", "votes": [
+        { "reviewerModel": "mock/reviewer-a", "verdict": "yes", "rationale": "public feed" },
+        { "reviewerModel": "mock/reviewer-b", "verdict": "yes", "rationale": "deterministic" },
+        { "reviewerModel": "mock/reviewer-c", "verdict": "yes", "rationale": "ok" }
+      ], "decision": "pass" }
+    ],
+    "judgeRationale": null,
+    "overall": "pass"
+  },
+  "finalJson": {
+    "refinedQuestion": "Will the referenced event occur by 2027-12-31?",
+    "outcomes": [
+      { "name": "Yes", "winCondition": "Event occurs before cutoff.", "resolutionCriteria": "Verified via https://example.com/feed." },
+      { "name": "No", "winCondition": "Event does not occur before cutoff.", "resolutionCriteria": "Verified via https://example.com/feed." }
+    ],
+    "marketStartTimeUTC": "2027-01-01T00:00:00Z",
+    "marketEndTimeUTC": "2027-12-31T23:59:59Z"
+  },
+  "riskAnalysis": { "level": "low", "text": "Low risk." },
+  "cost": {
+    "totalTokensIn": 1000,
+    "totalTokensOut": 500,
+    "wallClockMs": 2300,
+    "byStage": { "draft": 500, "claims": 300, "verify": 200, "review": 500 }
+  },
+  "log": [
+    { "stage": "draft", "level": "info", "message": "Draft generated.", "ts": 1700000001000 },
+    { "stage": "claims", "level": "info", "message": "Extracted 4 claim(s).", "ts": 1700000002000 },
+    { "stage": "review", "level": "info", "message": "All reviewers passed.", "ts": 1700000003000 }
+  ],
+  "gates": {
+    "risk": { "level": "low", "blocked": false },
+    "routing": { "overall": "clean", "blocked": false },
+    "verification": { "hasHardFail": false, "blocked": false },
+    "sources": { "status": "ok", "blocked": false }
+  }
+}

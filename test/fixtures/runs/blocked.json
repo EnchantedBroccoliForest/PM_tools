@@ -1,0 +1,76 @@
+{
+  "runId": "run_fixture_blocked",
+  "startedAt": 1700000000000,
+  "status": "blocked",
+  "input": {
+    "question": "Will Company X announce layoffs by 2027-03-31?",
+    "startDate": "2027-01-01T00:00:00Z",
+    "endDate": "2027-03-31T23:59:59Z",
+    "references": "https://bad-source.example.com/private",
+    "numberOfOutcomes": ""
+  },
+  "drafts": [
+    {
+      "model": "mock/drafter",
+      "content": "# Draft\n\n## Refined Question\nWill Company X announce layoffs by 2027-03-31?\n\n## Outcomes\n1. Yes\n2. No\n\n## Full Resolution Rules\nCheck internal HR docs.\n",
+      "timestamp": 1700000001000,
+      "kind": "initial"
+    }
+  ],
+  "claims": [
+    { "id": "claim.question.0", "category": "question", "text": "Will Company X announce layoffs by 2027-03-31?", "sourceRefs": [] },
+    { "id": "claim.source.0", "category": "source", "text": "https://bad-source.example.com/private", "sourceRefs": [] }
+  ],
+  "criticisms": [
+    { "id": "c1", "reviewerModel": "mock/reviewer-a", "claimId": "claim.source.0", "severity": "blocker", "category": "source", "rationale": "Source requires private HR access; not machine-readable." },
+    { "id": "c2", "reviewerModel": "mock/reviewer-b", "claimId": "claim.source.0", "severity": "blocker", "category": "source", "rationale": "Source is not publicly available." }
+  ],
+  "evidence": [
+    { "id": "ev.0", "claimId": "claim.source.0", "url": "https://bad-source.example.com/private", "title": "", "excerpt": "", "fetchedAt": 1700000002000, "rank": 0 }
+  ],
+  "verification": [
+    { "claimId": "claim.question.0", "entailment": "entailed", "consistencyScore": null, "toolOutput": null, "citationResolves": true, "verdict": "pass" },
+    { "claimId": "claim.source.0", "entailment": "entailed", "consistencyScore": null, "toolOutput": "source returned 404", "citationResolves": false, "verdict": "hard_fail" }
+  ],
+  "routing": {
+    "items": [
+      { "claimId": "claim.question.0", "severity": "ok", "uncertainty": 0, "reasons": [] },
+      { "claimId": "claim.source.0", "severity": "blocking", "uncertainty": 1.0, "reasons": ["verification hard_fail", "cited URL did not resolve", "2 blocker criticism(s)"] }
+    ],
+    "overall": "blocked",
+    "hasBlocking": true,
+    "hasTargetedReview": false,
+    "focusClaimIds": ["claim.source.0"]
+  },
+  "aggregation": {
+    "protocol": "majority",
+    "checklist": [
+      { "id": "objective_source", "question": "Objective source?", "votes": [
+        { "reviewerModel": "mock/reviewer-a", "verdict": "no", "rationale": "private" },
+        { "reviewerModel": "mock/reviewer-b", "verdict": "no", "rationale": "private" }
+      ], "decision": "fail" }
+    ],
+    "judgeRationale": null,
+    "overall": "fail"
+  },
+  "finalJson": null,
+  "riskAnalysis": { "level": "medium", "text": "Medium." },
+  "cost": {
+    "totalTokensIn": 800,
+    "totalTokensOut": 400,
+    "wallClockMs": 2000,
+    "byStage": { "draft": 400, "claims": 200, "verify": 200, "review": 400 }
+  },
+  "log": [
+    { "stage": "draft", "level": "info", "message": "Draft generated.", "ts": 1700000001000 },
+    { "stage": "verify", "level": "error", "message": "Source hard_fail.", "ts": 1700000002000 },
+    { "stage": "review", "level": "error", "message": "All reviewers rejected source.", "ts": 1700000003000 },
+    { "stage": "accept", "level": "error", "message": "Finalize blocked.", "ts": 1700000004000 }
+  ],
+  "gates": {
+    "risk": { "level": "medium", "blocked": false },
+    "routing": { "overall": "blocked", "blocked": true },
+    "verification": { "hasHardFail": true, "blocked": true },
+    "sources": { "status": "some_unreachable", "blocked": false }
+  }
+}
