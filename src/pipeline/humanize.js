@@ -201,7 +201,14 @@ export function mergeHumanized(original, humanized) {
  *
  * @param {string} model
  * @param {Object} finalJson  Parsed JSON produced by the finalizer stage.
- * @param {{queryModel?: typeof queryModel}} [deps]  Test injection hook.
+ * @param {{
+ *   queryModel?: typeof queryModel,
+ *   buildPrompt?: typeof buildHumanizerPrompt,
+ *   systemPrompt?: string,
+ * }} [deps]                  Test injection hook + optional rigor-level
+ *                            prompt overrides. Defaults to machine-mode
+ *                            prompts so existing callers keep their
+ *                            current behaviour.
  * @returns {Promise<{
  *   humanizedJson: Object,
  *   usage: {promptTokens:number, completionTokens:number, totalTokens:number}|null,
@@ -211,6 +218,8 @@ export function mergeHumanized(original, humanized) {
  */
 export async function humanizeFinalJson(model, finalJson, deps = {}) {
   const query = deps.queryModel || queryModel;
+  const buildPrompt = deps.buildPrompt || buildHumanizerPrompt;
+  const systemPrompt = deps.systemPrompt || SYSTEM_PROMPTS.humanizer;
 
   // `{ raw: "..." }` is the fallback shape handleAccept stores when the
   // finalizer's response was unparseable — nothing structured to humanize.
@@ -232,8 +241,8 @@ export async function humanizeFinalJson(model, finalJson, deps = {}) {
     result = await query(
       model,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.humanizer },
-        { role: 'user', content: buildHumanizerPrompt(finalJson) },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: buildPrompt(finalJson) },
       ],
       { temperature: 0.4 }
     );

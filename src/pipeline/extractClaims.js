@@ -77,9 +77,20 @@ function formatDropWarning(dropped) {
  *
  * @param {string} model           OpenRouter model id
  * @param {string} draftContent    the draft text to decompose
+ * @param {{
+ *   buildPrompt?: typeof buildClaimExtractorPrompt,
+ *   buildRetryPrompt?: typeof buildStrictClaimExtractorRetryPrompt,
+ *   systemPrompt?: string,
+ * }} [prompts]                    optional rigor-level overrides; defaults
+ *                                 to machine-mode prompts so existing
+ *                                 callers keep their current behaviour.
  * @returns {Promise<ExtractClaimsResult>}
  */
-export async function extractClaims(model, draftContent) {
+export async function extractClaims(model, draftContent, prompts = {}) {
+  const buildPrompt = prompts.buildPrompt || buildClaimExtractorPrompt;
+  const buildRetryPrompt = prompts.buildRetryPrompt || buildStrictClaimExtractorRetryPrompt;
+  const systemPrompt = prompts.systemPrompt || SYSTEM_PROMPTS.claimExtractor;
+
   const { aggregate, accumulate } = createUsageAggregator();
 
   // Attempt 1: standard extraction prompt.
@@ -88,8 +99,8 @@ export async function extractClaims(model, draftContent) {
     const result = await queryModel(
       model,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.claimExtractor },
-        { role: 'user', content: buildClaimExtractorPrompt(draftContent) },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: buildPrompt(draftContent) },
       ],
       { temperature: 0.2, maxTokens: CLAIM_EXTRACTION_MAX_TOKENS }
     );
@@ -129,8 +140,8 @@ export async function extractClaims(model, draftContent) {
     const result = await queryModel(
       model,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.claimExtractor },
-        { role: 'user', content: buildStrictClaimExtractorRetryPrompt(draftContent) },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: buildRetryPrompt(draftContent) },
       ],
       { temperature: 0.1, maxTokens: CLAIM_EXTRACTION_MAX_TOKENS }
     );

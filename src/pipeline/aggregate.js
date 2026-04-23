@@ -180,9 +180,20 @@ export function aggregateUnanimity(rubric, allVotes) {
  * @param {import('../constants/rubric').RubricItem[]} rubric
  * @param {Array<object>} allVotes
  * @param {string} judgeModelId   OpenRouter model id used for the judge
+ * @param {{
+ *   buildPrompt?: typeof buildJudgeAggregatorPrompt,
+ *   buildRetryPrompt?: typeof buildStrictJudgeAggregatorRetryPrompt,
+ *   systemPrompt?: string,
+ * }} [prompts]                   optional rigor-level overrides; defaults
+ *                                to machine-mode prompts so existing
+ *                                callers keep their current behaviour.
  * @returns {Promise<JudgeAggregationResult>}
  */
-export async function aggregateJudge(rubric, allVotes, judgeModelId) {
+export async function aggregateJudge(rubric, allVotes, judgeModelId, prompts = {}) {
+  const buildPrompt = prompts.buildPrompt || buildJudgeAggregatorPrompt;
+  const buildRetryPrompt = prompts.buildRetryPrompt || buildStrictJudgeAggregatorRetryPrompt;
+  const systemPrompt = prompts.systemPrompt || SYSTEM_PROMPTS.aggregationJudge;
+
   const baseline = aggregateMajority(rubric, allVotes);
   const { aggregate, accumulate } = createUsageAggregator();
 
@@ -191,10 +202,10 @@ export async function aggregateJudge(rubric, allVotes, judgeModelId) {
     const r = await queryModel(
       judgeModelId,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.aggregationJudge },
+        { role: 'system', content: systemPrompt },
         {
           role: 'user',
-          content: buildJudgeAggregatorPrompt(rubric, baseline.checklist),
+          content: buildPrompt(rubric, baseline.checklist),
         },
       ],
       { temperature: 0.2, maxTokens: 1500 }
@@ -225,10 +236,10 @@ export async function aggregateJudge(rubric, allVotes, judgeModelId) {
       const r2 = await queryModel(
         judgeModelId,
         [
-          { role: 'system', content: SYSTEM_PROMPTS.aggregationJudge },
+          { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: buildStrictJudgeAggregatorRetryPrompt(rubric, baseline.checklist),
+            content: buildRetryPrompt(rubric, baseline.checklist),
           },
         ],
         { temperature: 0.1, maxTokens: 1500 }
@@ -305,9 +316,15 @@ export async function aggregateJudge(rubric, allVotes, judgeModelId) {
  * @param {import('../constants/rubric').RubricItem[]} rubric
  * @param {Array<object>} allVotes
  * @param {string} [judgeModelId]   required when protocol === 'judge'
+ * @param {{
+ *   buildPrompt?: typeof buildJudgeAggregatorPrompt,
+ *   buildRetryPrompt?: typeof buildStrictJudgeAggregatorRetryPrompt,
+ *   systemPrompt?: string,
+ * }} [prompts]                     optional rigor-level overrides; only
+ *                                  used by the judge protocol.
  * @returns {Promise<JudgeAggregationResult>}
  */
-export async function aggregate(protocol, rubric, allVotes, judgeModelId) {
+export async function aggregate(protocol, rubric, allVotes, judgeModelId, prompts = {}) {
   const empty = {
     usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
     wallClockMs: 0,
@@ -332,7 +349,7 @@ export async function aggregate(protocol, rubric, allVotes, judgeModelId) {
         },
       };
     }
-    return aggregateJudge(rubric, allVotes, judgeModelId);
+    return aggregateJudge(rubric, allVotes, judgeModelId, prompts);
   }
   // Default / 'majority'
   return { aggregation: aggregateMajority(rubric, allVotes), ...empty };

@@ -19,14 +19,7 @@
  */
 
 import { queryModel } from './api/openrouter.js';
-import {
-  SYSTEM_PROMPTS,
-  buildDraftPrompt,
-  buildUpdatePrompt,
-  buildRoutingFocusBlock,
-  buildFinalizePrompt,
-  buildEarlyResolutionPrompt,
-} from './constants/prompts.js';
+import { resolvePromptSet, DEFAULT_RIGOR_LEVEL } from './constants/promptSet.js';
 import { extractClaims } from './pipeline/extractClaims.js';
 import { tryParseJsonObject } from './pipeline/llmJson.js';
 import { verifyClaims, structuralCheck } from './pipeline/verify.js';
@@ -149,9 +142,13 @@ function isClaimSetClean(run) {
  * Run extraction + verification + evidence + routing for a draft and fold
  * the results into the Run artifact.
  */
-async function runClaimPipeline(run, draftText, models, options, fetchImpl, cost, callbacks) {
+async function runClaimPipeline(run, draftText, models, options, fetchImpl, cost, callbacks, prompts) {
   // 1. Claim extraction.
-  const claimResult = await extractClaims(models.drafter, draftText);
+  const claimResult = await extractClaims(models.drafter, draftText, {
+    buildPrompt: prompts.buildClaimExtractorPrompt,
+    buildRetryPrompt: prompts.buildStrictClaimExtractorRetryPrompt,
+    systemPrompt: prompts.SYSTEM_PROMPTS.claimExtractor,
+  });
   cost.record('claims', claimResult);
   if (claimResult.logEntry) {
     log(run, 'claims', claimResult.logEntry.level, claimResult.logEntry.message, callbacks);
@@ -174,7 +171,11 @@ async function runClaimPipeline(run, draftText, models, options, fetchImpl, cost
     verifications = run.claims.map((c) => ({ ...structuralCheck(c), entailment: 'not_applicable' }));
     log(run, 'verify', 'info', `Verification structural-only (${verifications.length} claim(s)).`, callbacks);
   } else {
-    const vResult = await verifyClaims(run.claims, draftText, models.drafter);
+    const vResult = await verifyClaims(run.claims, draftText, models.drafter, {
+      buildPrompt: prompts.buildBatchEntailmentPrompt,
+      buildRetryPrompt: prompts.buildStrictBatchEntailmentRetryPrompt,
+      systemPrompt: prompts.SYSTEM_PROMPTS.entailmentVerifier,
+    });
     cost.record('verify', vResult);
     verifications = vResult.verifications;
     if (vResult.logEntry) {
@@ -225,12 +226,17 @@ async function runClaimPipeline(run, draftText, models, options, fetchImpl, cost
  * Run the review stage: parallel structured reviews, aggregation, and a
  * re-route that folds the resulting criticisms into the routing state.
  */
-async function runReviewStage(run, models, options, cost, callbacks) {
+async function runReviewStage(run, models, options, cost, callbacks, prompts) {
   const structured = await runStructuredReviewsParallel(
     models.reviewers,
     run.drafts[run.drafts.length - 1].content,
     RIGOR_RUBRIC,
     run.input?.numberOfOutcomes || '',
+    {
+      buildPrompt: prompts.buildStructuredReviewPrompt,
+      buildRetryPrompt: prompts.buildStrictStructuredReviewRetryPrompt,
+      systemPrompt: prompts.SYSTEM_PROMPTS.structuredReviewer,
+    },
   );
   for (const r of structured) {
     if (r.usage) cost.record('review', { usage: r.usage, wallClockMs: r.wallClockMs });
@@ -255,6 +261,11 @@ async function runReviewStage(run, models, options, cost, callbacks) {
     RIGOR_RUBRIC,
     allVotes,
     judgeModel,
+    {
+      buildPrompt: prompts.buildJudgeAggregatorPrompt,
+      buildRetryPrompt: prompts.buildStrictJudgeAggregatorRetryPrompt,
+      systemPrompt: prompts.SYSTEM_PROMPTS.aggregationJudge,
+    },
   );
   if (aggResult.usage && aggResult.usage.totalTokens > 0) {
     cost.record('aggregation', { usage: aggResult.usage, wallClockMs: aggResult.wallClockMs });
@@ -276,18 +287,18 @@ async function runReviewStage(run, models, options, cost, callbacks) {
 /**
  * Run the update stage: new draft, re-extract, re-verify, re-route.
  */
-async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks, referencesStr) {
+async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks, referencesStr, prompts) {
   const latestDraft = run.drafts[run.drafts.length - 1].content;
   const reviewText = run.aggregation?.checklist
     ?.map((item) => `${item.id}: ${item.decision}`)
     .join('\n') || '(no review)';
-  const focusBlock = buildRoutingFocusBlock(run.routing, run.claims);
+  const focusBlock = prompts.buildRoutingFocusBlock(run.routing, run.claims);
   const humanFeedback = options.humanFeedback || '';
   const updateResult = await queryModel(
     models.drafter,
     [
-      { role: 'system', content: SYSTEM_PROMPTS.drafter },
-      { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock, run.input?.numberOfOutcomes || '', referencesStr) },
+      { role: 'system', content: prompts.SYSTEM_PROMPTS.drafter },
+      { role: 'user', content: prompts.buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock, run.input?.numberOfOutcomes || '', referencesStr) },
     ],
     { maxTokens: 8000 },
   );
@@ -299,20 +310,20 @@ async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks, 
     kind: 'updated',
   });
   // Re-run the claim pipeline on the updated draft.
-  await runClaimPipeline(run, updateResult.content, models, options, fetchImpl, cost, callbacks);
+  await runClaimPipeline(run, updateResult.content, models, options, fetchImpl, cost, callbacks, prompts);
 }
 
 /**
  * Run the early-resolution risk analyst. Parses the risk level from the
  * response via the shared parseRiskLevel helper.
  */
-async function runRiskStage(run, models, cost, callbacks) {
+async function runRiskStage(run, models, cost, callbacks, prompts) {
   const latestDraft = run.drafts[run.drafts.length - 1].content;
   const riskResult = await queryModel(
     models.drafter,
     [
-      { role: 'system', content: SYSTEM_PROMPTS.earlyResolutionAnalyst },
-      { role: 'user', content: buildEarlyResolutionPrompt(latestDraft, run.input.startDate, run.input.endDate) },
+      { role: 'system', content: prompts.SYSTEM_PROMPTS.earlyResolutionAnalyst },
+      { role: 'user', content: prompts.buildEarlyResolutionPrompt(latestDraft, run.input.startDate, run.input.endDate) },
     ],
   );
   cost.record('early_resolution', riskResult);
@@ -330,7 +341,7 @@ async function runRiskStage(run, models, cost, callbacks) {
  * Run the finalizer and record whether the Accept gate allowed the final
  * JSON. Gate logic mirrors App.jsx's handleAccept.
  */
-async function runFinalizeStage(run, riskLevel, models, cost, callbacks) {
+async function runFinalizeStage(run, riskLevel, models, cost, callbacks, prompts) {
   const latestDraft = run.drafts[run.drafts.length - 1].content;
   const routingOverall = run.routing?.overall || 'clean';
   const blockedByRisk = riskLevel === 'high';
@@ -356,8 +367,8 @@ async function runFinalizeStage(run, riskLevel, models, cost, callbacks) {
   const finalResult = await queryModel(
     models.drafter,
     [
-      { role: 'system', content: SYSTEM_PROMPTS.finalizer },
-      { role: 'user', content: buildFinalizePrompt(latestDraft, run.input.startDate, run.input.endDate, run.input?.numberOfOutcomes || '') },
+      { role: 'system', content: prompts.SYSTEM_PROMPTS.finalizer },
+      { role: 'user', content: prompts.buildFinalizePrompt(latestDraft, run.input.startDate, run.input.endDate, run.input?.numberOfOutcomes || '') },
     ],
     { temperature: 0.3 },
   );
@@ -477,6 +488,28 @@ async function _orchestrateInner(config, signal) {
     xapiEnrich: optionsRaw?.xapiEnrich || false,
   };
 
+  // Resolve rigor level + prompt bundle. Machine is the default; passing
+  // 'human' through optionsRaw routes every prompt reference below at the
+  // human-mode bundle (currently a Phase 1 stub that aliases the
+  // machine-mode prompts; Phase 3 replaces it with real human prompts).
+  // We deliberately do NOT pre-validate the value here — resolvePromptSet
+  // silently falls back to machine on anything unknown, and we store the
+  // value the caller actually passed (after fallback) in options.
+  const rigorLevel = optionsRaw?.rigorLevel || DEFAULT_RIGOR_LEVEL;
+  const prompts = resolvePromptSet(rigorLevel);
+  options.rigorLevel = prompts.rigorLevel;
+
+  // Human-mode pipeline softeners — only applied when the caller did not
+  // explicitly set the option, so power users can still override per-call.
+  // Machine mode never enters this block, so machine eval baselines stay
+  // byte-identical.
+  if (prompts.rigorLevel === 'human') {
+    if (optionsRaw?.verifiers === undefined)   options.verifiers   = 'partial';
+    if (optionsRaw?.evidence === undefined)    options.evidence    = 'none';
+    if (optionsRaw?.escalation === undefined)  options.escalation  = 'selective';
+    if (optionsRaw?.aggregation === undefined) options.aggregation = 'majority';
+  }
+
   // Build the Run input. References may arrive as an array (CLI) or string (UI/harness).
   const refs = input?.references;
   let referencesStr = Array.isArray(refs) ? refs.join('\n') : (refs || '');
@@ -487,6 +520,14 @@ async function _orchestrateInner(config, signal) {
     endDate: input?.endDate || '',
     references: referencesStr,
   });
+
+  // Tag the run with its rigor level only when non-default. This keeps the
+  // committed machine-mode eval baseline byte-identical (it has no
+  // `rigorLevel` key) while still labelling every human-mode run for
+  // debuggability and downstream formatters.
+  if (prompts.rigorLevel !== DEFAULT_RIGOR_LEVEL) {
+    run.rigorLevel = prompts.rigorLevel;
+  }
 
   let riskLevel = 'unknown';
 
@@ -513,10 +554,10 @@ async function _orchestrateInner(config, signal) {
     const draftResult = await queryModel(
       models.drafter,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.drafter },
+        { role: 'system', content: prompts.SYSTEM_PROMPTS.drafter },
         {
           role: 'user',
-          content: buildDraftPrompt(
+          content: prompts.buildDraftPrompt(
             input?.question || '',
             input?.startDate || '',
             input?.endDate || '',
@@ -545,7 +586,7 @@ async function _orchestrateInner(config, signal) {
   // --- 2. Claim pipeline on the initial draft ---
   ok = await stage('claims', async () => {
     await runClaimPipeline(
-      run, run.drafts[0].content, models, options, fetchImpl, cost, callbacks,
+      run, run.drafts[0].content, models, options, fetchImpl, cost, callbacks, prompts,
     );
   });
   if (!ok || run.status === 'error') {
@@ -567,7 +608,7 @@ async function _orchestrateInner(config, signal) {
     log(run, 'review', 'info', 'Review skipped by selective escalation (claim set clean).', callbacks);
   } else {
     ok = await stage('review', async () => {
-      await runReviewStage(run, models, options, cost, callbacks);
+      await runReviewStage(run, models, options, cost, callbacks, prompts);
     });
     if (!ok || run.status === 'error') {
       run.cost = cost.snapshot();
@@ -599,7 +640,7 @@ async function _orchestrateInner(config, signal) {
 
   // --- 4. Update ---
   ok = await stage('update', async () => {
-    await runUpdateStage(run, models, options, fetchImpl, cost, callbacks, referencesStr);
+    await runUpdateStage(run, models, options, fetchImpl, cost, callbacks, referencesStr, prompts);
   });
   if (!ok || run.status === 'error') {
     run.cost = cost.snapshot();
@@ -610,7 +651,7 @@ async function _orchestrateInner(config, signal) {
   // --- 5. Risk analysis ---
   let riskText = '';
   ok = await stage('early_resolution', async () => {
-    const result = await runRiskStage(run, models, cost, callbacks);
+    const result = await runRiskStage(run, models, cost, callbacks, prompts);
     riskLevel = result.level;
     riskText = result.text;
     return result;
@@ -635,7 +676,7 @@ async function _orchestrateInner(config, signal) {
 
   let gate;
   ok = await stage('accept', async () => {
-    gate = await runFinalizeStage(run, riskLevel, models, cost, callbacks);
+    gate = await runFinalizeStage(run, riskLevel, models, cost, callbacks, prompts);
     return gate;
   });
   if (!ok || run.status === 'error') {

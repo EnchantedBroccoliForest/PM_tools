@@ -182,9 +182,20 @@ function mergeVerdict(structural, entailmentResult) {
  * @param {import('../types/run').Claim[]} claims
  * @param {string} draftContent
  * @param {string} verifierModelId   OpenRouter model id for the entailment pass
+ * @param {{
+ *   buildPrompt?: typeof buildBatchEntailmentPrompt,
+ *   buildRetryPrompt?: typeof buildStrictBatchEntailmentRetryPrompt,
+ *   systemPrompt?: string,
+ * }} [prompts]                      optional rigor-level overrides; defaults
+ *                                   to machine-mode prompts so existing
+ *                                   callers keep their current behaviour.
  * @returns {Promise<VerifyClaimsResult>}
  */
-export async function verifyClaims(claims, draftContent, verifierModelId) {
+export async function verifyClaims(claims, draftContent, verifierModelId, prompts = {}) {
+  const buildPrompt = prompts.buildPrompt || buildBatchEntailmentPrompt;
+  const buildRetryPrompt = prompts.buildRetryPrompt || buildStrictBatchEntailmentRetryPrompt;
+  const systemPrompt = prompts.systemPrompt || SYSTEM_PROMPTS.entailmentVerifier;
+
   const emptyUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
   if (!claims || claims.length === 0) {
@@ -223,8 +234,8 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
     const r = await queryModel(
       verifierModelId,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.entailmentVerifier },
-        { role: 'user', content: buildBatchEntailmentPrompt(claims, draftContent) },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: buildPrompt(claims, draftContent) },
       ],
       { temperature: 0.1, maxTokens: 3000 }
     );
@@ -251,10 +262,10 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
       const r2 = await queryModel(
         verifierModelId,
         [
-          { role: 'system', content: SYSTEM_PROMPTS.entailmentVerifier },
+          { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: buildStrictBatchEntailmentRetryPrompt(claims, draftContent),
+            content: buildRetryPrompt(claims, draftContent),
           },
         ],
         { temperature: 0.05, maxTokens: 3000 }
