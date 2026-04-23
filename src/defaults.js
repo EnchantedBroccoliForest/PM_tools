@@ -13,6 +13,11 @@ import { DEFAULT_DRAFT_MODEL, DEFAULT_REVIEW_MODEL } from './constants/models.js
 // callers that want the drafter default; no alias needed here.
 export { DEFAULT_DRAFT_MODEL };
 
+// Rigor-level constants live in promptSet.js (the resolver is their natural
+// home). Re-exported here so that callers pulling from defaults.js have one
+// stop for every pipeline default.
+export { DEFAULT_RIGOR_LEVEL, RIGOR_LEVELS } from './constants/promptSet.js';
+
 /**
  * Default reviewer council. The UI starts with a single reviewer; the CLI
  * mirrors that. Users can add up to 4 via flags or config.
@@ -43,4 +48,5 @@ export const DEFAULT_OPTIONS = {
   escalation: 'always',
   evidence: 'retrieval',
   verifiers: 'full',
+  rigorLevel: 'machine',
 };

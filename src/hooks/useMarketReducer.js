@@ -26,6 +26,12 @@ const initialState = {
   // 'judge' makes one extra LLM call using the first review model.
   aggregationProtocol: 'majority',
 
+  // Rigor level for the next run. 'machine' (default) keeps the current
+  // adversarial pipeline and raw JSON output; 'human' (wired in later
+  // phases) swaps in shorter prompts and runs the humanizer on the final
+  // JSON. Phase 1 only stores the field — no handler reads it yet.
+  rigorLevel: 'machine',
+
   // Ideating
   ideatingInput: '',
   ideatingModel: DEFAULT_DRAFT_MODEL,

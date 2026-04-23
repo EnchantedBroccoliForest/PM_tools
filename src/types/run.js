@@ -387,6 +387,12 @@ export const RunSchema = z.object({
   // Orchestrator status and gate summaries — optional for backward compat.
   status: z.enum(['complete', 'blocked', 'partial', 'error']).optional().default('partial'),
   gates: GatesSchema.optional(),
+  // Rigor level the run was produced under. Optional for backward compat
+  // with runs exported before the rigor-level feature existed — those are
+  // implicitly machine-mode runs. The orchestrator only persists this key
+  // when it is non-default ('human'), so machine-mode eval baselines stay
+  // byte-identical.
+  rigorLevel: z.enum(['machine', 'human']).optional(),
 });
 
 // ------------------------------------------------------------------ factories
