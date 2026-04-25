@@ -1099,21 +1099,23 @@ function App() {
               <div className="rigor-toggle mode-toggle">
                 <button
                   type="button"
-                  className={`mode-toggle__btn rigor-toggle__btn ${rigor === 'machine' ? 'mode-toggle__btn--active' : ''}`}
+                  className={`mode-toggle__btn rigor-toggle__btn rigor-toggle__btn--machine ${rigor === 'machine' ? 'mode-toggle__btn--active' : ''}`}
                   onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'machine' })}
                   disabled={anyLoading || !!draftContent}
-                  data-tooltip="Structured, machine-optimized prompts that preserve the model's full analytical rigor. Outputs read precise and technical."
+                  data-tooltip="Long-form, highly rigorous output for agents."
                 >
-                  Machine
+                  <span className="rigor-toggle__icon" aria-hidden="true">🤖</span>
+                  Machine Mode
                 </button>
                 <button
                   type="button"
-                  className={`mode-toggle__btn rigor-toggle__btn ${rigor === 'human' ? 'mode-toggle__btn--active' : ''}`}
+                  className={`mode-toggle__btn rigor-toggle__btn rigor-toggle__btn--human ${rigor === 'human' ? 'mode-toggle__btn--active' : ''}`}
                   onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'human' })}
                   disabled={anyLoading || !!draftContent}
-                  data-tooltip="Softer, conversational prompts with polished final text. Outputs read natural and reader-friendly."
+                  data-tooltip="Concise, human-readable output."
                 >
-                  Human
+                  <span className="rigor-toggle__icon" aria-hidden="true">🧑</span>
+                  Human Mode
                 </button>
               </div>
               <p className="rigor-toggle__hint">
