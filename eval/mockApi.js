@@ -118,13 +118,19 @@ export function createMockQueryModel(fixture, { onWarn } = {}) {
 
   function classify(systemPrompt) {
     if (typeof systemPrompt !== 'string') return 'unknown';
-    // Match against canonical Machine-bucket strings. Keys are role names
-    // used in the callsByRole counter and switch below. Phase 2 keeps
-    // Human and Machine byte-identical, so this single-bucket lookup
-    // matches Human-mode prompts too. When Phase 3 forks Human wording,
-    // a Phase 4 fallback will try the Human bucket on miss.
-    const entries = Object.entries(SYSTEM_PROMPTS.machine);
-    for (const [role, value] of entries) {
+    // Phase 4: try the Machine bucket first (the canonical role set;
+    // any fixture captured pre-rigor was produced under Machine), then
+    // fall back to Human on miss. The fallback exists so an ad-hoc
+    // eval run under `--rigor=human` (Phase 5) doesn't return empty
+    // for every call when Human prompts diverge from Machine. For the
+    // committed fixtures, which always run under Machine, only the
+    // first pass ever fires.
+    const machineEntries = Object.entries(SYSTEM_PROMPTS.machine);
+    for (const [role, value] of machineEntries) {
+      if (systemPrompt === value) return role;
+    }
+    const humanEntries = Object.entries(SYSTEM_PROMPTS.human);
+    for (const [role, value] of humanEntries) {
       if (systemPrompt === value) return role;
     }
     return 'unknown';
