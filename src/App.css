@@ -406,6 +406,31 @@
   line-height: 1.4;
 }
 
+.llm-loading__rigor {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--r-sm, 4px);
+  border: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  vertical-align: middle;
+}
+
+.llm-loading__rigor--human {
+  color: var(--neon-cyan, var(--blue));
+  border-color: var(--neon-cyan, var(--blue));
+}
+
+.final-doc__rigor-footer {
+  margin: 1.25rem 0 0.75rem;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .textarea--tall {
   min-height: 200px;
 }

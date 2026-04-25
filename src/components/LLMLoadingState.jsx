@@ -65,12 +65,17 @@ function formatElapsed(ms) {
   return `${minutes}m ${remaining.toString().padStart(2, '0')}s`;
 }
 
-export default function LLMLoadingState({ phase, meta }) {
+export default function LLMLoadingState({ phase, meta, rigor }) {
   const [elapsed, setElapsed] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
 
   const config = PHASE_CONFIG[phase] || PHASE_CONFIG.draft;
   const modelNames = meta?.models || [];
+  // Phase 3: surface the rigor chip next to the phase label so the user
+  // (and any QA) can see at a glance which mode the run is operating
+  // under. Only render when rigor is provided — older callers without
+  // rigor wired through stay visually unchanged.
+  const rigorLabel = rigor === 'human' ? 'Human' : rigor === 'machine' ? 'Machine' : null;
 
   // Elapsed timer — update every second
   useEffect(() => {
@@ -111,7 +116,14 @@ export default function LLMLoadingState({ phase, meta }) {
       </div>
 
       <div className="llm-loading__info">
-        <div className="llm-loading__phase">{config.label}</div>
+        <div className="llm-loading__phase">
+          {config.label}
+          {rigorLabel && (
+            <span className={`llm-loading__rigor llm-loading__rigor--${rigor}`}>
+              {rigorLabel}
+            </span>
+          )}
+        </div>
 
         <div className="llm-loading__models">
           {isMultiModel ? (

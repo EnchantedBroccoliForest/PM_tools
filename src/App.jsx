@@ -5,7 +5,7 @@ import { getModelName, getModelAbbrev } from './constants/models';
 import { useModels } from './hooks/useModels';
 import LLMLoadingState from './components/LLMLoadingState';
 import {
-  SYSTEM_PROMPTS,
+  getSystemPrompt,
   buildDraftPrompt,
   buildDeliberationPrompt,
   buildUpdatePrompt,
@@ -343,6 +343,12 @@ function App() {
   const displayedDraftContent = displayedVersion ? displayedVersion.content : draftContent;
   const isViewingLatest = viewingVersionIndex === latestVersionIndex;
 
+  // Phase 3: rigor for display surfaces (loading-state chip, finalized
+  // footer). Reads from the Run snapshot so an in-flight run keeps showing
+  // its frozen rigor even if the user starts a new draft from a different
+  // toggle position; falls back to live state for the pre-RUN_START case.
+  const displayRigor = currentRun?.input?.rigor ?? rigor;
+
   // Phase 0 gate: Accept & Finalize is blocked when the early-resolution
   // analyst has flagged the updated draft as HIGH risk and the user has not
   // yet acknowledged it. Low / Medium / Unknown do not block.
@@ -572,8 +578,8 @@ function App() {
     });
     try {
       const result = await queryModel(selectedModel, [
-        { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildDraftPrompt(question, startDate, endDate, references, numberOfOutcomes) },
+        { role: 'system', content: getSystemPrompt('drafter', rigor) },
+        { role: 'user', content: buildDraftPrompt(question, startDate, endDate, references, numberOfOutcomes, rigor) },
       ], { maxTokens: DRAFT_MAX_TOKENS });
       dispatch({ type: 'DRAFT_SUCCESS', content: result.content });
       recordCost('draft', result);
@@ -620,6 +626,12 @@ function App() {
     if (!draftContent) return;
     dispatch({ type: 'START_LOADING', phase: 'review', models: reviewModels.map((id) => getModelName(id)) });
 
+    // Read rigor off the Run snapshot so a mid-flow toggle (which the UI
+    // also disables) can never leak into a stage that has already started.
+    // Fall back to live state for safety; the toggle is locked while a
+    // draft exists, so the two should agree.
+    const runRigor = currentRunRef.current?.input?.rigor ?? rigor;
+
     try {
       const reviewerModels = reviewModels.map((id) => ({
         id,
@@ -633,6 +645,7 @@ function App() {
         draftContent,
         RIGOR_RUBRIC,
         numberOfOutcomes,
+        runRigor,
       );
 
       // Per-reviewer cost + log accounting.
@@ -669,9 +682,9 @@ function App() {
       // when we have 2+ reviewers.
       let deliberatedReview = null;
       if (legacyReviews.length > 1) {
-        const deliberationPrompt = buildDeliberationPrompt(draftContent, legacyReviews, numberOfOutcomes);
+        const deliberationPrompt = buildDeliberationPrompt(draftContent, legacyReviews, numberOfOutcomes, runRigor);
         const delibResult = await queryModel(legacyReviews[0].model, [
-          { role: 'system', content: SYSTEM_PROMPTS.reviewer },
+          { role: 'system', content: getSystemPrompt('reviewer', runRigor) },
           { role: 'user', content: deliberationPrompt },
         ]);
         deliberatedReview = delibResult.content;
@@ -699,7 +712,8 @@ function App() {
         aggregationProtocol,
         RIGOR_RUBRIC,
         allVotes,
-        judgeModelId
+        judgeModelId,
+        runRigor,
       );
 
       if (aggResult.usage && aggResult.usage.totalTokens > 0) {
@@ -758,6 +772,9 @@ function App() {
     if (!draftContent || reviews.length === 0) return;
     dispatch({ type: 'START_LOADING', phase: 'update', models: [getModelName(selectedModel)] });
 
+    // See handleReview for the snapshotting rationale.
+    const runRigor = currentRunRef.current?.input?.rigor ?? rigor;
+
     let updatedDraft;
     try {
       // Use the deliberated review if available, otherwise fall back to first review
@@ -772,8 +789,8 @@ function App() {
         currentRunRef.current?.claims || [],
       );
       const result = await queryModel(selectedModel, [
-        { role: 'system', content: SYSTEM_PROMPTS.drafter },
-        { role: 'user', content: buildUpdatePrompt(displayedDraftContent, reviewText, humanReviewInput, focusBlock, numberOfOutcomes, references) },
+        { role: 'system', content: getSystemPrompt('drafter', runRigor) },
+        { role: 'user', content: buildUpdatePrompt(displayedDraftContent, reviewText, humanReviewInput, focusBlock, numberOfOutcomes, references, runRigor) },
       ], { maxTokens: DRAFT_MAX_TOKENS });
       updatedDraft = result.content;
       dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });
@@ -804,8 +821,8 @@ function App() {
     dispatch({ type: 'START_EARLY_RESOLUTION', models: [getModelName(selectedModel)] });
     try {
       const riskResult = await queryModel(selectedModel, [
-        { role: 'system', content: SYSTEM_PROMPTS.earlyResolutionAnalyst },
-        { role: 'user', content: buildEarlyResolutionPrompt(updatedDraft, startDate, endDate) },
+        { role: 'system', content: getSystemPrompt('earlyResolutionAnalyst', runRigor) },
+        { role: 'user', content: buildEarlyResolutionPrompt(updatedDraft, startDate, endDate, runRigor) },
       ]);
       recordCost('early_resolution', riskResult);
       dispatch({
@@ -881,12 +898,15 @@ function App() {
     if (needsSourceAck) return; // block until unreachable data sources are addressed or acknowledged
     dispatch({ type: 'START_LOADING', phase: 'accept', models: [getModelName(selectedModel)] });
 
+    // See handleReview for the snapshotting rationale.
+    const runRigor = currentRunRef.current?.input?.rigor ?? rigor;
+
     try {
       const result = await queryModel(
         selectedModel,
         [
-          { role: 'system', content: SYSTEM_PROMPTS.finalizer },
-          { role: 'user', content: buildFinalizePrompt(draftContent, startDate, endDate, numberOfOutcomes) },
+          { role: 'system', content: getSystemPrompt('finalizer', runRigor) },
+          { role: 'user', content: buildFinalizePrompt(draftContent, startDate, endDate, numberOfOutcomes, runRigor) },
         ],
         { temperature: 0.3 }
       );
@@ -904,20 +924,31 @@ function App() {
         parsedContent = { raw: result.content };
       }
 
-      // Silent post-finalize humanizer pass. Runs under the existing
-      // 'accept' spinner so the user never sees an un-humanized flash of the
-      // market card. Any failure (thrown, malformed JSON, etc.) falls back
-      // to the un-humanized content — humanization is a polish step and
-      // must never block Finalize.
-      const humResult = await humanizeFinalJson(selectedModel, parsedContent);
-      recordCost('humanize', humResult);
-      dispatch({
-        type: 'RUN_LOG',
-        stage: 'humanize',
-        level: humResult.logEntry.level,
-        message: humResult.logEntry.message,
-      });
-      const finalContent = humResult.humanizedJson;
+      // Phase 3: humanizer runs only under Human rigor. Machine runs ship
+      // the un-humanized finalizer JSON straight to the market card, which
+      // is the existing eval-baseline behavior. The RUN_LOG entry on the
+      // skip path is intentionally informative so a regression that
+      // accidentally calls the humanizer under Machine surfaces as a
+      // missing 'Humanize skipped' line in the run trace.
+      let finalContent = parsedContent;
+      if (runRigor === 'human') {
+        const humResult = await humanizeFinalJson(selectedModel, parsedContent);
+        recordCost('humanize', humResult);
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'humanize',
+          level: humResult.logEntry.level,
+          message: humResult.logEntry.message,
+        });
+        finalContent = humResult.humanizedJson;
+      } else {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'humanize',
+          level: 'info',
+          message: 'Humanize skipped: Machine rigor selected.',
+        });
+      }
 
       dispatch({ type: 'FINALIZE_SUCCESS', content: finalContent });
       dispatch({ type: 'RUN_SET_FINAL', finalJson: finalContent });
@@ -958,8 +989,8 @@ function App() {
     dispatch({ type: 'START_LOADING', phase: 'ideate', models: [getModelName(ideatingModel)] });
     try {
       const result = await queryModel(ideatingModel, [
-        { role: 'system', content: SYSTEM_PROMPTS.ideator },
-        { role: 'user', content: buildIdeatePrompt(ideatingInput) },
+        { role: 'system', content: getSystemPrompt('ideator', rigor) },
+        { role: 'user', content: buildIdeatePrompt(ideatingInput, rigor) },
       ]);
       dispatch({ type: 'IDEATE_SUCCESS', content: result.content });
     } catch (err) {
@@ -1319,7 +1350,7 @@ function App() {
 
                 {loading === 'ideate' && (
                   <div className="draft-output-section fade-in">
-                    <LLMLoadingState phase="ideate" meta={loadingMeta} />
+                    <LLMLoadingState phase="ideate" meta={loadingMeta} rigor={displayRigor} />
                   </div>
                 )}
 
@@ -1405,7 +1436,7 @@ function App() {
               {/* Draft output — stays in Panel 1 right under the button */}
               {mode !== 'ideating' && loading === 'draft' && (
                 <div className="draft-output-section fade-in">
-                  <LLMLoadingState phase="draft" meta={loadingMeta} />
+                  <LLMLoadingState phase="draft" meta={loadingMeta} rigor={displayRigor} />
                 </div>
               )}
               {mode !== 'ideating' && draftContent && (
@@ -1992,7 +2023,7 @@ function App() {
                   {/* Loading state for review */}
                   {loading === 'review' && reviews.length === 0 && (
                     <div className="col-panel col-panel--review">
-                      <LLMLoadingState phase="review" meta={loadingMeta} />
+                      <LLMLoadingState phase="review" meta={loadingMeta} rigor={displayRigor} />
                     </div>
                   )}
 
@@ -2065,7 +2096,7 @@ function App() {
                   <p>Draft, review, and update your market to finalize</p>
                 </div>
               ) : loading === 'accept' ? (
-                <LLMLoadingState phase="accept" meta={loadingMeta} />
+                <LLMLoadingState phase="accept" meta={loadingMeta} rigor={displayRigor} />
               ) : (
                 <div className="final-content fade-in">
                   <div className="final-header">
@@ -2205,6 +2236,15 @@ function App() {
                       )}
                     </div>
                   )}
+
+                  {/* Phase 3: rigor provenance footer. Mirrors the chip on
+                      the loading spinner so users can confirm which mode
+                      this market was produced under after the run is done. */}
+                  <p className={`final-doc__rigor-footer final-doc__rigor-footer--${displayRigor}`}>
+                    {displayRigor === 'human'
+                      ? 'Produced in Human mode (prompts softened, text polished).'
+                      : 'Produced in Machine mode (full rigor).'}
+                  </p>
 
                   <button className="reset-button" onClick={handleReset}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>

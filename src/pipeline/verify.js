@@ -37,7 +37,7 @@
 
 import { queryModel } from '../api/openrouter.js';
 import {
-  SYSTEM_PROMPTS,
+  getSystemPrompt,
   buildBatchEntailmentPrompt,
   buildStrictBatchEntailmentRetryPrompt,
 } from '../constants/prompts.js';
@@ -182,9 +182,15 @@ function mergeVerdict(structural, entailmentResult) {
  * @param {import('../types/run').Claim[]} claims
  * @param {string} draftContent
  * @param {string} verifierModelId   OpenRouter model id for the entailment pass
+ * @param {'machine'|'human'} [rigor]  accepted for signature parity with the
+ *                                     other rigor-aware pipeline functions.
+ *                                     The entailment verifier is a pure
+ *                                     extraction-style task and is NOT
+ *                                     softened by rigor (§0.6 of the plan),
+ *                                     so the parameter is currently unused.
  * @returns {Promise<VerifyClaimsResult>}
  */
-export async function verifyClaims(claims, draftContent, verifierModelId) {
+export async function verifyClaims(claims, draftContent, verifierModelId, _rigor = 'machine') {
   const emptyUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
   if (!claims || claims.length === 0) {
@@ -223,7 +229,7 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
     const r = await queryModel(
       verifierModelId,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.entailmentVerifier },
+        { role: 'system', content: getSystemPrompt('entailmentVerifier') },
         { role: 'user', content: buildBatchEntailmentPrompt(claims, draftContent) },
       ],
       { temperature: 0.1, maxTokens: 3000 }
@@ -251,7 +257,7 @@ export async function verifyClaims(claims, draftContent, verifierModelId) {
       const r2 = await queryModel(
         verifierModelId,
         [
-          { role: 'system', content: SYSTEM_PROMPTS.entailmentVerifier },
+          { role: 'system', content: getSystemPrompt('entailmentVerifier') },
           {
             role: 'user',
             content: buildStrictBatchEntailmentRetryPrompt(claims, draftContent),

@@ -23,7 +23,7 @@
  */
 
 import { queryModel } from '../api/openrouter';
-import { SYSTEM_PROMPTS, buildHumanizerPrompt } from '../constants/prompts';
+import { getSystemPrompt, buildHumanizerPrompt } from '../constants/prompts';
 import { tryParseJsonObject } from './llmJson';
 
 // Fields the humanizer is NOT allowed to modify. Restored from the original
@@ -232,7 +232,7 @@ export async function humanizeFinalJson(model, finalJson, deps = {}) {
     result = await query(
       model,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.humanizer },
+        { role: 'system', content: getSystemPrompt('humanizer') },
         { role: 'user', content: buildHumanizerPrompt(finalJson) },
       ],
       { temperature: 0.4 }
