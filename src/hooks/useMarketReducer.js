@@ -2,7 +2,10 @@ import { useReducer } from 'react';
 import { DEFAULT_DRAFT_MODEL, DEFAULT_REVIEW_MODEL } from '../constants/models';
 import { createRun } from '../types/run';
 
-const initialState = {
+// Exported for direct testing of state transitions. Production code should
+// continue to use `useMarketReducer()` below — this re-export only widens
+// the surface for unit tests, it does not change the public hook.
+export const initialState = {
   // Mode
   mode: 'draft', // 'draft' | 'review' | 'ideating'
 
@@ -105,7 +108,7 @@ function clearEarlyResolution(state) {
   };
 }
 
-function reducer(state, action) {
+export function reducer(state, action) {
   switch (action.type) {
     case 'SET_FIELD':
       return { ...state, [action.field]: action.value };
