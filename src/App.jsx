@@ -571,7 +571,11 @@ function App() {
   // --- Stage 1: Draft (single model) ---
   const handleDraft = async () => {
     dispatch({ type: 'START_LOADING', phase: 'draft', models: [getModelName(selectedModel)] });
-    // Start a fresh Run artifact; previous run (if any) is discarded.
+    // Start a fresh Run artifact; previous run (if any) is discarded. Note
+    // that `rigor` here is the live reducer field (the user's current
+    // selection), and including it in RUN_START is what freezes it onto
+    // run.input.rigor so every later stage reads the snapshot via
+    // currentRunRef.current?.input?.rigor — see handleReview for that read.
     dispatch({
       type: 'RUN_START',
       input: { question, startDate, endDate, references, numberOfOutcomes, rigor },

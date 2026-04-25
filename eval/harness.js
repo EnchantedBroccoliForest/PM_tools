@@ -56,7 +56,19 @@ const FIXTURE_JUDGE_MODEL = 'mock/judge';
  * @param {object} ablation
  * @returns {Promise<FixtureResult>}
  */
-export async function runFixture(fixture, ablation) {
+export async function runFixture(fixture, ablation, options = {}) {
+  // Phase 5: rigor is normally pinned to 'machine' here so the committed
+  // baseline.json stays stable. eval/run.js exposes an opt-in override
+  // (--rigor=human) for ad-hoc comparison runs that explicitly avoid
+  // --check-regression. Anything else passing 'human' here (a future
+  // caller, a typo) reverts to Machine and prints a console.warn.
+  const requestedRigor = options.rigor;
+  let rigor = 'machine';
+  if (requestedRigor === 'human') {
+    rigor = 'human';
+  } else if (requestedRigor && requestedRigor !== 'machine') {
+    console.warn(`[eval] runFixture: ignoring unknown rigor='${requestedRigor}', falling back to 'machine'`);
+  }
   const mockQuery = createMockQueryModel(fixture, {
     onWarn: (m) => console.warn(`[eval] ${m}`),
   });
@@ -70,6 +82,12 @@ export async function runFixture(fixture, ablation) {
         startDate: fixture.input?.startDate || '',
         endDate: fixture.input?.endDate || '',
         references: fixture.input?.references || '',
+        // Phase 5: rigor is pinned to Machine by default so the
+        // committed eval/baseline.json stays stable; an opt-in override
+        // (--rigor=human via eval/run.js) flows through `options.rigor`
+        // for ad-hoc comparison runs. Ad-hoc runs are not gated by CI
+        // and do not regenerate the baseline.
+        rigor,
       },
       models: {
         drafter: FIXTURE_DRAFT_MODEL,

@@ -55,6 +55,10 @@ function parseArgs(argv) {
     escalation: 'always',
     evidence: 'retrieval',
     verifiers: 'full',
+    // Default rigor is Machine because the committed baseline.json was
+    // captured under Machine. Human is opt-in for ad-hoc runs and is
+    // explicitly incompatible with --check-regression / --baseline below.
+    rigor: 'machine',
     fixtures: null,
     out: null,
     baseline: false,
@@ -79,6 +83,13 @@ function parseArgs(argv) {
         break;
       case 'verifiers':
         args.verifiers = value;
+        break;
+      case 'rigor':
+        if (value !== 'machine' && value !== 'human') {
+          console.error(`[eval] --rigor must be 'machine' or 'human' (got '${value}')`);
+          process.exit(2);
+        }
+        args.rigor = value;
         break;
       case 'fixtures':
         args.fixtures = value;
@@ -120,6 +131,12 @@ Ablation flags:
   --escalation=always|selective                whether to skip review when clean
   --evidence=none|retrieval|retrieval+debate   retrieval behaviour
   --verifiers=off|partial|full                 verifier depth
+  --rigor=machine|human                        rigor variant (default machine).
+                                               Human is for ad-hoc comparison
+                                               only — incompatible with
+                                               --check-regression / --baseline
+                                               since the committed baseline is
+                                               Machine.
 
 Filters & output:
   --fixtures=<substring>   only run fixtures whose id / bucket contains this string
@@ -256,6 +273,17 @@ async function main() {
     verifiers: args.verifiers,
   };
 
+  // Phase 5: a Human-mode run is informational only — the committed
+  // baseline.json was captured under Machine. Refuse to compare or
+  // overwrite the baseline from a Human run so a misuse cannot quietly
+  // ship a baseline that mixes the two rigors.
+  if (args.rigor === 'human' && (args.checkRegression || args.baseline)) {
+    console.error(
+      '[eval] --rigor=human is incompatible with --check-regression / --baseline; the committed baseline is Machine-only.',
+    );
+    process.exit(2);
+  }
+
   // Load fixtures.
   let fixtures;
   try {
@@ -275,7 +303,7 @@ async function main() {
   const results = [];
   for (const fixture of fixtures) {
     try {
-      const r = await runFixture(fixture, ablation);
+      const r = await runFixture(fixture, ablation, { rigor: args.rigor });
       results.push(r);
     } catch (err) {
       console.error(`[eval] fixture ${fixture.id} threw: ${err.stack || err.message}`);
