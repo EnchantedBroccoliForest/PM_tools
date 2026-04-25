@@ -128,10 +128,21 @@ describe('getSystemPrompt(role, rigor)', () => {
   });
 
   it('falls back to the machine variant if a role is missing from the requested bucket', () => {
-    // Defensive: simulate what would happen if a future Phase 5 added a
-    // role to machine but forgot to add it to human. The accessor must
-    // still return the machine string rather than undefined.
-    expect(getSystemPrompt('claimExtractor', 'human')).toBe(SYSTEM_PROMPTS.machine.claimExtractor);
+    // Defensive: simulate what would happen if a future Phase added a role
+    // to machine but forgot to add it to human. Because human starts as a
+    // spread copy of machine, every role is normally present in both
+    // buckets — to actually exercise the fallback we have to delete the
+    // role from human for the duration of the assertion. (Without this
+    // mutation the test would pass even if the resolver stopped falling
+    // back, which defeats the point.)
+    const original = SYSTEM_PROMPTS.human.claimExtractor;
+    delete SYSTEM_PROMPTS.human.claimExtractor;
+    try {
+      expect('claimExtractor' in SYSTEM_PROMPTS.human).toBe(false);
+      expect(getSystemPrompt('claimExtractor', 'human')).toBe(SYSTEM_PROMPTS.machine.claimExtractor);
+    } finally {
+      SYSTEM_PROMPTS.human.claimExtractor = original;
+    }
   });
 });
 

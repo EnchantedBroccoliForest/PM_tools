@@ -43,6 +43,46 @@ function stripComments(src) {
     .replace(/\/\/[^\n]*/g, '');
 }
 
+/**
+ * Find the balanced `{...}` block that immediately follows the first
+ * match of `anchorRegex` in `src` and return the contents (without the
+ * outer braces). Returns null when either the anchor or its block is
+ * missing. Used by the gate test to extract the body of the
+ * `if (runRigor === 'human') { ... }` block so we can assert which
+ * calls live inside it vs alongside it.
+ *
+ * Quotes and template literals inside the block can confuse a naive
+ * brace counter — App.jsx's gate body doesn't currently have any, but
+ * skipping over them keeps this helper safe against future edits.
+ */
+function balancedBlockAfter(src, anchorRegex) {
+  const match = anchorRegex.exec(src);
+  if (!match) return null;
+  let i = match.index + match[0].length;
+  while (i < src.length && src[i] !== '{') i++;
+  if (i >= src.length) return null;
+  const start = i;
+  let depth = 0;
+  for (; i < src.length; i++) {
+    const c = src[i];
+    if (c === "'" || c === '"' || c === '`') {
+      const quote = c;
+      i++;
+      while (i < src.length) {
+        if (src[i] === '\\') { i += 2; continue; }
+        if (src[i] === quote) break;
+        i++;
+      }
+    } else if (c === '{') {
+      depth++;
+    } else if (c === '}') {
+      depth--;
+      if (depth === 0) return src.slice(start + 1, i);
+    }
+  }
+  return null;
+}
+
 describe('humanize gate is wired in handleAccept under Human rigor only', () => {
   const APP = readSource('src/App.jsx');
   const APP_CODE = stripComments(APP);
@@ -51,20 +91,28 @@ describe('humanize gate is wired in handleAccept under Human rigor only', () => 
     expect(APP_CODE).toMatch(/import\s*{\s*humanizeFinalJson\s*}\s*from/);
   });
 
-  it('handleAccept guards humanizeFinalJson with a Human-rigor conditional', () => {
-    // Find the handleAccept body and check the gate appears inside it.
-    const handleAcceptIdx = APP.indexOf('const handleAccept');
-    expect(handleAcceptIdx).toBeGreaterThan(-1);
-    // Slice forward enough text to cover the body. The whole file is
-    // ~2300 lines; a 12_000-char window covers handleAccept comfortably
-    // without bleeding into far-away handlers.
-    const body = APP.slice(handleAcceptIdx, handleAcceptIdx + 12000);
-    const bodyCode = stripComments(body);
-    // Gate condition: `runRigor === 'human'` (the snapshotted rigor name
-    // used by Phase 3's handleAccept).
-    expect(bodyCode).toMatch(/runRigor\s*===\s*['"]human['"]/);
-    // The actual humanizer call must appear inside that body.
-    expect(bodyCode).toMatch(/humanizeFinalJson\s*\(/);
+  it('every humanizeFinalJson call in App.jsx lives inside the Human-rigor guard block', () => {
+    // The weaker version of this test (and the version a previous review
+    // flagged as P3) only required the conditional and the call to both
+    // appear somewhere in handleAccept — which would still pass if a
+    // future refactor moved the call out of the guard. To lock the real
+    // contract, we extract the balanced `if (runRigor === 'human') { ... }`
+    // block and assert that every humanizer call in the entire file lives
+    // inside it.
+    const guardBlock = balancedBlockAfter(
+      APP_CODE,
+      /if\s*\(\s*runRigor\s*===\s*['"]human['"]\s*\)\s*/,
+    );
+    expect(guardBlock, 'expected `if (runRigor === \'human\') { ... }` block in App.jsx').not.toBeNull();
+    expect(guardBlock).toMatch(/humanizeFinalJson\s*\(/);
+
+    const totalCalls = (APP_CODE.match(/humanizeFinalJson\s*\(/g) || []).length;
+    const callsInsideGuard = (guardBlock.match(/humanizeFinalJson\s*\(/g) || []).length;
+    expect(
+      totalCalls,
+      'unguarded humanizeFinalJson() call detected outside the Human-rigor block',
+    ).toBe(callsInsideGuard);
+    expect(totalCalls).toBeGreaterThan(0);
   });
 
   it('handleAccept emits the "Humanize skipped" canary log line on the Machine path', () => {
