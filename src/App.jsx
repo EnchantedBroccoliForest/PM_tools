@@ -1122,9 +1122,6 @@ function App() {
                   Human Mode
                 </button>
               </div>
-              <p className="rigor-toggle__hint">
-                Recorded on the Run today; Human-mode prompt softening and final-text polish ship in a follow-up.
-              </p>
 
               {/* Mode Toggle */}
               <div className="mode-toggle">
