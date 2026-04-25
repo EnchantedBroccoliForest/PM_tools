@@ -1083,7 +1083,7 @@ function App() {
                 </button>
               </div>
               <p className="rigor-toggle__hint">
-                Human mode relaxes reviewer rigor and polishes final text. Machine mode enforces the strictest checks.
+                Recorded on the Run today; Human-mode prompt softening and final-text polish ship in a follow-up.
               </p>
 
               {/* Mode Toggle */}
