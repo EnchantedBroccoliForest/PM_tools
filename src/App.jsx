@@ -343,6 +343,12 @@ function App() {
   const displayedDraftContent = displayedVersion ? displayedVersion.content : draftContent;
   const isViewingLatest = viewingVersionIndex === latestVersionIndex;
 
+  // Phase 3: rigor for display surfaces (loading-state chip, finalized
+  // footer). Reads from the Run snapshot so an in-flight run keeps showing
+  // its frozen rigor even if the user starts a new draft from a different
+  // toggle position; falls back to live state for the pre-RUN_START case.
+  const displayRigor = currentRun?.input?.rigor ?? rigor;
+
   // Phase 0 gate: Accept & Finalize is blocked when the early-resolution
   // analyst has flagged the updated draft as HIGH risk and the user has not
   // yet acknowledged it. Low / Medium / Unknown do not block.
@@ -918,20 +924,31 @@ function App() {
         parsedContent = { raw: result.content };
       }
 
-      // Silent post-finalize humanizer pass. Runs under the existing
-      // 'accept' spinner so the user never sees an un-humanized flash of the
-      // market card. Any failure (thrown, malformed JSON, etc.) falls back
-      // to the un-humanized content — humanization is a polish step and
-      // must never block Finalize.
-      const humResult = await humanizeFinalJson(selectedModel, parsedContent);
-      recordCost('humanize', humResult);
-      dispatch({
-        type: 'RUN_LOG',
-        stage: 'humanize',
-        level: humResult.logEntry.level,
-        message: humResult.logEntry.message,
-      });
-      const finalContent = humResult.humanizedJson;
+      // Phase 3: humanizer runs only under Human rigor. Machine runs ship
+      // the un-humanized finalizer JSON straight to the market card, which
+      // is the existing eval-baseline behavior. The RUN_LOG entry on the
+      // skip path is intentionally informative so a regression that
+      // accidentally calls the humanizer under Machine surfaces as a
+      // missing 'Humanize skipped' line in the run trace.
+      let finalContent = parsedContent;
+      if (runRigor === 'human') {
+        const humResult = await humanizeFinalJson(selectedModel, parsedContent);
+        recordCost('humanize', humResult);
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'humanize',
+          level: humResult.logEntry.level,
+          message: humResult.logEntry.message,
+        });
+        finalContent = humResult.humanizedJson;
+      } else {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'humanize',
+          level: 'info',
+          message: 'Humanize skipped: Machine rigor selected.',
+        });
+      }
 
       dispatch({ type: 'FINALIZE_SUCCESS', content: finalContent });
       dispatch({ type: 'RUN_SET_FINAL', finalJson: finalContent });
@@ -1333,7 +1350,7 @@ function App() {
 
                 {loading === 'ideate' && (
                   <div className="draft-output-section fade-in">
-                    <LLMLoadingState phase="ideate" meta={loadingMeta} />
+                    <LLMLoadingState phase="ideate" meta={loadingMeta} rigor={displayRigor} />
                   </div>
                 )}
 
@@ -1419,7 +1436,7 @@ function App() {
               {/* Draft output — stays in Panel 1 right under the button */}
               {mode !== 'ideating' && loading === 'draft' && (
                 <div className="draft-output-section fade-in">
-                  <LLMLoadingState phase="draft" meta={loadingMeta} />
+                  <LLMLoadingState phase="draft" meta={loadingMeta} rigor={displayRigor} />
                 </div>
               )}
               {mode !== 'ideating' && draftContent && (
@@ -2006,7 +2023,7 @@ function App() {
                   {/* Loading state for review */}
                   {loading === 'review' && reviews.length === 0 && (
                     <div className="col-panel col-panel--review">
-                      <LLMLoadingState phase="review" meta={loadingMeta} />
+                      <LLMLoadingState phase="review" meta={loadingMeta} rigor={displayRigor} />
                     </div>
                   )}
 
@@ -2079,7 +2096,7 @@ function App() {
                   <p>Draft, review, and update your market to finalize</p>
                 </div>
               ) : loading === 'accept' ? (
-                <LLMLoadingState phase="accept" meta={loadingMeta} />
+                <LLMLoadingState phase="accept" meta={loadingMeta} rigor={displayRigor} />
               ) : (
                 <div className="final-content fade-in">
                   <div className="final-header">
@@ -2219,6 +2236,15 @@ function App() {
                       )}
                     </div>
                   )}
+
+                  {/* Phase 3: rigor provenance footer. Mirrors the chip on
+                      the loading spinner so users can confirm which mode
+                      this market was produced under after the run is done. */}
+                  <p className={`final-doc__rigor-footer final-doc__rigor-footer--${displayRigor}`}>
+                    {displayRigor === 'human'
+                      ? 'Produced in Human mode (prompts softened, text polished).'
+                      : 'Produced in Machine mode (full rigor).'}
+                  </p>
 
                   <button className="reset-button" onClick={handleReset}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
