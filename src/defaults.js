@@ -43,4 +43,5 @@ export const DEFAULT_OPTIONS = {
   escalation: 'always',
   evidence: 'retrieval',
   verifiers: 'full',
+  deliberation: 'off',
 };

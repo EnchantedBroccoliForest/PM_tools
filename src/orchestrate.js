@@ -34,6 +34,7 @@ import { gatherEvidence } from './pipeline/gatherEvidence.js';
 import { routeClaims } from './pipeline/route.js';
 import { runStructuredReviewsParallel } from './pipeline/structuredReview.js';
 import { aggregate } from './pipeline/aggregate.js';
+import { hasUnanimousAgreement, runDeliberationParallel } from './pipeline/deliberate.js';
 import { RIGOR_RUBRIC } from './constants/rubric.js';
 import { enrichReferencesWithXData } from './pipeline/xapi.js';
 import { parseRiskLevel } from './util/riskLevel.js';
@@ -222,13 +223,22 @@ async function runClaimPipeline(run, draftText, models, options, fetchImpl, cost
 }
 
 /**
- * Run the review stage: parallel structured reviews, aggregation, and a
- * re-route that folds the resulting criticisms into the routing state.
+ * Run the review stage: parallel structured reviews, optional deliberation,
+ * aggregation, and a re-route that folds the resulting criticisms into the
+ * routing state.
+ *
+ * When `options.deliberation` is 'on', a deliberation round runs after the
+ * initial reviews: each reviewer sees peer reasoning and revises their votes.
+ * When 'auto', deliberation runs only if reviewers disagree (per the
+ * llm-council-governance finding that governance structures matter most
+ * under disagreement). When 'off', the pipeline behaves as before.
  */
 async function runReviewStage(run, models, options, cost, callbacks) {
+  const draftContent = run.drafts[run.drafts.length - 1].content;
+
   const structured = await runStructuredReviewsParallel(
     models.reviewers,
-    run.drafts[run.drafts.length - 1].content,
+    draftContent,
     RIGOR_RUBRIC,
     run.input?.numberOfOutcomes || '',
   );
@@ -245,10 +255,48 @@ async function runReviewStage(run, models, options, cost, callbacks) {
     return;
   }
 
-  const allCriticisms = successful.flatMap((r) => r.criticisms);
+  // --- Deliberation round (optional) ---
+  let finalReviews = successful;
+  const shouldDeliberate =
+    options.deliberation === 'on' ||
+    (options.deliberation === 'auto' && !hasUnanimousAgreement(successful));
+
+  if (shouldDeliberate && successful.length >= 2) {
+    log(run, 'deliberation', 'info', `Starting deliberation round with ${successful.length} reviewers.`, callbacks);
+    const deliberationResult = await runDeliberationParallel(
+      models.reviewers,
+      draftContent,
+      RIGOR_RUBRIC,
+      successful,
+    );
+    finalReviews = deliberationResult.reviews.filter((r) => r.reviewProse !== null);
+    for (const entry of deliberationResult.logEntries) {
+      log(run, 'deliberation', entry.level, entry.message, callbacks);
+    }
+    // Only count usage for reviews that actually went through deliberation.
+    // Fallback reviews reuse the initial review object (no fromDeliberation
+    // flag) whose usage was already counted under 'review' above.
+    for (const r of deliberationResult.reviews) {
+      if (!r.fromDeliberation || !r.usage) continue;
+      cost.record('deliberation', { usage: r.usage, wallClockMs: r.wallClockMs });
+    }
+    if (deliberationResult.mindChanges.length > 0) {
+      log(
+        run, 'deliberation', 'info',
+        `Deliberation complete: ${deliberationResult.mindChanges.length} total vote change(s) across all reviewers.`,
+        callbacks,
+      );
+    } else {
+      log(run, 'deliberation', 'info', 'Deliberation complete: no votes changed.', callbacks);
+    }
+  } else if (options.deliberation === 'auto') {
+    log(run, 'deliberation', 'info', 'Deliberation skipped: reviewers unanimously agree.', callbacks);
+  }
+
+  const allCriticisms = finalReviews.flatMap((r) => r.criticisms);
   run.criticisms = [...(run.criticisms || []), ...allCriticisms];
 
-  const allVotes = successful.flatMap((r) => r.rubricVotes);
+  const allVotes = finalReviews.flatMap((r) => r.rubricVotes);
   const judgeModel = options.aggregation === 'judge' ? models.judge : undefined;
   const aggResult = await aggregate(
     options.aggregation,
@@ -429,6 +477,7 @@ function buildGates(run, riskLevel) {
  * @param {'always'|'selective'} [config.options.escalation]
  * @param {'none'|'retrieval'} [config.options.evidence]
  * @param {'off'|'partial'|'full'} [config.options.verifiers]
+ * @param {'off'|'on'|'auto'} [config.options.deliberation]  'auto' deliberates only when reviewers disagree
  * @param {string} [config.options.humanFeedback]
  * @param {boolean} [config.options.skipReview]   stop after claim pipeline, before review + update
  * @param {boolean} [config.options.skipFinalize]
@@ -471,6 +520,7 @@ async function _orchestrateInner(config, signal) {
     escalation: optionsRaw?.escalation || DEFAULT_OPTIONS.escalation,
     evidence: optionsRaw?.evidence || DEFAULT_OPTIONS.evidence,
     verifiers: optionsRaw?.verifiers || DEFAULT_OPTIONS.verifiers,
+    deliberation: optionsRaw?.deliberation || DEFAULT_OPTIONS.deliberation,
     humanFeedback: optionsRaw?.humanFeedback || undefined,
     skipReview: optionsRaw?.skipReview || false,
     skipFinalize: optionsRaw?.skipFinalize || false,
