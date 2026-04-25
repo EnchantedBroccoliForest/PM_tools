@@ -29,6 +29,18 @@
    ================================================ */
 .App.ambient-light {
   --bg-dark: #f5f0e8;
+  --shadow-card:
+    0 0 0 1px rgba(107, 93, 72, 0.22),
+    0 1px 2px rgba(139, 119, 90, 0.09),
+    0 2px 6px rgba(139, 119, 90, 0.07);
+  --shadow-card-hover:
+    0 0 0 1px rgba(107, 93, 72, 0.36),
+    0 2px 4px rgba(139, 119, 90, 0.12),
+    0 6px 14px rgba(139, 119, 90, 0.12);
+  --shadow-card-active:
+    0 0 0 1px var(--accent),
+    0 0 0 4px var(--accent-glow),
+    0 2px 6px rgba(139, 119, 90, 0.10);
   --surface-1: rgba(139, 119, 90, 0.06);
   --surface-2: rgba(139, 119, 90, 0.10);
   --surface-3: rgba(139, 119, 90, 0.15);
@@ -74,15 +86,10 @@
 
 .App.ambient-light .panel {
   background: rgba(255, 253, 248, 0.88);
-  border-color: var(--border);
-}
-.App.ambient-light .panel--active {
-  border-color: rgba(31, 95, 107, 0.55);
 }
 
 .App.ambient-light .content-box {
   background: rgba(255, 253, 248, 0.94);
-  border-color: rgba(107, 93, 72, 0.3);
   color: var(--text-1);
 }
 .App.ambient-light .content-box--rich .md-heading,
@@ -91,7 +98,6 @@
 .App.ambient-light .panel-placeholder p { color: var(--text-2); }
 .App.ambient-light .action-toolbar {
   background: rgba(245, 240, 232, 0.95);
-  border-color: var(--border);
 }
 .App.ambient-light .toolbar-select {
   background: rgba(255, 253, 248, 0.95);
@@ -138,6 +144,12 @@
   scrollbar-color: rgba(139, 119, 90, 0.2) transparent;
 }
 
+.App.ambient-light .review-button:hover:not(:disabled),
+.App.ambient-light .reset-button:hover:not(:disabled) {
+  background: rgba(107, 93, 72, 0.12);
+  color: var(--text-1);
+}
+
 .App.ambient-light .copy-btn {
   background: rgba(31, 95, 107, 0.1);
   border-color: rgba(31, 95, 107, 0.3);
@@ -169,7 +181,6 @@
 }
 
 .App.ambient-light .human-review-section {
-  border-color: var(--border);
   background: rgba(255, 253, 248, 0.7);
 }
 
@@ -181,7 +192,6 @@
 
 .App.ambient-light .ideate-idea {
   background: rgba(31, 95, 107, 0.07);
-  border-color: rgba(31, 95, 107, 0.3);
 }
 .App.ambient-light .ideate-idea:hover {
   background: rgba(31, 95, 107, 0.12);
@@ -196,7 +206,6 @@
 }
 
 .App.ambient-light .run-trace {
-  border-color: rgba(107, 93, 72, 0.25);
   background: rgba(255, 253, 248, 0.55);
 }
 .App.ambient-light .run-trace__body {

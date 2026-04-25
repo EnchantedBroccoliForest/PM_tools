@@ -1,5 +1,5 @@
-/* Inter variable font — the only typeface */
-@import url('https://rsms.me/inter/inter.css');
+/* Inter variable font is loaded via <link rel="stylesheet"> in index.html
+   so it doesn't render-block this stylesheet. */
 
 * {
   box-sizing: border-box;
@@ -15,6 +15,10 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Opt-in tabular numerals — only for digit columns that need to stay aligned */
+.tnum {
   font-variant-numeric: tabular-nums;
 }
 

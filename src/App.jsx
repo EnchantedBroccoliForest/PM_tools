@@ -4,6 +4,9 @@ import './ambient-modes.css';
 import { getModelName, getModelAbbrev } from './constants/models';
 import { useModels } from './hooks/useModels';
 import LLMLoadingState from './components/LLMLoadingState';
+import ErrorMessage from './components/ErrorMessage';
+import Enter from './components/Enter';
+import Presence from './components/Presence';
 import {
   getSystemPrompt,
   buildDraftPrompt,
@@ -1107,6 +1110,7 @@ function App() {
                   onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'machine' })}
                   disabled={anyLoading || !!draftContent}
                   data-tooltip="Long-form, highly rigorous output for agents."
+                  aria-label="Machine mode: long-form, highly rigorous output for agents"
                 >
                   <span className="rigor-toggle__icon" aria-hidden="true">🤖</span>
                   Machine Mode
@@ -1117,6 +1121,7 @@ function App() {
                   onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'human' })}
                   disabled={anyLoading || !!draftContent}
                   data-tooltip="Concise, human-readable output."
+                  aria-label="Human mode: concise, human-readable output"
                 >
                   <span className="rigor-toggle__icon" aria-hidden="true">🧑</span>
                   Human Mode
@@ -1237,18 +1242,11 @@ function App() {
                   />
                 </div>
 
-                {dateError && (
-                  <div className="error-message">
-                    <span>{dateError}</span>
-                    <button className="error-dismiss" onClick={() => dispatch({ type: 'SET_DATE', field: 'startDate', value: startDate, dateError: null })} aria-label="Dismiss">&times;</button>
-                  </div>
-                )}
-                {error && (
-                  <div className="error-message">
-                    <span>{error}</span>
-                    <button className="error-dismiss" onClick={handleDismissError} aria-label="Dismiss">&times;</button>
-                  </div>
-                )}
+                <ErrorMessage
+                  message={dateError}
+                  onDismiss={() => dispatch({ type: 'SET_DATE', field: 'startDate', value: startDate, dateError: null })}
+                />
+                <ErrorMessage message={error} onDismiss={handleDismissError} />
 
                 <button
                   type="button"
@@ -1284,12 +1282,7 @@ function App() {
                   />
                 </div>
 
-                {error && (
-                  <div className="error-message">
-                    <span>{error}</span>
-                    <button className="error-dismiss" onClick={handleDismissError} aria-label="Dismiss">&times;</button>
-                  </div>
-                )}
+                <ErrorMessage message={error} onDismiss={handleDismissError} />
 
                 <button
                   type="button"
@@ -1328,12 +1321,7 @@ function App() {
                   />
                 </div>
 
-                {error && (
-                  <div className="error-message">
-                    <span>{error}</span>
-                    <button className="error-dismiss" onClick={handleDismissError} aria-label="Dismiss">&times;</button>
-                  </div>
-                )}
+                <ErrorMessage message={error} onDismiss={handleDismissError} />
 
                 <button
                   type="button"
@@ -1355,18 +1343,18 @@ function App() {
                 </button>
 
                 {loading === 'ideate' && (
-                  <div className="draft-output-section fade-in">
+                  <Enter className="draft-output-section">
                     <LLMLoadingState phase="ideate" meta={loadingMeta} rigor={displayRigor} />
-                  </div>
+                  </Enter>
                 )}
 
                 {ideatingContent && loading !== 'ideate' && (
-                  <div className="draft-output-section fade-in">
+                  <Enter className="draft-output-section">
                     <div className="col-panel col-panel--draft">
                       <div className="col-panel-header">
                         <h2>Market Ideas</h2>
                         <div className="col-panel-actions">
-                          <span className="model-badge" data-tooltip={getModelName(ideatingModel)}>{getModelAbbrev(ideatingModel)}</span>
+                          <span className="model-badge" data-tooltip={getModelName(ideatingModel)} tabIndex={0} role="img" aria-label={`Model: ${getModelName(ideatingModel)}`}>{getModelAbbrev(ideatingModel)}</span>
                           <button
                             type="button"
                             className="copy-btn"
@@ -1403,7 +1391,8 @@ function App() {
                                 {ideas.map((idea, idx) => (
                                   <div
                                     key={`idea-${idx}-${idea.number}`}
-                                    className="ideate-idea"
+                                    className="ideate-idea stagger-item"
+                                    style={{ '--stagger': Math.min(idx, 8) }}
                                   >
                                     <div className="ideate-idea__header">
                                       <span className="ideate-idea__number">{idea.number}.</span>
@@ -1434,19 +1423,19 @@ function App() {
                         })()}
                       </div>
                     </div>
-                  </div>
+                  </Enter>
                 )}
               </div>
               )}
 
               {/* Draft output — stays in Panel 1 right under the button */}
               {mode !== 'ideating' && loading === 'draft' && (
-                <div className="draft-output-section fade-in">
+                <Enter className="draft-output-section">
                   <LLMLoadingState phase="draft" meta={loadingMeta} rigor={displayRigor} />
-                </div>
+                </Enter>
               )}
               {mode !== 'ideating' && draftContent && (
-                <div className="draft-output-section fade-in" ref={draftOutputRef}>
+                <Enter className="draft-output-section" ref={draftOutputRef}>
                   <div className={`col-panel col-panel--draft ${draftJustUpdated ? 'col-panel--just-updated' : ''}`}>
                     <div className="col-panel-header">
                       <div className="draft-title-group">
@@ -1489,7 +1478,7 @@ function App() {
                             </button>
                           </div>
                         )}
-                        <span className="model-badge" data-tooltip={getModelName(selectedModel)}>{getModelAbbrev(selectedModel)}</span>
+                        <span className="model-badge" data-tooltip={getModelName(selectedModel)} tabIndex={0} role="img" aria-label={`Model: ${getModelName(selectedModel)}`}>{getModelAbbrev(selectedModel)}</span>
                         <button
                           className={`copy-btn ${copiedId === 'draft' ? 'copy-btn--copied' : ''}`}
                           onClick={() => handleCopy(displayedDraftContent, 'draft')}
@@ -1514,7 +1503,7 @@ function App() {
                       {renderContent(displayedDraftContent)}
                     </div>
                   </div>
-                </div>
+                </Enter>
               )}
             </div>
           </div>
@@ -1539,7 +1528,7 @@ function App() {
                   <p>Complete setup and draft a market to continue</p>
                 </div>
               ) : (
-                <div className="draft-review-section fade-in">
+                <Enter className="draft-review-section">
 
                   {/* Action Toolbar */}
                   <div className="action-toolbar">
@@ -1710,7 +1699,7 @@ function App() {
                       HIGH risk blocks Accept & Finalize until acknowledged. */}
                   {hasUpdated && (loading === 'early-resolution' || earlyResolutionRiskLevel) && (
                     <div
-                      className={`risk-gate risk-gate--${earlyResolutionRiskLevel || 'checking'} fade-in`}
+                      className={`risk-gate risk-gate--${earlyResolutionRiskLevel || 'checking'}`}
                       role={earlyResolutionRiskLevel === 'high' ? 'alert' : 'status'}
                     >
                       <div className="risk-gate__header">
@@ -1756,7 +1745,7 @@ function App() {
                       criticism) prevents Accept until acknowledged. */}
                   {hasUpdated && currentRun?.routing && currentRun.routing.overall !== 'clean' && (
                     <div
-                      className={`risk-gate risk-gate--${currentRun.routing.overall === 'blocked' ? 'high' : 'medium'} fade-in`}
+                      className={`risk-gate risk-gate--${currentRun.routing.overall === 'blocked' ? 'high' : 'medium'}`}
                       role={currentRun.routing.overall === 'blocked' ? 'alert' : 'status'}
                     >
                       <div className="risk-gate__header">
@@ -1919,7 +1908,7 @@ function App() {
                     const reachable = sources.filter((s) => s.accessible);
                     return (
                       <div
-                        className={`risk-gate risk-gate--${gateLevel} fade-in`}
+                        className={`risk-gate risk-gate--${gateLevel}`}
                         role={needsSourceAck ? 'alert' : 'status'}
                       >
                         <div className="risk-gate__header">
@@ -2035,13 +2024,13 @@ function App() {
 
                   {/* Agent Review content */}
                   {reviews.length > 0 && (
-                    <div className="col-panel col-panel--review fade-in">
+                    <Enter className="col-panel col-panel--review">
                       {deliberatedReview && (
-                        <div className="fade-in">
+                        <Enter>
                           <div className="col-panel-header">
                             <h2>Deliberated Review</h2>
                             <div className="col-panel-actions">
-                              <span className="model-badge deliberation-badge" data-tooltip="Council Deliberation">C</span>
+                              <span className="model-badge deliberation-badge" data-tooltip="Council Deliberation" tabIndex={0} role="img" aria-label="Council Deliberation">C</span>
                               <button
                                 className={`copy-btn ${copiedId === 'deliberated' ? 'copy-btn--copied' : ''}`}
                                 onClick={() => handleCopy(deliberatedReview, 'deliberated')}
@@ -2053,15 +2042,15 @@ function App() {
                           <div className="content-box content-box--rich">
                             {renderContent(deliberatedReview)}
                           </div>
-                        </div>
+                        </Enter>
                       )}
 
                       {reviews.map((review, idx) => (
-                        <div key={idx} className={`${deliberatedReview ? 'individual-review' : ''} fade-in`}>
+                        <Enter key={idx} className={deliberatedReview ? 'individual-review' : ''}>
                           <div className="col-panel-header">
                             <h2>{deliberatedReview ? `Reviewer ${idx + 1}` : 'Agent Review'}</h2>
                             <div className="col-panel-actions">
-                              <span className="model-badge" data-tooltip={review.modelName}>{getModelAbbrev(review.model)}</span>
+                              <span className="model-badge" data-tooltip={review.modelName} tabIndex={0} role="img" aria-label={`Model: ${review.modelName}`}>{getModelAbbrev(review.model)}</span>
                               <button
                                 className={`copy-btn ${copiedId === `review-${idx}` ? 'copy-btn--copied' : ''}`}
                                 onClick={() => handleCopy(review.content, `review-${idx}`)}
@@ -2073,11 +2062,11 @@ function App() {
                           <div className="content-box content-box--rich">
                             {renderContent(review.content)}
                           </div>
-                        </div>
+                        </Enter>
                       ))}
-                    </div>
+                    </Enter>
                   )}
-                </div>
+                </Enter>
               )}
             </div>
           </div>
@@ -2104,8 +2093,8 @@ function App() {
               ) : loading === 'accept' ? (
                 <LLMLoadingState phase="accept" meta={loadingMeta} rigor={displayRigor} />
               ) : (
-                <div className="final-content fade-in">
-                  <div className="final-header">
+                <div className="final-content">
+                  <div className="final-header stagger-item" style={{ '--stagger': 0 }}>
                     <div className="final-header__icon">
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                     </div>
@@ -2134,7 +2123,7 @@ function App() {
 
                   {finalContent.raw ? (
                     <div className="final-doc">
-                      <div className="content-box content-box--rich">
+                      <div className="content-box content-box--rich stagger-item" style={{ '--stagger': 1 }}>
                         {renderContent(finalContent.raw)}
                       </div>
                     </div>
@@ -2142,17 +2131,17 @@ function App() {
                     <div className="final-doc">
                       {/* Question + Description */}
                       {finalContent.refinedQuestion && (
-                        <div className="final-doc__question">
+                        <div className="final-doc__question stagger-item" style={{ '--stagger': 1 }}>
                           {finalContent.refinedQuestion}
                         </div>
                       )}
 
                       {finalContent.shortDescription && (
-                        <p className="final-doc__description">{finalContent.shortDescription}</p>
+                        <p className="final-doc__description stagger-item" style={{ '--stagger': 2 }}>{finalContent.shortDescription}</p>
                       )}
 
                       {/* Market Period */}
-                      <div className="final-doc__period">
+                      <div className="final-doc__period stagger-item" style={{ '--stagger': 3 }}>
                         <span className="final-doc__period-label">Market Period</span>
                         <span className="final-doc__period-dates">
                           {finalContent.marketStartTimeUTC} &mdash; {finalContent.marketEndTimeUTC}
@@ -2161,11 +2150,15 @@ function App() {
 
                       {/* Outcomes */}
                       {finalContent.outcomes?.length > 0 && (
-                        <div className="final-doc__section">
+                        <div className="final-doc__section stagger-item" style={{ '--stagger': 4 }}>
                           <h3 className="final-doc__heading">Outcomes ({finalContent.outcomes.length})</h3>
                           <div className="final-doc__outcomes">
                             {finalContent.outcomes.map((outcome, index) => (
-                              <div key={index} className="outcome-row">
+                              <div
+                                key={index}
+                                className="outcome-row stagger-item"
+                                style={{ '--stagger': Math.min(5 + index, 8) }}
+                              >
                                 <div className="outcome-row__header">
                                   <span className="outcome-row__number">{index + 1}</span>
                                   <span className="outcome-row__name">{outcome.name}</span>
@@ -2186,7 +2179,7 @@ function App() {
 
                       {/* Resolution Rules */}
                       {finalContent.fullResolutionRules && (
-                        <div className="final-doc__section">
+                        <div className="final-doc__section stagger-item" style={{ '--stagger': 8 }}>
                           <div className="final-doc__section-header">
                             <h3 className="final-doc__heading">Resolution Rules</h3>
                             <button
@@ -2204,7 +2197,7 @@ function App() {
 
                       {/* Edge Cases */}
                       {finalContent.edgeCases && (
-                        <div className="final-doc__section">
+                        <div className="final-doc__section stagger-item" style={{ '--stagger': 8 }}>
                           <h3 className="final-doc__heading">Edge Cases</h3>
                           <div className="final-doc__text">
                             {renderContent(finalContent.edgeCases)}
@@ -2215,7 +2208,7 @@ function App() {
                       {/* Early-resolution risk — computed pre-finalize during
                           the Update → Finalize gate; shown here for reference. */}
                       {earlyResolutionRisk && (
-                        <div className="final-doc__section">
+                        <div className="final-doc__section stagger-item" style={{ '--stagger': 8 }}>
                           <div className="final-doc__section-header">
                             <h3 className="final-doc__heading">
                               Early Resolution Risk
@@ -2226,7 +2219,7 @@ function App() {
                               )}
                             </h3>
                             <div className="col-panel-actions">
-                              <span className="model-badge" data-tooltip={getModelName(selectedModel)}>{getModelAbbrev(selectedModel)}</span>
+                              <span className="model-badge" data-tooltip={getModelName(selectedModel)} tabIndex={0} role="img" aria-label={`Model: ${getModelName(selectedModel)}`}>{getModelAbbrev(selectedModel)}</span>
                               <button
                                 className={`copy-btn ${copiedId === 'early-risk' ? 'copy-btn--copied' : ''}`}
                                 onClick={() => handleCopy(earlyResolutionRisk, 'early-risk')}
