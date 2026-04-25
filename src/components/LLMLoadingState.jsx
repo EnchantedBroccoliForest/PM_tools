@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useEnterTransition } from '../hooks/useEnterTransition';
 
 const PHASE_CONFIG = {
   draft: {
@@ -68,6 +69,7 @@ function formatElapsed(ms) {
 export default function LLMLoadingState({ phase, meta, rigor }) {
   const [elapsed, setElapsed] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
+  const mounted = useEnterTransition();
 
   const config = PHASE_CONFIG[phase] || PHASE_CONFIG.draft;
   const modelNames = meta?.models || [];
@@ -107,7 +109,7 @@ export default function LLMLoadingState({ phase, meta, rigor }) {
   const isMultiModel = modelNames.length > 1;
 
   return (
-    <div className="llm-loading">
+    <div className={`llm-loading ${mounted ? 'llm-loading--mounted' : ''}`}>
       <div className="llm-loading__spinner-ring">
         <svg className="llm-loading__spinner-svg" viewBox="0 0 50 50">
           <circle className="llm-loading__track" cx="25" cy="25" r="20" />
