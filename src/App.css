@@ -410,6 +410,17 @@
   border-width: 2px;
   border-color: var(--neon-cyan, var(--blue));
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15), 0 6px 18px rgba(0, 0, 0, 0.18);
+  overflow: visible;
+}
+
+.rigor-toggle .rigor-toggle__btn:first-child {
+  border-top-left-radius: calc(var(--r-md) - 2px);
+  border-bottom-left-radius: calc(var(--r-md) - 2px);
+}
+
+.rigor-toggle .rigor-toggle__btn:last-child {
+  border-top-right-radius: calc(var(--r-md) - 2px);
+  border-bottom-right-radius: calc(var(--r-md) - 2px);
 }
 
 .rigor-toggle__btn {
