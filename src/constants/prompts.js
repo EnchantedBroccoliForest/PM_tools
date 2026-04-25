@@ -36,7 +36,14 @@ Do NOT import CTF/Polymarket/Kalshi/Manifold assumptions — those are different
 // only set role identity and role-specific output discipline; they do NOT
 // restate the protocol rules. Per-step user prompts (buildDraftPrompt etc.)
 // likewise stay focused on the step-specific task and omit restatements.
-export const SYSTEM_PROMPTS = {
+//
+// Phase 2: SYSTEM_PROMPTS is nested by `rigor` (machine | human). Phase 2
+// keeps both buckets byte-identical so Machine-mode behavior is unchanged;
+// Phase 3 forks Human-mode wording to soften the reviewer / deliberation /
+// update prompts. Read prompts via `getSystemPrompt(role, rigor)` — direct
+// access (`SYSTEM_PROMPTS.<role>`) is deliberately disallowed so any new
+// call site is forced through the rigor-aware accessor.
+const MACHINE_SYSTEM_PROMPTS = {
   drafter:
     `You are an expert at drafting market proposals for 42.space. You design proposals that satisfy the protocol rules below; you do not draft Polymarket-style binary CTF markets unless the question is genuinely binary.\n\n${PROTOCOL_CONTEXT}`,
 
@@ -88,6 +95,32 @@ CONSTRAINTS:
   - Output strictly valid JSON. No prose, preamble, explanation, or markdown fences.`,
 };
 
+// Phase 2 keeps Human-mode wording byte-identical to Machine. Phase 3 will
+// fork the reviewer / structuredReviewer / aggregationJudge variants here.
+// Spreading instead of re-typing locks the equality at module load time so a
+// stray edit to Machine that should also apply to Human can't drift silently.
+const HUMAN_SYSTEM_PROMPTS = { ...MACHINE_SYSTEM_PROMPTS };
+
+export const SYSTEM_PROMPTS = {
+  machine: MACHINE_SYSTEM_PROMPTS,
+  human: HUMAN_SYSTEM_PROMPTS,
+};
+
+/**
+ * Resolve a system prompt for a (role, rigor) pair. Falls back to the
+ * Machine-bucket variant if the rigor is unknown or the role is missing
+ * from the requested bucket — that's how Phase 2 keeps the eval mock
+ * working for fixtures that were captured before rigor existed.
+ *
+ * @param {string} role
+ * @param {'machine'|'human'} [rigor]
+ * @returns {string}
+ */
+export function getSystemPrompt(role, rigor = 'machine') {
+  const bucket = SYSTEM_PROMPTS[rigor] || SYSTEM_PROMPTS.machine;
+  return bucket[role] ?? SYSTEM_PROMPTS.machine[role];
+}
+
 /**
  * Build the outcome-count hard-restriction block that gets injected into
  * every drafter / reviewer / finalizer prompt when the user has specified a
@@ -107,7 +140,13 @@ export function buildOutcomeCountConstraint(numberOfOutcomes) {
   return `\nHARD RESTRICTION — OUTCOME SET SIZE: the market MUST have EXACTLY ${n} Outcome Tokens — no more, no fewer. This is a user-imposed constraint and overrides any instinct to add or drop outcomes. The mandatory catch-all "Other / None" (required unless the field is provably closed) counts toward the ${n}. If ${n} is too small to cover the outcome space MECE-ly, compress by merging adjacent buckets rather than exceeding ${n}, and state explicitly in the draft how the merge preserves MECE. Do NOT emit a draft with any other number of outcomes.\n`;
 }
 
-export function buildDraftPrompt(question, startDate, endDate, references, numberOfOutcomes) {
+// Phase 2: each user-prompt builder now accepts an optional trailing `rigor`
+// argument so Phase 3 can fork wording without touching call sites again.
+// Bodies are unchanged in Phase 2 — Machine and Human both render the same
+// string. Builders deliberately do NOT branch on `rigor` yet; the parameter
+// is signature plumbing. Names are prefixed with `_` so eslint doesn't flag
+// the temporarily-unused arg; Phase 3 drops the prefix when wiring branches.
+export function buildDraftPrompt(question, startDate, endDate, references, numberOfOutcomes, _rigor = 'machine') {
   const referencesSection = references && references.trim()
     ? `\nReference Links:\n${references.trim()}\n`
     : '';
@@ -129,7 +168,7 @@ Provide a comprehensive draft that includes:
 6. Any assumptions that need to be made explicit`;
 }
 
-export function buildReviewPrompt(draftContent) {
+export function buildReviewPrompt(draftContent, _rigor = 'machine') {
   // Per-step prompt is intentionally lean: the failure modes to look for are
   // already enumerated in PROTOCOL_CONTEXT (system prompt). This prompt only
   // tells the reviewer what to do with the draft.
@@ -152,7 +191,7 @@ DRAFT TO REVIEW:
 ${draftContent}`;
 }
 
-export function buildDeliberationPrompt(draftContent, reviews, numberOfOutcomes) {
+export function buildDeliberationPrompt(draftContent, reviews, numberOfOutcomes, _rigor = 'machine') {
   const reviewsText = reviews
     .map(
       (r, i) =>
@@ -187,7 +226,7 @@ Provide your consolidated, adversarial review, noting:
 4. Your final prioritized list of recommended changes — blockers first, then majors, then minors. Every item must be a concrete edit, not a generic direction.`;
 }
 
-export function buildUpdatePrompt(draftContent, reviewContent, humanReviewInput, focusBlock, numberOfOutcomes, references) {
+export function buildUpdatePrompt(draftContent, reviewContent, humanReviewInput, focusBlock, numberOfOutcomes, references, _rigor = 'machine') {
   // Phase 5: `focusBlock` is an optional pre-rendered string produced by
   // buildRoutingFocusBlock(). When present it lists the specific claims
   // the routing pipeline flagged as blocking or needing targeted review,
@@ -254,7 +293,7 @@ export function buildRoutingFocusBlock(routing, claims) {
     .join('\n');
 }
 
-export function buildFinalizePrompt(draftContent, startDate, endDate, numberOfOutcomes) {
+export function buildFinalizePrompt(draftContent, startDate, endDate, numberOfOutcomes, _rigor = 'machine') {
   const outcomeCountSection = buildOutcomeCountConstraint(numberOfOutcomes);
   // Per-step prompt is intentionally lean: protocol rules live in
   // PROTOCOL_CONTEXT (system prompt). This prompt only specifies the JSON
@@ -321,7 +360,7 @@ SPEC JSON:
 ${JSON.stringify(finalJson, null, 2)}`;
 }
 
-export function buildIdeatePrompt(direction) {
+export function buildIdeatePrompt(direction, _rigor = 'machine') {
   const trimmed = (direction || '').trim();
   const directionSection = trimmed
     ? `USER DIRECTION:\n${trimmed}`
@@ -399,7 +438,7 @@ ${buildClaimExtractorPrompt(draftContent)}`;
 // The rubric is passed in explicitly so adding or reordering rubric items
 // never requires changing this module — `src/constants/rubric.js` is the
 // single source of truth.
-export function buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes) {
+export function buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes, _rigor = 'machine') {
   const rubricBlock = rubric
     .map(
       (item, i) =>
@@ -465,12 +504,12 @@ ${draftContent}`;
 // Strict retry for the structured reviewer. Used when the first pass
 // returned invalid JSON. Identical content but leans harder on the
 // "JSON only" constraint.
-export function buildStrictStructuredReviewRetryPrompt(draftContent, rubric, numberOfOutcomes) {
+export function buildStrictStructuredReviewRetryPrompt(draftContent, rubric, numberOfOutcomes, rigor = 'machine') {
   return `Your previous response was not valid JSON. Try again.
 
 Output ONLY a JSON object. No prose. No markdown fences. No commentary. Nothing before or after the object. The first character of your response must be "{" and the last character must be "}".
 
-${buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes)}`;
+${buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes, rigor)}`;
 }
 
 // Judge aggregator prompt — only used when the user selects the 'judge'
@@ -481,7 +520,7 @@ ${buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes)}`;
 // Rationale is required because the judge result is otherwise opaque — a
 // plain pass/fail verdict from a single extra LLM call would replace one
 // single-point-of-failure (the chairman) with another.
-export function buildJudgeAggregatorPrompt(rubric, checklist) {
+export function buildJudgeAggregatorPrompt(rubric, checklist, _rigor = 'machine') {
   const rubricById = Object.fromEntries(rubric.map((r) => [r.id, r]));
   const itemsBlock = checklist
     .map((item) => {
@@ -527,12 +566,12 @@ RULES:
   - The rationale must name specific rubric ids — do not give a generic summary.`;
 }
 
-export function buildStrictJudgeAggregatorRetryPrompt(rubric, checklist) {
+export function buildStrictJudgeAggregatorRetryPrompt(rubric, checklist, rigor = 'machine') {
   return `Your previous response was not valid JSON. Try again.
 
 Output ONLY a JSON object. No prose. No markdown fences. The first character must be "{" and the last character must be "}".
 
-${buildJudgeAggregatorPrompt(rubric, checklist)}`;
+${buildJudgeAggregatorPrompt(rubric, checklist, rigor)}`;
 }
 
 // Batched draft-entailment verifier — Phase 3. One LLM call per run
@@ -594,7 +633,7 @@ ${buildBatchEntailmentPrompt(claims, draftContent)}`;
 // NOTE: this builder takes the *raw updated draft* (not a finalized JSON
 // object). The risk check now gates Stage 4 — HIGH risk must be acknowledged
 // before the user can Accept & Finalize.
-export function buildEarlyResolutionPrompt(draftContent, startDate, endDate) {
+export function buildEarlyResolutionPrompt(draftContent, startDate, endDate, _rigor = 'machine') {
   // Per-step prompt is intentionally lean: the protocol context (why early
   // certainty is bad on 42) lives in the system prompt. This prompt only
   // orchestrates the risk check.

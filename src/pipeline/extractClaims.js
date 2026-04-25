@@ -16,7 +16,7 @@
 
 import { queryModel } from '../api/openrouter.js';
 import {
-  SYSTEM_PROMPTS,
+  getSystemPrompt,
   buildClaimExtractorPrompt,
   buildStrictClaimExtractorRetryPrompt,
 } from '../constants/prompts.js';
@@ -88,7 +88,7 @@ export async function extractClaims(model, draftContent) {
     const result = await queryModel(
       model,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.claimExtractor },
+        { role: 'system', content: getSystemPrompt('claimExtractor') },
         { role: 'user', content: buildClaimExtractorPrompt(draftContent) },
       ],
       { temperature: 0.2, maxTokens: CLAIM_EXTRACTION_MAX_TOKENS }
@@ -129,7 +129,7 @@ export async function extractClaims(model, draftContent) {
     const result = await queryModel(
       model,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.claimExtractor },
+        { role: 'system', content: getSystemPrompt('claimExtractor') },
         { role: 'user', content: buildStrictClaimExtractorRetryPrompt(draftContent) },
       ],
       { temperature: 0.1, maxTokens: CLAIM_EXTRACTION_MAX_TOKENS }

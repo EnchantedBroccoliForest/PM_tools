@@ -118,9 +118,12 @@ export function createMockQueryModel(fixture, { onWarn } = {}) {
 
   function classify(systemPrompt) {
     if (typeof systemPrompt !== 'string') return 'unknown';
-    // Match against canonical strings. Keys are role names used in the
-    // callsByRole counter and switch below.
-    const entries = Object.entries(SYSTEM_PROMPTS);
+    // Match against canonical Machine-bucket strings. Keys are role names
+    // used in the callsByRole counter and switch below. Phase 2 keeps
+    // Human and Machine byte-identical, so this single-bucket lookup
+    // matches Human-mode prompts too. When Phase 3 forks Human wording,
+    // a Phase 4 fallback will try the Human bucket on miss.
+    const entries = Object.entries(SYSTEM_PROMPTS.machine);
     for (const [role, value] of entries) {
       if (systemPrompt === value) return role;
     }

@@ -20,7 +20,7 @@
 
 import { queryModel } from './api/openrouter.js';
 import {
-  SYSTEM_PROMPTS,
+  getSystemPrompt,
   buildDraftPrompt,
   buildUpdatePrompt,
   buildRoutingFocusBlock,
@@ -226,11 +226,13 @@ async function runClaimPipeline(run, draftText, models, options, fetchImpl, cost
  * re-route that folds the resulting criticisms into the routing state.
  */
 async function runReviewStage(run, models, options, cost, callbacks) {
+  const rigor = run.input?.rigor || 'machine';
   const structured = await runStructuredReviewsParallel(
     models.reviewers,
     run.drafts[run.drafts.length - 1].content,
     RIGOR_RUBRIC,
     run.input?.numberOfOutcomes || '',
+    rigor,
   );
   for (const r of structured) {
     if (r.usage) cost.record('review', { usage: r.usage, wallClockMs: r.wallClockMs });
@@ -255,6 +257,7 @@ async function runReviewStage(run, models, options, cost, callbacks) {
     RIGOR_RUBRIC,
     allVotes,
     judgeModel,
+    rigor,
   );
   if (aggResult.usage && aggResult.usage.totalTokens > 0) {
     cost.record('aggregation', { usage: aggResult.usage, wallClockMs: aggResult.wallClockMs });
@@ -286,8 +289,8 @@ async function runUpdateStage(run, models, options, fetchImpl, cost, callbacks, 
   const updateResult = await queryModel(
     models.drafter,
     [
-      { role: 'system', content: SYSTEM_PROMPTS.drafter },
-      { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock, run.input?.numberOfOutcomes || '', referencesStr) },
+      { role: 'system', content: getSystemPrompt('drafter', run.input?.rigor || 'machine') },
+      { role: 'user', content: buildUpdatePrompt(latestDraft, reviewText, humanFeedback, focusBlock, run.input?.numberOfOutcomes || '', referencesStr, run.input?.rigor || 'machine') },
     ],
     { maxTokens: 8000 },
   );
@@ -311,8 +314,8 @@ async function runRiskStage(run, models, cost, callbacks) {
   const riskResult = await queryModel(
     models.drafter,
     [
-      { role: 'system', content: SYSTEM_PROMPTS.earlyResolutionAnalyst },
-      { role: 'user', content: buildEarlyResolutionPrompt(latestDraft, run.input.startDate, run.input.endDate) },
+      { role: 'system', content: getSystemPrompt('earlyResolutionAnalyst', run.input?.rigor || 'machine') },
+      { role: 'user', content: buildEarlyResolutionPrompt(latestDraft, run.input.startDate, run.input.endDate, run.input?.rigor || 'machine') },
     ],
   );
   cost.record('early_resolution', riskResult);
@@ -356,8 +359,8 @@ async function runFinalizeStage(run, riskLevel, models, cost, callbacks) {
   const finalResult = await queryModel(
     models.drafter,
     [
-      { role: 'system', content: SYSTEM_PROMPTS.finalizer },
-      { role: 'user', content: buildFinalizePrompt(latestDraft, run.input.startDate, run.input.endDate, run.input?.numberOfOutcomes || '') },
+      { role: 'system', content: getSystemPrompt('finalizer', run.input?.rigor || 'machine') },
+      { role: 'user', content: buildFinalizePrompt(latestDraft, run.input.startDate, run.input.endDate, run.input?.numberOfOutcomes || '', run.input?.rigor || 'machine') },
     ],
     { temperature: 0.3 },
   );
@@ -486,6 +489,12 @@ async function _orchestrateInner(config, signal) {
     startDate: input?.startDate || '',
     endDate: input?.endDate || '',
     references: referencesStr,
+    numberOfOutcomes: input?.numberOfOutcomes || '',
+    // Rigor is threaded onto the Run input so every stage below reads the
+    // same value the caller selected, not whatever default a downstream
+    // helper might fall back to. Defaults to 'machine' inside createRun()
+    // when omitted, preserving today's CLI / harness behavior.
+    rigor: input?.rigor || 'machine',
   });
 
   let riskLevel = 'unknown';
@@ -513,7 +522,7 @@ async function _orchestrateInner(config, signal) {
     const draftResult = await queryModel(
       models.drafter,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.drafter },
+        { role: 'system', content: getSystemPrompt('drafter', run.input?.rigor || 'machine') },
         {
           role: 'user',
           content: buildDraftPrompt(
@@ -522,6 +531,7 @@ async function _orchestrateInner(config, signal) {
             input?.endDate || '',
             referencesStr,
             input?.numberOfOutcomes || '',
+            run.input?.rigor || 'machine',
           ),
         },
       ],

@@ -294,7 +294,7 @@ async function cmdDraft(values, stdinConfig) {
 
 async function cmdIdeate(values) {
   const { queryModel } = await import('../src/api/openrouter.js');
-  const { SYSTEM_PROMPTS, buildIdeatePrompt } = await import('../src/constants/prompts.js');
+  const { getSystemPrompt, buildIdeatePrompt } = await import('../src/constants/prompts.js');
   const { DEFAULT_DRAFT_MODEL } = await import('../src/defaults.js');
 
   const direction = values.direction || values.question;
@@ -310,7 +310,7 @@ async function cmdIdeate(values) {
   }
 
   const result = await queryModel(model, [
-    { role: 'system', content: SYSTEM_PROMPTS.ideator },
+    { role: 'system', content: getSystemPrompt('ideator') },
     { role: 'user', content: buildIdeatePrompt(direction) },
   ]);
 

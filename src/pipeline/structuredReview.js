@@ -23,7 +23,7 @@
 
 import { queryModel } from '../api/openrouter.js';
 import {
-  SYSTEM_PROMPTS,
+  getSystemPrompt,
   buildStructuredReviewPrompt,
   buildStrictStructuredReviewRetryPrompt,
 } from '../constants/prompts.js';
@@ -52,9 +52,15 @@ import { tryParseJsonObject, createUsageAggregator } from './llmJson.js';
  *                                                the outcome-set cardinality;
  *                                                empty string means no
  *                                                restriction (default).
+ * @param {'machine'|'human'} [rigor]             selects the rigor variant of
+ *                                                the structured-reviewer
+ *                                                system prompt and the user
+ *                                                prompt builder. Phase 2 keeps
+ *                                                both variants byte-identical;
+ *                                                Phase 3 forks Human wording.
  * @returns {Promise<StructuredReviewResult>}
  */
-export async function runStructuredReview(model, draftContent, rubric, numberOfOutcomes = '') {
+export async function runStructuredReview(model, draftContent, rubric, numberOfOutcomes = '', rigor = 'machine') {
   const rubricIds = new Set(rubric.map((r) => r.id));
   const { aggregate, accumulate } = createUsageAggregator();
 
@@ -64,8 +70,8 @@ export async function runStructuredReview(model, draftContent, rubric, numberOfO
     const r = await queryModel(
       model.id,
       [
-        { role: 'system', content: SYSTEM_PROMPTS.structuredReviewer },
-        { role: 'user', content: buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes) },
+        { role: 'system', content: getSystemPrompt('structuredReviewer', rigor) },
+        { role: 'user', content: buildStructuredReviewPrompt(draftContent, rubric, numberOfOutcomes, rigor) },
       ],
       { temperature: 0.4, maxTokens: 3000 }
     );
@@ -96,10 +102,10 @@ export async function runStructuredReview(model, draftContent, rubric, numberOfO
       const r2 = await queryModel(
         model.id,
         [
-          { role: 'system', content: SYSTEM_PROMPTS.structuredReviewer },
+          { role: 'system', content: getSystemPrompt('structuredReviewer', rigor) },
           {
             role: 'user',
-            content: buildStrictStructuredReviewRetryPrompt(draftContent, rubric, numberOfOutcomes),
+            content: buildStrictStructuredReviewRetryPrompt(draftContent, rubric, numberOfOutcomes, rigor),
           },
         ],
         { temperature: 0.2, maxTokens: 3000 }
@@ -203,11 +209,13 @@ export async function runStructuredReview(model, draftContent, rubric, numberOfO
  *                                     outcome-set cardinality (propagated to
  *                                     every reviewer); empty string = no
  *                                     restriction.
+ * @param {'machine'|'human'} [rigor]  rigor variant; threaded into every
+ *                                     reviewer call.
  * @returns {Promise<StructuredReviewResult[]>}
  */
-export async function runStructuredReviewsParallel(models, draftContent, rubric, numberOfOutcomes = '') {
+export async function runStructuredReviewsParallel(models, draftContent, rubric, numberOfOutcomes = '', rigor = 'machine') {
   const settled = await Promise.allSettled(
-    models.map((m) => runStructuredReview(m, draftContent, rubric, numberOfOutcomes))
+    models.map((m) => runStructuredReview(m, draftContent, rubric, numberOfOutcomes, rigor))
   );
   return settled.map((s, i) => {
     if (s.status === 'fulfilled') return s.value;
