@@ -934,7 +934,7 @@ function App() {
     // claim-extraction → review → verify pipeline.
     dispatch({
       type: 'RUN_START',
-      input: { question, startDate, endDate, references },
+      input: { question, startDate, endDate, references, numberOfOutcomes },
     });
     dispatch({
       type: 'RUN_APPEND_DRAFT',
