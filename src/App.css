@@ -406,10 +406,28 @@
 }
 
 .rigor-toggle {
+  --rigor-machine: #4DD0E1;
+  --rigor-human: #F48FB1;
   margin-bottom: 0.4rem;
   border-width: 2px;
-  border-color: var(--neon-cyan, var(--blue));
+  border-color: var(--border);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15), 0 6px 18px rgba(0, 0, 0, 0.18);
+  overflow: visible;
+}
+
+.App.theme-light .rigor-toggle {
+  --rigor-machine: #2a7d8c;
+  --rigor-human: #c0533a;
+}
+
+.rigor-toggle .rigor-toggle__btn:first-child {
+  border-top-left-radius: calc(var(--r-md) - 2px);
+  border-bottom-left-radius: calc(var(--r-md) - 2px);
+}
+
+.rigor-toggle .rigor-toggle__btn:last-child {
+  border-top-right-radius: calc(var(--r-md) - 2px);
+  border-bottom-right-radius: calc(var(--r-md) - 2px);
 }
 
 .rigor-toggle__btn {
@@ -420,14 +438,34 @@
   letter-spacing: 0.02em;
 }
 
-.rigor-toggle .rigor-toggle__btn.mode-toggle__btn--active {
-  background: var(--neon-cyan, var(--blue));
-  color: #0a0612;
-  box-shadow: inset 0 -2px 0 var(--neon-cyan, var(--blue));
+.rigor-toggle__icon {
+  margin-right: 0.4rem;
+  font-size: 16px;
+  line-height: 1;
 }
 
-.App.theme-light .rigor-toggle .rigor-toggle__btn.mode-toggle__btn--active {
-  background: var(--neon-cyan, var(--blue));
+.rigor-toggle .rigor-toggle__btn--machine:hover:not(:disabled):not(.mode-toggle__btn--active) {
+  color: var(--rigor-machine);
+}
+
+.rigor-toggle .rigor-toggle__btn--human:hover:not(:disabled):not(.mode-toggle__btn--active) {
+  color: var(--rigor-human);
+}
+
+.rigor-toggle .rigor-toggle__btn--machine.mode-toggle__btn--active {
+  background: var(--rigor-machine);
+  color: #0a0612;
+  box-shadow: inset 0 -2px 0 var(--rigor-machine);
+}
+
+.rigor-toggle .rigor-toggle__btn--human.mode-toggle__btn--active {
+  background: var(--rigor-human);
+  color: #0a0612;
+  box-shadow: inset 0 -2px 0 var(--rigor-human);
+}
+
+.App.theme-light .rigor-toggle .rigor-toggle__btn--machine.mode-toggle__btn--active,
+.App.theme-light .rigor-toggle .rigor-toggle__btn--human.mode-toggle__btn--active {
   color: #fffdf8;
 }
 
