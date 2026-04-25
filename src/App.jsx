@@ -1095,20 +1095,23 @@ function App() {
                   rigor it started with. The downstream stages also snapshot
                   rigor onto the Run artifact (see RUN_START dispatches) so a
                   late toggle cannot leak into an in-flight pipeline. */}
+              <div className="rigor-toggle__label">Output style</div>
               <div className="rigor-toggle mode-toggle">
                 <button
                   type="button"
-                  className={`mode-toggle__btn ${rigor === 'machine' ? 'mode-toggle__btn--active' : ''}`}
+                  className={`mode-toggle__btn rigor-toggle__btn ${rigor === 'machine' ? 'mode-toggle__btn--active' : ''}`}
                   onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'machine' })}
                   disabled={anyLoading || !!draftContent}
+                  data-tooltip="Structured, machine-optimized prompts that preserve the model's full analytical rigor. Outputs read precise and technical."
                 >
                   Machine
                 </button>
                 <button
                   type="button"
-                  className={`mode-toggle__btn ${rigor === 'human' ? 'mode-toggle__btn--active' : ''}`}
+                  className={`mode-toggle__btn rigor-toggle__btn ${rigor === 'human' ? 'mode-toggle__btn--active' : ''}`}
                   onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'human' })}
                   disabled={anyLoading || !!draftContent}
+                  data-tooltip="Softer, conversational prompts with polished final text. Outputs read natural and reader-friendly."
                 >
                   Human
                 </button>
