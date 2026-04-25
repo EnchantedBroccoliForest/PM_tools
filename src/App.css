@@ -395,6 +395,17 @@
   cursor: not-allowed;
 }
 
+.rigor-toggle {
+  margin-bottom: 0.4rem;
+}
+
+.rigor-toggle__hint {
+  margin: 0 0 1.25rem 0;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .textarea--tall {
   min-height: 200px;
 }

@@ -306,6 +306,7 @@ function App() {
     endDate,
     references,
     numberOfOutcomes,
+    rigor,
     selectedModel,
     reviewModels,
     aggregationProtocol,
@@ -567,7 +568,7 @@ function App() {
     // Start a fresh Run artifact; previous run (if any) is discarded.
     dispatch({
       type: 'RUN_START',
-      input: { question, startDate, endDate, references, numberOfOutcomes },
+      input: { question, startDate, endDate, references, numberOfOutcomes, rigor },
     });
     try {
       const result = await queryModel(selectedModel, [
@@ -934,7 +935,7 @@ function App() {
     // claim-extraction → review → verify pipeline.
     dispatch({
       type: 'RUN_START',
-      input: { question, startDate, endDate, references, numberOfOutcomes },
+      input: { question, startDate, endDate, references, numberOfOutcomes, rigor },
     });
     dispatch({
       type: 'RUN_APPEND_DRAFT',
@@ -1059,6 +1060,32 @@ function App() {
               </div>
             </div>
             <div className="panel-body">
+              {/* Rigor Toggle — locks once a draft exists so the run keeps the
+                  rigor it started with. The downstream stages also snapshot
+                  rigor onto the Run artifact (see RUN_START dispatches) so a
+                  late toggle cannot leak into an in-flight pipeline. */}
+              <div className="rigor-toggle mode-toggle">
+                <button
+                  type="button"
+                  className={`mode-toggle__btn ${rigor === 'machine' ? 'mode-toggle__btn--active' : ''}`}
+                  onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'machine' })}
+                  disabled={anyLoading || !!draftContent}
+                >
+                  Machine
+                </button>
+                <button
+                  type="button"
+                  className={`mode-toggle__btn ${rigor === 'human' ? 'mode-toggle__btn--active' : ''}`}
+                  onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'human' })}
+                  disabled={anyLoading || !!draftContent}
+                >
+                  Human
+                </button>
+              </div>
+              <p className="rigor-toggle__hint">
+                Recorded on the Run today; Human-mode prompt softening and final-text polish ship in a follow-up.
+              </p>
+
               {/* Mode Toggle */}
               <div className="mode-toggle">
                 <button
