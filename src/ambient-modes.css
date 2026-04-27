@@ -221,6 +221,34 @@
   color: var(--text-1);
 }
 
+/* Tooltips — base style uses near-black #120917 which produces dark text on
+   dark background in light mode. Swap to a warm cream surface. */
+.App.ambient-light .rigor-toggle__btn[data-tooltip]::after,
+.App.ambient-light .model-badge[data-tooltip]::after {
+  background: rgba(255, 253, 248, 0.95);
+  color: var(--text-1);
+  border-color: var(--border);
+}
+
+/* Secondary/ghost review button — base CSS hardcodes #120917 background. */
+.App.ambient-light .review-button {
+  background: rgba(255, 253, 248, 0.85);
+  color: var(--text-1);
+  border-color: var(--border);
+}
+
+/* Final-doc text containers — base CSS hardcodes #120917 background. */
+.App.ambient-light .final-doc__period,
+.App.ambient-light .final-doc__text {
+  background: rgba(255, 253, 248, 0.7);
+  color: var(--text-1);
+  border-color: var(--border);
+}
+
+.App.ambient-light .final-doc__text {
+  color: var(--text-2);
+}
+
 /* ================================================
    Dark Mode — 42.space palette
    Tokens match :root defaults, just sets background.
