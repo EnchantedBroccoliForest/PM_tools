@@ -156,6 +156,11 @@ h1, h2, h3, h4,
   margin-right: 0.3rem;
 }
 
+.rigor-toggle--header .rigor-toggle__btn[data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
 @media (max-width: 600px) {
   .header__rigor .rigor-toggle__label { display: none; }
 }
