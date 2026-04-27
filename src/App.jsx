@@ -1073,37 +1073,19 @@ function App() {
 
   return (
     <div className={`App ${ambientConfig.classes.join(' ')}`}>
+      <AmbientModeToggle mode={ambientMode} setMode={setAmbientMode} />
       <div className="container">
 
         {/* Header */}
         <header className="header">
           <div className="header__top-row">
-            <AmbientModeToggle mode={ambientMode} setMode={setAmbientMode} />
-          </div>
-          {/* Progress bar */}
-          <div className="progress-bar" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
-            <div className="progress-bar__fill" style={{ width: `${progressPercent}%` }} />
-          </div>
-        </header>
-
-        {/* Horizontal Panels */}
-        <div className="panels-row">
-
-          {/* Panel 1: Setup + Draft Output */}
-          <div className={`panel ${currentStep === 1 ? 'panel--active' : ''} ${currentStep > 1 ? 'panel--done' : ''}`}>
-            <div className="panel-header">
-              <div className={`step ${currentStep >= 1 ? 'step--active' : ''} ${currentStep > 1 ? 'step--done' : ''}`}>
-                <div className="step__number">{currentStep > 1 ? <svg className="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : '1'}</div>
-                <div className="step__label">Setup</div>
-              </div>
-            </div>
-            <div className="panel-body">
-              {/* Rigor Toggle — locks once a draft exists so the run keeps the
-                  rigor it started with. The downstream stages also snapshot
-                  rigor onto the Run artifact (see RUN_START dispatches) so a
-                  late toggle cannot leak into an in-flight pipeline. */}
-              <div className="rigor-toggle__label">Output style</div>
-              <div className="rigor-toggle mode-toggle">
+            {/* Rigor Toggle — locks once a draft exists so the run keeps the
+                rigor it started with. The downstream stages also snapshot
+                rigor onto the Run artifact (see RUN_START dispatches) so a
+                late toggle cannot leak into an in-flight pipeline. */}
+            <div className="header__rigor">
+              <span className="rigor-toggle__label">Output style</span>
+              <div className="rigor-toggle rigor-toggle--header mode-toggle">
                 <button
                   type="button"
                   className={`mode-toggle__btn rigor-toggle__btn rigor-toggle__btn--machine ${rigor === 'machine' ? 'mode-toggle__btn--active' : ''}`}
@@ -1127,7 +1109,26 @@ function App() {
                   Human Mode
                 </button>
               </div>
+            </div>
+          </div>
+          {/* Progress bar */}
+          <div className="progress-bar" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
+            <div className="progress-bar__fill" style={{ width: `${progressPercent}%` }} />
+          </div>
+        </header>
 
+        {/* Horizontal Panels */}
+        <div className="panels-row">
+
+          {/* Panel 1: Setup + Draft Output */}
+          <div className={`panel ${currentStep === 1 ? 'panel--active' : ''} ${currentStep > 1 ? 'panel--done' : ''}`}>
+            <div className="panel-header">
+              <div className={`step ${currentStep >= 1 ? 'step--active' : ''} ${currentStep > 1 ? 'step--done' : ''}`}>
+                <div className="step__number">{currentStep > 1 ? <svg className="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : '1'}</div>
+                <div className="step__label">Setup</div>
+              </div>
+            </div>
+            <div className="panel-body">
               {/* Mode Toggle */}
               <div className="mode-toggle">
                 <button

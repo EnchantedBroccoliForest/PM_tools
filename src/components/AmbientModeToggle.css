@@ -1,86 +1,38 @@
 /* ================================================
-   Ambient Mode Toggle — 42.space chip bar
+   Ambient Mode Toggle — lower-left floating icon
    ================================================ */
-.ambient-bar {
-  position: relative;
+.ambient-toggle {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
   z-index: 10000;
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  padding: 0.35rem 0 0.5rem;
-}
-
-.ambient-bar__inner {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 8px;
-  background: #1F1B29;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  transition: background-color 150ms ease, border-color 150ms ease;
-}
-
-.ambient-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.85rem;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-3, #868089);
-  font-family: var(--font-body, 'Inter', sans-serif);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
-  white-space: nowrap;
-  position: relative;
-  overflow: hidden;
-}
-
-.ambient-btn:hover:not(.ambient-btn--active) {
-  background: rgba(255, 255, 255, 0.04);
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  background: #1F1B29;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-2, #A1A1AA);
-  border-color: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 150ms ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.ambient-btn__icon {
-  font-size: 0.85rem;
+.ambient-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.ambient-toggle:focus-visible {
+  outline: 2px solid var(--neon-cyan, #4DD0E1);
+  outline-offset: 2px;
+}
+
+.ambient-toggle__icon {
+  font-size: 16px;
   line-height: 1;
-}
-
-.ambient-btn__label {
-  transition: color 150ms ease;
-}
-
-.ambient-btn__shortcut {
-  font-size: 10px;
-  opacity: 0.35;
-  font-family: var(--font-body, 'Inter', sans-serif);
-  transition: opacity 150ms ease;
-}
-
-.ambient-btn:hover .ambient-btn__shortcut { opacity: 0.6; }
-
-.ambient-btn--active {
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.ambient-btn--light.ambient-btn--active {
-  background: rgba(200, 160, 80, 0.12);
-  color: #c8a050;
-  border-color: rgba(200, 160, 80, 0.25);
-}
-
-.ambient-btn--dark.ambient-btn--active {
-  background: rgba(215, 69, 255, 0.12);
-  color: #DE8BF3;
-  border-color: rgba(215, 69, 255, 0.25);
-}
-
-@media (max-width: 600px) {
-  .ambient-btn__label { display: none; }
-  .ambient-btn__shortcut { display: none; }
-  .ambient-btn { padding: 0.35rem 0.6rem; }
 }
