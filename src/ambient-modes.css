@@ -160,13 +160,14 @@
   border-color: rgba(31, 95, 107, 0.5);
 }
 
-.App.ambient-light .ambient-bar__inner {
-  background: rgba(255, 253, 248, 0.7);
+.App.ambient-light .ambient-toggle {
+  background: rgba(255, 253, 248, 0.85);
   border-color: rgba(107, 93, 72, 0.25);
+  color: var(--text-2);
 }
-.App.ambient-light .ambient-btn { color: var(--text-2); }
-.App.ambient-light .ambient-btn:hover:not(.ambient-btn--active) {
+.App.ambient-light .ambient-toggle:hover {
   background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(107, 93, 72, 0.4);
   color: var(--text-1);
 }
 

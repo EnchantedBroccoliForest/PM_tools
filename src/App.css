@@ -131,6 +131,35 @@ h1, h2, h3, h4,
   gap: 0.75rem;
 }
 
+.header__rigor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.header__rigor .rigor-toggle__label {
+  margin: 0;
+}
+
+.rigor-toggle--header {
+  margin-bottom: 0;
+}
+
+.rigor-toggle--header .rigor-toggle__btn {
+  padding: 0.4rem 0.75rem;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rigor-toggle--header .rigor-toggle__icon {
+  font-size: 13px;
+  margin-right: 0.3rem;
+}
+
+@media (max-width: 600px) {
+  .header__rigor .rigor-toggle__label { display: none; }
+}
+
 .theme-toggle {
   display: inline-flex;
   align-items: center;
