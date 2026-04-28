@@ -12,7 +12,7 @@ const DEFAULT_LIMITS = Object.freeze({
   copyChars: 1600,
 });
 
-export const MARKET_CARD_LIMITS = { ...DEFAULT_LIMITS };
+export const MARKET_CARD_LIMITS = Object.freeze({ ...DEFAULT_LIMITS });
 
 function positiveInteger(value, fallback) {
   return Number.isInteger(value) && value > 0 ? value : fallback;
@@ -66,6 +66,17 @@ function isHeadingOnly(value) {
 }
 
 function splitBullets(value, maxItems, maxChars) {
+  if (Array.isArray(value)) {
+    const allItems = value
+      .map((item) => cleanBullet(item, maxChars))
+      .filter((line) => line && !isHeadingOnly(line));
+
+    return {
+      items: allItems.slice(0, maxItems),
+      hiddenCount: Math.max(0, allItems.length - maxItems),
+    };
+  }
+
   const raw = toText(value);
   if (!raw) return { items: [], hiddenCount: 0 };
 
