@@ -915,7 +915,7 @@ function App() {
           { role: 'system', content: getSystemPrompt('finalizer', runRigor) },
           { role: 'user', content: buildFinalizePrompt(draftContent, startDate, endDate, numberOfOutcomes, runRigor) },
         ],
-        { temperature: 0.3 }
+        { temperature: 0.3, maxTokens: DRAFT_MAX_TOKENS }
       );
       recordCost('accept', result);
 
