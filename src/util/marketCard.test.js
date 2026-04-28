@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildMarketCard, formatMarketCardCopy } from './marketCard.js';
+import { MARKET_CARD_LIMITS, buildMarketCard, formatMarketCardCopy } from './marketCard.js';
 
 const FINAL_MARKET = {
   refinedQuestion: 'Will Example City publish its final certified mayoral result by 2027-01-15?',
@@ -25,6 +25,10 @@ const FINAL_MARKET = {
 };
 
 describe('buildMarketCard', () => {
+  it('exports frozen default limits', () => {
+    expect(Object.isFrozen(MARKET_CARD_LIMITS)).toBe(true);
+  });
+
   it('derives a capped market card without mutating the final JSON', () => {
     const originalRules = FINAL_MARKET.fullResolutionRules;
 
@@ -69,6 +73,44 @@ describe('buildMarketCard', () => {
     expect(copy).toContain('Risk: MEDIUM: Watch for certification delays.');
     expect(copy).not.toContain('Archive raw evidence in the audit notes.');
     expect(copy).not.toContain('A duplicate page should be ignored.');
+  });
+
+  it('accepts array-shaped resolution rules and edge cases', () => {
+    const card = buildMarketCard({
+      ...FINAL_MARKET,
+      fullResolutionRules: [
+        'Use the official city election office certification page.',
+        'Match the published mayoral result to the market question.',
+        'Ignore unofficial projections and campaign statements.',
+        'Use the first final certification posted before close.',
+        'If certification is later corrected, use the version available at close.',
+        'Archive raw evidence in the audit notes.',
+      ],
+      edgeCases: [
+        'Source unavailable at close resolves No.',
+        'A recount after close does not change the result.',
+        'A court order before close pauses certification.',
+        'A typo corrected before close uses the corrected text.',
+        'A partial certification is not final.',
+        'A duplicate page should be ignored.',
+      ],
+    });
+
+    expect(card.settlementBullets).toEqual([
+      'Use the official city election office certification page.',
+      'Match the published mayoral result to the market question.',
+      'Ignore unofficial projections and campaign statements.',
+      'Use the first final certification posted before close.',
+      'If certification is later corrected, use the version available at close.',
+    ]);
+    expect(card.hiddenSettlementCount).toBe(1);
+    expect(card.edgeCaseBullets).toHaveLength(5);
+    expect(card.hiddenEdgeCaseCount).toBe(1);
+
+    const copy = formatMarketCardCopy(card);
+    expect(copy).toContain('- Use the official city election office certification page.');
+    expect(copy).toContain('+1 more settlement rule in full spec.');
+    expect(copy).not.toContain('- Archive raw evidence in the audit notes.');
   });
 
   it('passes raw fallback content through unchanged', () => {
