@@ -1237,42 +1237,42 @@ select.input optgroup {
 .final-doc {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 1.5rem;
 }
 
 .final-doc__question {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 600;
   color: var(--text-1);
   line-height: 1.5;
-  margin-bottom: 0.5rem;
 }
 
 .final-doc__description {
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   color: var(--text-2);
-  line-height: 1.6;
-  margin: 0 0 1.25rem;
+  line-height: 1.7;
+  margin: 0;
 }
 
 .final-doc__period {
   display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-  padding: 0.6rem 0.85rem;
-  background: #120917;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  margin-bottom: 1.5rem;
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 0.88rem;
   color: var(--text-1);
   font-variant-numeric: tabular-nums;
 }
 
 .final-doc__period-label {
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--text-3);
   flex-shrink: 0;
 }
@@ -1282,24 +1282,29 @@ select.input optgroup {
 }
 
 .final-doc__section {
-  margin-bottom: 1.5rem;
+  padding: 1rem 1.15rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--r-sm);
 }
 
 .final-doc__section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .final-doc__heading {
   font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 0.88rem;
+  font-weight: 700;
   color: var(--text-1);
-  margin: 0 0 0.5rem;
-  padding-bottom: 0.35rem;
+  margin: 0 0 0.6rem;
+  padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .final-doc__section-header .final-doc__heading {
@@ -1309,13 +1314,25 @@ select.input optgroup {
 }
 
 .final-doc__text {
-  font-size: 13px;
+  font-size: 0.88rem;
   color: var(--text-2);
-  line-height: 1.55;
-  padding: 0.75rem 1rem;
-  background: #120917;
+  line-height: 1.7;
+  padding: 0.85rem 1.1rem 0.85rem 1.5rem;
+  background: rgba(255, 255, 255, 0.02);
   border-radius: var(--r-sm);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.final-doc__text .md-list {
+  margin: 0.4rem 0;
+  padding-left: 1.4rem;
+  list-style-position: outside;
+}
+
+.final-doc__text .md-list li {
+  margin-bottom: 0.4rem;
+  line-height: 1.7;
 }
 
 .final-doc__text--risk {
@@ -1323,25 +1340,24 @@ select.input optgroup {
   border-color: rgba(244, 194, 17, 0.15);
 }
 
-/* Outcomes – clean list layout */
+/* Outcomes – card list layout */
 .final-doc__outcomes {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.65rem;
 }
 
 .outcome-row {
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--border);
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left-width: 3px;
+  border-left-color: var(--accent);
+  border-radius: var(--r-sm);
 }
 
 .outcome-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.outcome-row:first-child {
-  padding-top: 0;
+  border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
 .outcome-row__header {
@@ -1353,8 +1369,8 @@ select.input optgroup {
 
 .outcome-row__number {
   font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
   color: var(--accent);
   flex-shrink: 0;
   min-width: 1.2rem;
@@ -1362,7 +1378,7 @@ select.input optgroup {
 }
 
 .outcome-row__name {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-1);
 }
@@ -1370,28 +1386,28 @@ select.input optgroup {
 .outcome-row__win {
   font-size: 0.88rem;
   color: var(--text-2);
-  line-height: 1.6;
-  margin-bottom: 0.35rem;
+  line-height: 1.65;
+  margin-bottom: 0.3rem;
   padding-left: 1.8rem;
 }
 
 .outcome-row__win strong {
   color: var(--teal-light);
   font-weight: 600;
-  font-size: 13px;
+  font-size: 0.8rem;
 }
 
 .outcome-row__criteria {
   font-size: 0.88rem;
   color: var(--text-2);
-  line-height: 1.6;
+  line-height: 1.65;
   padding-left: 1.8rem;
 }
 
 .outcome-row__criteria strong {
   color: var(--text-3);
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 
 /* Time Display - base styles, layout overridden below */
@@ -2392,16 +2408,29 @@ select.input optgroup {
 
 /* Final doc */
 .App.theme-light .final-doc__period {
-  background: rgba(139, 119, 90, 0.06);
+  background: rgba(139, 119, 90, 0.05);
+  border-color: rgba(139, 119, 90, 0.15);
+}
+
+.App.theme-light .final-doc__section {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .App.theme-light .final-doc__text {
-  background: rgba(139, 119, 90, 0.04);
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .App.theme-light .final-doc__text--risk {
   background: rgba(180, 140, 20, 0.06);
   border-color: rgba(180, 140, 20, 0.2);
+}
+
+.App.theme-light .outcome-row {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
+  border-left-color: var(--accent);
 }
 
 .App.theme-light .outcome-row__win strong {

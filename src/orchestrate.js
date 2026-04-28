@@ -362,7 +362,7 @@ async function runFinalizeStage(run, riskLevel, models, cost, callbacks) {
       { role: 'system', content: getSystemPrompt('finalizer', run.input?.rigor || 'machine') },
       { role: 'user', content: buildFinalizePrompt(latestDraft, run.input.startDate, run.input.endDate, run.input?.numberOfOutcomes || '', run.input?.rigor || 'machine') },
     ],
-    { temperature: 0.3 },
+    { temperature: 0.3, maxTokens: DRAFT_MAX_TOKENS },
   );
   cost.record('accept', finalResult);
   run.finalJson = tryParseJsonObject(finalResult.content) || { raw: finalResult.content };
