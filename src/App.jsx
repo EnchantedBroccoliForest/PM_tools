@@ -26,6 +26,7 @@ import { gatherEvidence } from './pipeline/gatherEvidence';
 import { routeClaims, groupRoutingBySeverity } from './pipeline/route';
 import { checkResolutionSources } from './pipeline/checkSources';
 import { humanizeFinalJson } from './pipeline/humanize';
+import { repairMarketQuestionTitle } from './pipeline/marketQuestionTitle';
 import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/rubric';
 import { parseRun, GLOBAL_CLAIM_ID } from './types/run';
 import { DRAFT_MAX_TOKENS } from './defaults';
@@ -956,6 +957,16 @@ function App() {
           message: 'Humanize skipped: Machine rigor selected.',
         });
       }
+
+      const titleResult = await repairMarketQuestionTitle(selectedModel, finalContent, runRigor);
+      recordCost('title_repair', titleResult);
+      dispatch({
+        type: 'RUN_LOG',
+        stage: 'title_repair',
+        level: titleResult.logEntry.level,
+        message: titleResult.logEntry.message,
+      });
+      finalContent = titleResult.finalJson;
 
       dispatch({ type: 'FINALIZE_SUCCESS', content: finalContent });
       dispatch({ type: 'RUN_SET_FINAL', finalJson: finalContent });

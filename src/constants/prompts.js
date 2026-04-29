@@ -1,3 +1,5 @@
+import { getMarketQuestionTitleLimit } from '../util/marketQuestionTitle.js';
+
 // ---------------------------------------------------------------------------
 // 42.space protocol context — single source of truth
 // ---------------------------------------------------------------------------
@@ -344,6 +346,7 @@ export function buildRoutingFocusBlock(routing, claims) {
 
 export function buildFinalizePrompt(draftContent, startDate, endDate, numberOfOutcomes, rigor = 'machine') {
   const outcomeCountSection = buildOutcomeCountConstraint(numberOfOutcomes);
+  const titleMaxChars = getMarketQuestionTitleLimit(rigor);
   // Per-step prompt is intentionally lean: protocol rules live in
   // PROTOCOL_CONTEXT (system prompt). This prompt only specifies the JSON
   // schema and the conciseness discipline.
@@ -359,6 +362,7 @@ export function buildFinalizePrompt(draftContent, startDate, endDate, numberOfOu
   return `Based on the following 42.space market draft, generate the final market details in a structured JSON format. Each entry in the "outcomes" array will become an Outcome Token spawned at launch and must respect the protocol rules in your system prompt.${outcomeCountSection}${humanVoiceRider}
 
 CONCISENESS RULES:
+- refinedQuestion: trader-facing market title, max ${titleMaxChars} chars. Pattern: "Will/Which/Who + subject + outcome + date/window?" Keep resolver detail, sources, exact timestamps, edge cases, and protocol mechanics out of the title.
 - Cut all output text by at least 50% compared to the draft. Be terse and direct.
 - Use fragments and short declarative sentences. No filler, hedging, qualifiers, or redundant phrasing.
 - Do NOT repeat information across fields — each field must contain unique content only.
@@ -390,6 +394,28 @@ Generate a JSON response with exactly these fields:
   "fullResolutionRules": "Compact numbered rules — no redundancy with outcome-level criteria",
   "edgeCases": "Numbered list: scenario → named outcome from the outcomes array"
 }`;
+}
+
+export function buildMarketQuestionTitleRepairPrompt(finalJson, rigor = 'machine') {
+  const titleMaxChars = getMarketQuestionTitleLimit(rigor);
+  return `Rewrite only the "refinedQuestion" field below as a trader-facing market title.
+
+TITLE RULES:
+- Max ${titleMaxChars} characters.
+- One plain question ending in "?".
+- Pattern: "Will/Which/Who + subject + outcome + date/window?"
+- Include only the core tradable claim: subject, predicate, date/window.
+- Do NOT include sources, URLs, oracle language, exact clock times, UTC/ET cutoffs, edge cases, Outcome Token/42.space/parimutuel/MECE mechanics, or "will resolve" phrasing.
+- Keep all resolver detail in the other fields unchanged.
+- Polymarket-style examples: "Kraken IPO by December 31, 2026?", "Will any country leave NATO by June 30, 2026?", "Which artist tops the 2026 Hot 100?"
+
+OUTPUT strictly valid JSON with exactly this shape:
+{
+  "refinedQuestion": "short market question"
+}
+
+FINAL MARKET JSON:
+${JSON.stringify(finalJson, null, 2)}`;
 }
 
 // Post-finalize humanizer pass. Runs silently after handleAccept has produced
