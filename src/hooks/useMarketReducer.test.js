@@ -65,6 +65,48 @@ describe('review council defaults', () => {
   });
 });
 
+describe('review lifecycle config', () => {
+  const reviewConfig = {
+    reviewModels: DEFAULT_REVIEW_MODELS,
+    aggregationProtocol: 'majority',
+  };
+
+  it('stores the review configuration used for a successful review', () => {
+    const next = reducer(initialState, {
+      type: 'REVIEW_SUCCESS',
+      reviews: [{ model: DEFAULT_REVIEW_MODELS[0], modelName: 'Reviewer', content: 'Looks good.' }],
+      deliberatedReview: 'Council says update one thing.',
+      reviewConfig,
+    });
+
+    expect(next.lastReviewConfig).toEqual(reviewConfig);
+  });
+
+  it('clears stale review configuration when a new draft is generated', () => {
+    const reviewed = reducer(initialState, {
+      type: 'REVIEW_SUCCESS',
+      reviews: [{ model: DEFAULT_REVIEW_MODELS[0], modelName: 'Reviewer', content: 'Looks good.' }],
+      reviewConfig,
+    });
+    const next = reducer(reviewed, { type: 'DRAFT_SUCCESS', content: 'fresh draft' });
+
+    expect(next.reviews).toEqual([]);
+    expect(next.lastReviewConfig).toBeNull();
+  });
+
+  it('clears stale review configuration when a pasted draft replaces the current draft', () => {
+    const reviewed = reducer(initialState, {
+      type: 'REVIEW_SUCCESS',
+      reviews: [{ model: DEFAULT_REVIEW_MODELS[0], modelName: 'Reviewer', content: 'Looks good.' }],
+      reviewConfig,
+    });
+    const next = reducer(reviewed, { type: 'SUBMIT_PASTED_DRAFT', content: 'pasted draft' });
+
+    expect(next.reviews).toEqual([]);
+    expect(next.lastReviewConfig).toBeNull();
+  });
+});
+
 describe('RUN_IMPORT rehydrates rigor from the run artifact', () => {
   it('imports rigor=human from a run produced under Human mode', () => {
     const importedRun = {
