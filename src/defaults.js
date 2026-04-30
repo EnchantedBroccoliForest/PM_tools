@@ -10,7 +10,8 @@
 import {
   DEFAULT_DRAFT_MODEL,
   DEFAULT_REVIEW_MODEL,
-  DEFAULT_REVIEW_MODELS,
+  DEFAULT_REVIEW_MODEL_IDS,
+  getModelName,
 } from './constants/models.js';
 
 // DEFAULT_DRAFT_MODEL is re-exported from constants/models.js by pipeline
@@ -22,14 +23,9 @@ export { DEFAULT_DRAFT_MODEL };
  * "Review & Deliberate" produces a real council result by default. Users can
  * add up to 4 via flags or config.
  */
-const DEFAULT_REVIEWER_MODEL_NAMES = {
-  [DEFAULT_REVIEW_MODEL]: 'Gemini 3 Pro',
-  'anthropic/claude-opus-4.5': 'Claude Opus 4.5',
-};
-
-export const DEFAULT_REVIEWER_MODELS = DEFAULT_REVIEW_MODELS.map((id) => ({
+export const DEFAULT_REVIEWER_MODELS = DEFAULT_REVIEW_MODEL_IDS.map((id) => ({
   id,
-  name: DEFAULT_REVIEWER_MODEL_NAMES[id] || id,
+  name: getModelName(id),
 }));
 
 /**

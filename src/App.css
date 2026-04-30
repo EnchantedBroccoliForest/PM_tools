@@ -325,6 +325,11 @@ h1, h2, h3, h4,
   font-size: 0.85em;
 }
 
+.required-marker {
+  color: #ff8f8f;
+  font-weight: 700;
+}
+
 .textarea {
   min-height: 80px;
   resize: vertical;
@@ -645,6 +650,14 @@ h1, h2, h3, h4,
   font-family: var(--font-body);
 }
 
+.field-error {
+  color: #ff9a9a;
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 0.35rem 0 0;
+  font-family: var(--font-body);
+}
+
 /* ================================================
    Inputs
    ================================================ */
@@ -669,6 +682,13 @@ h1, h2, h3, h4,
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 1px rgba(222, 139, 243, 0.3);
+}
+
+.input--error,
+.input--error:hover:not(:disabled),
+.input--error:focus {
+  border-color: #ff8f8f;
+  box-shadow: 0 0 0 1px rgba(255, 143, 143, 0.28);
 }
 
 .input::placeholder {

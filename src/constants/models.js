@@ -231,13 +231,13 @@ export function getAvailableModels() {
 // surfaces it as a fallback option so the user can switch away from it.
 export const DEFAULT_DRAFT_MODEL = 'openai/gpt-5.2';
 export const DEFAULT_REVIEW_MODEL = 'google/gemini-3-pro-preview';
-export const DEFAULT_SECOND_REVIEW_MODEL = 'anthropic/claude-opus-4.5';
-export const DEFAULT_REVIEW_MODELS = [
+const DEFAULT_SECOND_REVIEW_MODEL = 'anthropic/claude-opus-4.5';
+export const DEFAULT_REVIEW_MODEL_IDS = [
   DEFAULT_REVIEW_MODEL,
   DEFAULT_SECOND_REVIEW_MODEL,
 ];
 export const REVIEW_MODEL_ADD_ORDER = [
-  ...DEFAULT_REVIEW_MODELS,
+  ...DEFAULT_REVIEW_MODEL_IDS,
   DEFAULT_DRAFT_MODEL,
   'anthropic/claude-sonnet-4',
 ];
