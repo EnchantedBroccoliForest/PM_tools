@@ -250,6 +250,22 @@ function buildReferenceFromIdea(idea) {
   return (idea.rest || idea.rawText || '').trim();
 }
 
+function buildReviewConfig(reviewModels, aggregationProtocol) {
+  return {
+    reviewModels: [...(reviewModels || [])],
+    aggregationProtocol,
+  };
+}
+
+function reviewConfigsEqual(a, b) {
+  if (!a || !b) return false;
+  if (a.aggregationProtocol !== b.aggregationProtocol) return false;
+  const aModels = a.reviewModels || [];
+  const bModels = b.reviewModels || [];
+  if (aModels.length !== bModels.length) return false;
+  return aModels.every((model, index) => model === bModels[index]);
+}
+
 function toSimpleRoutingReason(reason) {
   if (!reason) return '';
   if (reason === 'verification hard_fail') return 'Failed a verification check';
@@ -335,6 +351,7 @@ function App() {
     draftJustUpdated,
     reviews,
     deliberatedReview,
+    lastReviewConfig,
     finalContent,
     hasUpdated,
     earlyResolutionRisk,
@@ -387,6 +404,17 @@ function App() {
   const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
   const anyLoading = loading !== null;
   const progressPercent = finalContent ? 100 : hasUpdated ? 75 : reviews.length > 0 ? 50 : draftContent ? 33 : 0;
+  const currentReviewConfig = buildReviewConfig(reviewModels, aggregationProtocol);
+  const hasReviews = reviews.length > 0;
+  const reviewConfigChanged =
+    hasReviews && !reviewConfigsEqual(currentReviewConfig, lastReviewConfig);
+  const reviewAlreadyCurrent = hasReviews && !reviewConfigChanged;
+  const updateDraftReady = hasReviews && !reviewConfigChanged;
+  const baseReviewActionLabel = reviewModels.length > 1 ? 'Review & Deliberate' : 'Review';
+  const reviewActionLabel = reviewConfigChanged
+    ? `Re-run ${baseReviewActionLabel}`
+    : baseReviewActionLabel;
+  const reviewLoadingLabel = reviewModels.length > 1 ? 'Deliberating...' : 'Reviewing...';
   const draftValidation = validateDraftInputs({ question, startDate, endDate });
   const draftFieldErrors = draftValidation.errors;
   const visibleFieldError = (field) =>
@@ -709,6 +737,7 @@ function App() {
         type: 'REVIEW_SUCCESS',
         reviews: legacyReviews,
         deliberatedReview,
+        reviewConfig: buildReviewConfig(reviewModels, aggregationProtocol),
       });
 
       // Real Criticism records from every successful reviewer go into the
@@ -1690,32 +1719,42 @@ function App() {
                     <div className="toolbar-divider" />
 
                     <div className="toolbar-actions">
-                      <div className="toolbar-group toolbar-group--primary">
+                      <div className={`toolbar-group ${updateDraftReady ? '' : 'toolbar-group--primary'}`}>
                         <button
                           type="button"
-                          className="review-button--primary"
-                          disabled={anyLoading}
+                          className={updateDraftReady ? 'review-button' : 'review-button--primary'}
+                          disabled={anyLoading || reviewAlreadyCurrent}
                           onClick={handleReview}
+                          title={
+                            reviewAlreadyCurrent
+                              ? 'This review already reflects the selected council. Update the draft or change the council to review again.'
+                              : undefined
+                          }
                         >
                           {loading === 'review' ? (
                             <>
                               <span className="spinner" />
-                              {reviewModels.length > 1 ? 'Deliberating...' : 'Reviewing...'}
+                              {reviewLoadingLabel}
                             </>
                           ) : (
                             <>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                              {reviewModels.length > 1 ? 'Review & Deliberate' : 'Review'}
+                              {reviewActionLabel}
                             </>
                           )}
                         </button>
+                        {reviewConfigChanged && (
+                          <span className="toolbar-hint">
+                            Council changed; rerun review before updating.
+                          </span>
+                        )}
                       </div>
 
-                      {reviews.length > 0 && (
-                        <div className="toolbar-group">
+                      {reviews.length > 0 && !reviewConfigChanged && (
+                        <div className="toolbar-group toolbar-group--primary">
                           <button
                             type="button"
-                            className="review-button"
+                            className="review-button--primary"
                             disabled={anyLoading}
                             onClick={handleUpdate}
                           >
@@ -1739,10 +1778,12 @@ function App() {
                           <button
                             type="button"
                             className="accept-button"
-                            disabled={anyLoading || needsRiskAck || needsRoutingAck || needsSourceAck}
+                            disabled={anyLoading || needsRiskAck || needsRoutingAck || needsSourceAck || reviewConfigChanged}
                             onClick={handleAccept}
                             title={
-                              needsRiskAck
+                              reviewConfigChanged
+                                ? 'Rerun review with the selected council and update the draft before finalizing.'
+                                : needsRiskAck
                                 ? 'Acknowledge the HIGH early-resolution risk below before finalizing.'
                                 : needsRoutingAck
                                   ? 'Resolve or acknowledge the blocking claims flagged by the rigor pipeline before finalizing.'

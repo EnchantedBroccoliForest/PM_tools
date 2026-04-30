@@ -64,6 +64,7 @@ export const initialState = {
   draftJustUpdated: false, // Transient flag to trigger scroll + flash after an update
   reviews: [],           // Array of { model, modelName, content }
   deliberatedReview: null, // Synthesized review after deliberation
+  lastReviewConfig: null,  // { reviewModels: string[], aggregationProtocol: string } for the current reviews
   finalContent: null,
   hasUpdated: false,
 
@@ -201,6 +202,7 @@ export function reducer(state, action) {
         draftJustUpdated: false,
         reviews: [],
         deliberatedReview: null,
+        lastReviewConfig: null,
         humanReviewInput: '',
         finalContent: null,
         hasUpdated: false,
@@ -217,6 +219,7 @@ export function reducer(state, action) {
         draftJustUpdated: false,
         reviews: [],
         deliberatedReview: null,
+        lastReviewConfig: null,
         humanReviewInput: '',
         finalContent: null,
         hasUpdated: false,
@@ -229,6 +232,7 @@ export function reducer(state, action) {
         loadingMeta: null,
         reviews: action.reviews,
         deliberatedReview: action.deliberatedReview || null,
+        lastReviewConfig: action.reviewConfig || null,
       };
 
     case 'UPDATE_SUCCESS': {
@@ -594,6 +598,7 @@ function rehydrateFromRun(state, run) {
     draftJustUpdated: false,
     reviews: [],
     deliberatedReview: null,
+    lastReviewConfig: null,
     finalContent: run.finalJson || null,
     hasUpdated,
     // Early-resolution gate is not persisted across export/import; imported
