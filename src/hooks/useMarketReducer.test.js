@@ -81,6 +81,59 @@ describe('review council defaults', () => {
   });
 });
 
+describe('draft required-field touch state', () => {
+  it('starts with required draft fields untouched', () => {
+    expect(initialState.touchedFields).toEqual({
+      question: false,
+      startDate: false,
+      endDate: false,
+    });
+  });
+
+  it('marks one field touched', () => {
+    const next = reducer(initialState, { type: 'TOUCH_FIELD', field: 'question' });
+
+    expect(next.touchedFields.question).toBe(true);
+    expect(next.touchedFields.startDate).toBe(false);
+    expect(next.touchedFields.endDate).toBe(false);
+  });
+
+  it('marks all required draft fields touched', () => {
+    const next = reducer(initialState, { type: 'TOUCH_DRAFT_REQUIRED_FIELDS' });
+
+    expect(next.touchedFields).toEqual({
+      question: true,
+      startDate: true,
+      endDate: true,
+    });
+  });
+
+  it('SET_DATE_ERROR sets dateError without mutating dates or touched state', () => {
+    const seeded = {
+      ...initialState,
+      startDate: '2026-06-01T10:00',
+      endDate: '2026-06-30T23:30',
+      touchedFields: { question: true, startDate: true, endDate: true },
+    };
+    const next = reducer(seeded, {
+      type: 'SET_DATE_ERROR',
+      dateError: 'End date and time must be later than Start.',
+    });
+
+    expect(next.dateError).toBe('End date and time must be later than Start.');
+    expect(next.startDate).toBe('2026-06-01T10:00');
+    expect(next.endDate).toBe('2026-06-30T23:30');
+    expect(next.touchedFields).toEqual(seeded.touchedFields);
+  });
+
+  it('SET_DATE_ERROR with no dateError clears the field', () => {
+    const seeded = { ...initialState, dateError: 'previous error' };
+    const next = reducer(seeded, { type: 'SET_DATE_ERROR' });
+
+    expect(next.dateError).toBeNull();
+  });
+});
+
 describe('RUN_IMPORT rehydrates rigor from the run artifact', () => {
   it('imports rigor=human from a run produced under Human mode', () => {
     const importedRun = {

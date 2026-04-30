@@ -30,6 +30,12 @@ import { RIGOR_RUBRIC, AGGREGATION_PROTOCOLS, RUBRIC_BY_ID } from './constants/r
 import { parseRun, GLOBAL_CLAIM_ID } from './types/run';
 import { DRAFT_MAX_TOKENS } from './defaults';
 import { parseRiskLevel } from './util/riskLevel';
+import {
+  normalizeUtcDateTime,
+  toDateTimeLocalValue,
+  validateDatePair,
+  validateDraftInputs,
+} from './util/draftInput';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
@@ -322,6 +328,7 @@ function App() {
     loadingMeta,
     error,
     dateError,
+    touchedFields,
     draftContent,
     draftVersions,
     viewingVersionIndex,
@@ -380,6 +387,12 @@ function App() {
   const currentStep = finalContent ? 3 : draftContent ? 2 : 1;
   const anyLoading = loading !== null;
   const progressPercent = finalContent ? 100 : hasUpdated ? 75 : reviews.length > 0 ? 50 : draftContent ? 33 : 0;
+  const draftValidation = validateDraftInputs({ question, startDate, endDate });
+  const draftFieldErrors = draftValidation.errors;
+  const visibleFieldError = (field) =>
+    touchedFields?.[field] ? draftFieldErrors[field] : null;
+  const inputClassName = (field) =>
+    visibleFieldError(field) ? 'input input--error' : 'input';
 
   // Auto-scroll to active panel on mobile
   useEffect(() => {
@@ -415,37 +428,18 @@ function App() {
     });
   };
 
-  const formatUTCDateHint = (dateString, suffix) => {
-    if (!dateString) return null;
-    // Append 'Z' so the string is parsed as UTC, not local time. Without it
-    // `new Date('2026-06-01T00:00:00')` is taken as local time and the
-    // resulting ISO string shifts by the viewer's timezone offset.
-    const parsed = new Date(`${dateString}T${suffix}Z`);
-    if (Number.isNaN(parsed.getTime())) return null;
-    return parsed.toISOString().replace('T', ' ').slice(0, -5);
+  const formatUTCDateHint = (dateString, fallbackTime) => {
+    const normalized = normalizeUtcDateTime(dateString, fallbackTime);
+    if (!normalized) return null;
+    return normalized.replace('T', ' ').replace('Z', ' UTC');
   };
 
   const handleDismissError = () => dispatch({ type: 'SET_ERROR', error: null });
 
-  const validateDates = (start, end) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (start) {
-      const startDateObj = new Date(start);
-      if (startDateObj <= today) return 'Start Date must be in the future';
-    }
-    if (start && end) {
-      const startDateObj = new Date(start);
-      const endDateObj = new Date(end);
-      if (endDateObj <= startDateObj) return 'End Date must be later than Start Date';
-    }
-    return null;
-  };
-
   const handleDateChange = (field, value) => {
     const newStart = field === 'startDate' ? value : startDate;
     const newEnd = field === 'endDate' ? value : endDate;
-    dispatch({ type: 'SET_DATE', field, value, dateError: validateDates(newStart, newEnd) });
+    dispatch({ type: 'SET_DATE', field, value, dateError: validateDatePair(newStart, newEnd) });
   };
 
   // Small helper: dispatch a RUN_COST entry for a single LLM call result.
@@ -573,6 +567,19 @@ function App() {
 
   // --- Stage 1: Draft (single model) ---
   const handleDraft = async () => {
+    const validation = validateDraftInputs({ question, startDate, endDate });
+    if (!validation.isValid) {
+      dispatch({ type: 'TOUCH_DRAFT_REQUIRED_FIELDS' });
+      dispatch({
+        type: 'SET_DATE_ERROR',
+        dateError: validation.errors.startDate || validation.errors.endDate || null,
+      });
+      return;
+    }
+
+    const startDateUTC = validation.startDateUTC;
+    const endDateUTC = validation.endDateUTC;
+
     dispatch({ type: 'START_LOADING', phase: 'draft', models: [getModelName(selectedModel)] });
     // Start a fresh Run artifact; previous run (if any) is discarded. Note
     // that `rigor` here is the live reducer field (the user's current
@@ -581,12 +588,12 @@ function App() {
     // currentRunRef.current?.input?.rigor — see handleReview for that read.
     dispatch({
       type: 'RUN_START',
-      input: { question, startDate, endDate, references, numberOfOutcomes, rigor },
+      input: { question, startDate: startDateUTC, endDate: endDateUTC, references, numberOfOutcomes, rigor },
     });
     try {
       const result = await queryModel(selectedModel, [
         { role: 'system', content: getSystemPrompt('drafter', rigor) },
-        { role: 'user', content: buildDraftPrompt(question, startDate, endDate, references, numberOfOutcomes, rigor) },
+        { role: 'user', content: buildDraftPrompt(question, startDateUTC, endDateUTC, references, numberOfOutcomes, rigor) },
       ], { maxTokens: DRAFT_MAX_TOKENS });
       dispatch({ type: 'DRAFT_SUCCESS', content: result.content });
       recordCost('draft', result);
@@ -829,7 +836,15 @@ function App() {
     try {
       const riskResult = await queryModel(selectedModel, [
         { role: 'system', content: getSystemPrompt('earlyResolutionAnalyst', runRigor) },
-        { role: 'user', content: buildEarlyResolutionPrompt(updatedDraft, startDate, endDate, runRigor) },
+        {
+          role: 'user',
+          content: buildEarlyResolutionPrompt(
+            updatedDraft,
+            normalizeUtcDateTime(startDate, '00:00:00'),
+            normalizeUtcDateTime(endDate, '23:59:59'),
+            runRigor,
+          ),
+        },
       ]);
       recordCost('early_resolution', riskResult);
       dispatch({
@@ -913,7 +928,16 @@ function App() {
         selectedModel,
         [
           { role: 'system', content: getSystemPrompt('finalizer', runRigor) },
-          { role: 'user', content: buildFinalizePrompt(draftContent, startDate, endDate, numberOfOutcomes, runRigor) },
+          {
+            role: 'user',
+            content: buildFinalizePrompt(
+              draftContent,
+              normalizeUtcDateTime(startDate, '00:00:00'),
+              normalizeUtcDateTime(endDate, '23:59:59'),
+              numberOfOutcomes,
+              runRigor,
+            ),
+          },
         ],
         { temperature: 0.3, maxTokens: DRAFT_MAX_TOKENS }
       );
@@ -973,7 +997,14 @@ function App() {
     // claim-extraction → review → verify pipeline.
     dispatch({
       type: 'RUN_START',
-      input: { question, startDate, endDate, references, numberOfOutcomes, rigor },
+      input: {
+        question,
+        startDate: normalizeUtcDateTime(startDate, '00:00:00'),
+        endDate: normalizeUtcDateTime(endDate, '23:59:59'),
+        references,
+        numberOfOutcomes,
+        rigor,
+      },
     });
     dispatch({
       type: 'RUN_APPEND_DRAFT',
@@ -1154,49 +1185,90 @@ function App() {
               {mode === 'draft' && (
               <div className="market-form">
                 <div className="form-group">
-                  <label htmlFor="question">42.space Market Question</label>
+                  <label htmlFor="question">
+                    42.space Market Question <span className="required-marker" aria-hidden="true">*</span>
+                  </label>
                   <input
                     id="question"
                     type="text"
                     value={question}
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'question', value: e.target.value })}
+                    onBlur={() => dispatch({ type: 'TOUCH_FIELD', field: 'question' })}
                     placeholder="e.g., Which artist tops the Billboard Hot 100 year-end chart 2026?"
-                    className="input"
+                    className={inputClassName('question')}
                     disabled={loading === 'draft'}
+                    required
+                    aria-invalid={!!visibleFieldError('question')}
+                    aria-describedby={visibleFieldError('question') ? 'question-error' : undefined}
                   />
+                  {visibleFieldError('question') && (
+                    <p id="question-error" className="field-error">{visibleFieldError('question')}</p>
+                  )}
                 </div>
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label htmlFor="startDate">Start Date</label>
+                    <label htmlFor="startDate">
+                      Start Date &amp; Time <span className="label-hint">(UTC)</span> <span className="required-marker" aria-hidden="true">*</span>
+                    </label>
                     <input
                       id="startDate"
-                      type="date"
-                      value={startDate}
+                      type="datetime-local"
+                      step="60"
+                      value={toDateTimeLocalValue(startDate, '00:00:00')}
                       onChange={(e) => handleDateChange('startDate', e.target.value)}
-                      className="input"
+                      onBlur={() => dispatch({ type: 'TOUCH_FIELD', field: 'startDate' })}
+                      className={inputClassName('startDate')}
                       disabled={loading === 'draft'}
+                      required
+                      aria-invalid={!!visibleFieldError('startDate')}
+                      aria-describedby={
+                        visibleFieldError('startDate')
+                          ? 'startDate-error'
+                          : startDate
+                            ? 'startDate-hint'
+                            : undefined
+                      }
                     />
                     {startDate && (
-                      <p className="utc-hint">
-                        {formatUTCDateHint(startDate, '00:00:00')} UTC
+                      <p id="startDate-hint" className="utc-hint">
+                        {formatUTCDateHint(startDate, '00:00:00')}
                       </p>
+                    )}
+                    {visibleFieldError('startDate') && (
+                      <p id="startDate-error" className="field-error">{visibleFieldError('startDate')}</p>
                     )}
                   </div>
                   <div className="form-group">
-                    <label htmlFor="endDate">End Date</label>
+                    <label htmlFor="endDate">
+                      End Date &amp; Time <span className="label-hint">(UTC)</span> <span className="required-marker" aria-hidden="true">*</span>
+                    </label>
                     <input
                       id="endDate"
-                      type="date"
-                      value={endDate}
+                      type="datetime-local"
+                      step="60"
+                      value={toDateTimeLocalValue(endDate, '23:59:59')}
                       onChange={(e) => handleDateChange('endDate', e.target.value)}
-                      className="input"
+                      onBlur={() => dispatch({ type: 'TOUCH_FIELD', field: 'endDate' })}
+                      className={inputClassName('endDate')}
                       disabled={loading === 'draft'}
+                      required
+                      aria-invalid={!!visibleFieldError('endDate')}
+                      aria-describedby={
+                        visibleFieldError('endDate')
+                          ? 'endDate-error'
+                          : endDate
+                            ? 'endDate-hint'
+                            : undefined
+                      }
                     />
                     {endDate && (
-                      <p className="utc-hint">
-                        {formatUTCDateHint(endDate, '23:59:59')} UTC
+                      <p id="endDate-hint" className="utc-hint">
+                        {formatUTCDateHint(endDate, '23:59:59')}
                       </p>
+                    )}
+                    {visibleFieldError('endDate') && (
+                      <p id="endDate-error" className="field-error">{visibleFieldError('endDate')}</p>
                     )}
                   </div>
                 </div>
@@ -1252,7 +1324,7 @@ function App() {
                 <button
                   type="button"
                   className="draft-button"
-                  disabled={loading === 'draft' || !question.trim() || !startDate || !endDate || !!dateError}
+                  disabled={loading === 'draft' || !!dateError}
                   onClick={handleDraft}
                 >
                   {loading === 'draft' ? (

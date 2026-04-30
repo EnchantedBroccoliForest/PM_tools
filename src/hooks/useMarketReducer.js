@@ -51,6 +51,11 @@ export const initialState = {
   loadingMeta: null, // { models: string[], startTime: number } | null
   error: null,
   dateError: null,
+  touchedFields: {
+    question: false,
+    startDate: false,
+    endDate: false,
+  },
 
   // Content
   draftContent: null,
@@ -125,6 +130,29 @@ export function reducer(state, action) {
         dateError: action.dateError,
       };
     }
+
+    case 'SET_DATE_ERROR':
+      return { ...state, dateError: action.dateError ?? null };
+
+    case 'TOUCH_FIELD':
+      return {
+        ...state,
+        touchedFields: {
+          ...state.touchedFields,
+          [action.field]: true,
+        },
+      };
+
+    case 'TOUCH_DRAFT_REQUIRED_FIELDS':
+      return {
+        ...state,
+        touchedFields: {
+          ...state.touchedFields,
+          question: true,
+          startDate: true,
+          endDate: true,
+        },
+      };
 
     case 'ADD_REVIEW_MODEL':
       return {
@@ -249,6 +277,11 @@ export function reducer(state, action) {
         startDate: action.startDate ?? state.startDate,
         endDate: action.endDate ?? state.endDate,
         dateError: null,
+        touchedFields: {
+          question: false,
+          startDate: false,
+          endDate: false,
+        },
         error: null,
       };
 
@@ -572,6 +605,11 @@ function rehydrateFromRun(state, run) {
     // to be re-checked if the user wants the gate to gate Accept.
     sourceAccessibility: null,
     sourceAccessibilityAcknowledged: false,
+    touchedFields: {
+      question: false,
+      startDate: false,
+      endDate: false,
+    },
   };
 }
 
