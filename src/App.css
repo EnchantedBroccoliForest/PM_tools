@@ -1308,6 +1308,10 @@ select.input optgroup {
   border-radius: var(--r-sm);
 }
 
+.final-doc__section--description {
+  border-color: rgba(0, 229, 255, 0.18);
+}
+
 .final-doc__section-header {
   display: flex;
   justify-content: space-between;
@@ -1358,6 +1362,53 @@ select.input optgroup {
 .final-doc__text--risk {
   background: rgba(244, 194, 17, 0.04);
   border-color: rgba(244, 194, 17, 0.15);
+}
+
+.final-doc__text--markdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1rem 1.1rem;
+  overflow-wrap: anywhere;
+}
+
+.final-doc__text--markdown .md-heading {
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin: 0.35rem 0 0;
+}
+
+.final-doc__text--markdown .md-heading:first-child {
+  margin-top: 0;
+}
+
+.final-doc__text--markdown .md-paragraph {
+  margin: 0;
+}
+
+.md-link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.md-link:hover {
+  color: var(--accent-2);
+}
+
+.md-divider {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0.35rem 0;
+}
+
+.final-doc__text em {
+  color: var(--text-2);
 }
 
 /* Outcomes – card list layout */
@@ -2435,6 +2486,10 @@ select.input optgroup {
 .App.theme-light .final-doc__section {
   background: rgba(0, 0, 0, 0.02);
   border-color: rgba(0, 0, 0, 0.08);
+}
+
+.App.theme-light .final-doc__section--description {
+  border-color: rgba(0, 141, 160, 0.22);
 }
 
 .App.theme-light .final-doc__text {

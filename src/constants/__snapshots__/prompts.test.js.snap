@@ -81,6 +81,20 @@ CONCISENESS RULES:
 - shortDescription: max 15 words.
 - fullResolutionRules: compact numbered list, max 1 line per rule. No prose.
 - edgeCases: compact numbered list, format "scenario → named outcome it resolves to", max 1 line each. Every edge case must terminate in a named outcome from the outcomes array above (or its catch-all).
+- resolutionDescriptionMarkdown: dashboard-ready Markdown for the \`description\` field. Follow the template exactly. Encode it as one JSON string with \\n line breaks. Use one clickable external source link in [label](url) syntax; no bare URLs.
+
+DESCRIPTION MARKDOWN TEMPLATE:
+## Resolution Criteria:
+<one or two sentences stating the exact resolution condition, including the asset, venue, timeframe, and timestamp in UTC>
+
+## Resolution Sources:
+<source name and a single linked reference using [label](url) syntax; specify any UI parameters required to reproduce the resolution value>
+
+## Additional Information:
+<scope limitations, exclusions, and the resolution window, e.g. "resolved within 24 hours after the index timestamp">
+
+---
+_Language: <ISO 639-1 code>_
 
 DRAFT:
 DRAFT_PLACEHOLDER
@@ -103,7 +117,8 @@ Generate a JSON response with exactly these fields:
   "marketEndTimeUTC": "YYYY-MM-DDTHH:MM:SSZ format based on end date (hard parimutuel cutoff)",
   "shortDescription": "One sentence market description",
   "fullResolutionRules": "Compact numbered rules — no redundancy with outcome-level criteria",
-  "edgeCases": "Numbered list: scenario → named outcome from the outcomes array"
+  "edgeCases": "Numbered list: scenario → named outcome from the outcomes array",
+  "resolutionDescriptionMarkdown": "Markdown string following the DESCRIPTION MARKDOWN TEMPLATE exactly"
 }"
 `;
 
