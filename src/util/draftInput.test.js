@@ -45,6 +45,17 @@ describe('validateDraftInputs', () => {
     expect(result.errors.endDate).toBe('End date and time must be later than Start.');
   });
 
+  it('rejects a start timestamp in the past', () => {
+    const result = validateDraftInputs({
+      question: 'Will BTC exceed 100k?',
+      startDate: '2025-06-01T10:00',
+      endDate: '2026-06-30T23:30',
+    }, now);
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors.startDate).toBe('Start date and time must be in the future.');
+  });
+
   it('returns normalized UTC timestamps for valid input', () => {
     const result = validateDraftInputs({
       question: 'Will BTC exceed 100k?',
@@ -59,7 +70,7 @@ describe('validateDraftInputs', () => {
 });
 
 describe('validateDatePair', () => {
-  it('does not show required-date errors while untouched blanks are blank', () => {
+  it('returns null when both dates are blank', () => {
     expect(validateDatePair('', '', Date.parse('2026-01-01T00:00:00Z'))).toBeNull();
   });
 });
