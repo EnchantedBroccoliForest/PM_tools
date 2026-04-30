@@ -36,6 +36,7 @@ import {
   validateDatePair,
   validateDraftInputs,
 } from './util/draftInput';
+import { buildResolutionDescriptionMarkdown } from './util/resolutionDescription';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
@@ -50,6 +51,13 @@ function renderContent(text) {
 
   while (i < lines.length) {
     const line = lines[i];
+
+    // Markdown divider
+    if (/^\s*---+\s*$/.test(line)) {
+      elements.push(<hr key={i} className="md-divider" />);
+      i++;
+      continue;
+    }
 
     // Heading lines (### or ##)
     const headingMatch = line.match(/^(#{1,3})\s+(.+)/);
@@ -101,14 +109,63 @@ function formatRelativeTime(timestamp) {
 }
 
 function formatInline(text) {
-  // Split on **bold** markers
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
+  const elements = [];
+  const tokenPattern = /(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|_[^_]+_)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = tokenPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      elements.push(text.slice(lastIndex, match.index));
     }
-    return part;
-  });
+
+    const token = match[0];
+    const key = `${match.index}-${token}`;
+    if (token.startsWith('**') && token.endsWith('**')) {
+      elements.push(<strong key={key}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith('_') && token.endsWith('_')) {
+      const previousChar = match.index > 0 ? text[match.index - 1] : '';
+      const nextChar = text[match.index + token.length] || '';
+      if (/\w/.test(previousChar) || /\w/.test(nextChar)) {
+        elements.push(token);
+      } else {
+        elements.push(<em key={key}>{token.slice(1, -1)}</em>);
+      }
+    } else {
+      const linkMatch = token.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+      if (linkMatch && isSafeMarkdownUrl(linkMatch[2])) {
+        elements.push(
+          <a
+            key={key}
+            className="md-link"
+            href={linkMatch[2]}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            {linkMatch[1]}
+          </a>
+        );
+      } else {
+        elements.push(token);
+      }
+    }
+    lastIndex = match.index + token.length;
+  }
+
+  if (lastIndex < text.length) {
+    elements.push(text.slice(lastIndex));
+  }
+
+  return elements;
+}
+
+function isSafeMarkdownUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
 }
 
 // Parse the Ideate stage output into discrete ideas. The prompt asks the
@@ -375,6 +432,9 @@ function App() {
   // its frozen rigor even if the user starts a new draft from a different
   // toggle position; falls back to live state for the pre-RUN_START case.
   const displayRigor = currentRun?.input?.rigor ?? rigor;
+  const resolutionDescriptionMarkdown = finalContent && !finalContent.raw
+    ? buildResolutionDescriptionMarkdown(finalContent)
+    : '';
 
   // Phase 0 gate: Accept & Finalize is blocked when the early-resolution
   // analyst has flagged the updated draft as HIGH risk and the user has not
@@ -2262,9 +2322,26 @@ function App() {
                         </span>
                       </div>
 
+                      {resolutionDescriptionMarkdown && (
+                        <div className="final-doc__section final-doc__section--description stagger-item" style={{ '--stagger': 4 }}>
+                          <div className="final-doc__section-header">
+                            <h3 className="final-doc__heading">Description</h3>
+                            <button
+                              className={`copy-btn ${copiedId === 'description-markdown' ? 'copy-btn--copied' : ''}`}
+                              onClick={() => handleCopy(resolutionDescriptionMarkdown, 'description-markdown')}
+                            >
+                              {copiedId === 'description-markdown' ? 'Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                          <div className="final-doc__text final-doc__text--markdown">
+                            {renderContent(resolutionDescriptionMarkdown)}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Outcomes */}
                       {finalContent.outcomes?.length > 0 && (
-                        <div className="final-doc__section stagger-item" style={{ '--stagger': 4 }}>
+                        <div className="final-doc__section stagger-item" style={{ '--stagger': 5 }}>
                           <h3 className="final-doc__heading">Outcomes ({finalContent.outcomes.length})</h3>
                           <div className="final-doc__outcomes">
                             {finalContent.outcomes.map((outcome, index) => (
