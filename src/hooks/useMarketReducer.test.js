@@ -136,14 +136,14 @@ describe('draft required-field touch state', () => {
 
 describe('review lifecycle config', () => {
   const reviewConfig = {
-    reviewModels: DEFAULT_REVIEW_MODELS,
+    reviewModels: DEFAULT_REVIEW_MODEL_IDS,
     aggregationProtocol: 'majority',
   };
 
   it('stores the review configuration used for a successful review', () => {
     const next = reducer(initialState, {
       type: 'REVIEW_SUCCESS',
-      reviews: [{ model: DEFAULT_REVIEW_MODELS[0], modelName: 'Reviewer', content: 'Looks good.' }],
+      reviews: [{ model: DEFAULT_REVIEW_MODEL_IDS[0], modelName: 'Reviewer', content: 'Looks good.' }],
       deliberatedReview: 'Council says update one thing.',
       reviewConfig,
     });
@@ -154,7 +154,7 @@ describe('review lifecycle config', () => {
   it('clears stale review configuration when a new draft is generated', () => {
     const reviewed = reducer(initialState, {
       type: 'REVIEW_SUCCESS',
-      reviews: [{ model: DEFAULT_REVIEW_MODELS[0], modelName: 'Reviewer', content: 'Looks good.' }],
+      reviews: [{ model: DEFAULT_REVIEW_MODEL_IDS[0], modelName: 'Reviewer', content: 'Looks good.' }],
       reviewConfig,
     });
     const next = reducer(reviewed, { type: 'DRAFT_SUCCESS', content: 'fresh draft' });
@@ -166,7 +166,7 @@ describe('review lifecycle config', () => {
   it('clears stale review configuration when a pasted draft replaces the current draft', () => {
     const reviewed = reducer(initialState, {
       type: 'REVIEW_SUCCESS',
-      reviews: [{ model: DEFAULT_REVIEW_MODELS[0], modelName: 'Reviewer', content: 'Looks good.' }],
+      reviews: [{ model: DEFAULT_REVIEW_MODEL_IDS[0], modelName: 'Reviewer', content: 'Looks good.' }],
       reviewConfig,
     });
     const next = reducer(reviewed, { type: 'SUBMIT_PASTED_DRAFT', content: 'pasted draft' });
