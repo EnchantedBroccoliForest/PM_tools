@@ -2,7 +2,7 @@ import { useReducer } from 'react';
 import {
   DEFAULT_DRAFT_MODEL,
   DEFAULT_REVIEW_MODEL,
-  DEFAULT_REVIEW_MODELS,
+  DEFAULT_REVIEW_MODEL_IDS,
   REVIEW_MODEL_ADD_ORDER,
 } from '../constants/models';
 import { createRun } from '../types/run';
@@ -32,7 +32,7 @@ export const initialState = {
   // drafter / reviewer / finalizer prompt receives it as a hard rule.
   numberOfOutcomes: '',
   selectedModel: DEFAULT_DRAFT_MODEL,
-  reviewModels: [...DEFAULT_REVIEW_MODELS],
+  reviewModels: [...DEFAULT_REVIEW_MODEL_IDS],
   humanReviewInput: '',
   pastedDraft: '',
 
