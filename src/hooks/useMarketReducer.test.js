@@ -17,6 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { reducer, initialState } from './useMarketReducer.js';
 import { createRun } from '../types/run.js';
+import { DEFAULT_REVIEW_MODEL_IDS } from '../constants/models.js';
 
 describe('useMarketReducer rigor field', () => {
   it('initialState defaults rigor to machine', () => {
@@ -39,6 +40,44 @@ describe('useMarketReducer rigor field', () => {
     expect(human.rigor).toBe('human');
     const reset = reducer(human, { type: 'RESET' });
     expect(reset.rigor).toBe('machine');
+  });
+});
+
+describe('review council defaults', () => {
+  it('starts with Gemini 3 Pro and Claude Opus 4.5 as the default council', () => {
+    expect(initialState.reviewModels).toEqual([
+      'google/gemini-3-pro-preview',
+      'anthropic/claude-opus-4.5',
+    ]);
+    expect(DEFAULT_REVIEW_MODEL_IDS).toEqual(initialState.reviewModels);
+  });
+
+  it('adds GPT-5.2 as the third reviewer when expanding the council', () => {
+    const next = reducer(initialState, { type: 'ADD_REVIEW_MODEL' });
+
+    expect(next.reviewModels).toEqual([
+      'google/gemini-3-pro-preview',
+      'anthropic/claude-opus-4.5',
+      'openai/gpt-5.2',
+    ]);
+  });
+
+  it('adds Claude Sonnet 4 as the fourth reviewer when expanding again', () => {
+    const three = reducer(initialState, { type: 'ADD_REVIEW_MODEL' });
+    const four = reducer(three, { type: 'ADD_REVIEW_MODEL' });
+
+    expect(four.reviewModels).toEqual([
+      'google/gemini-3-pro-preview',
+      'anthropic/claude-opus-4.5',
+      'openai/gpt-5.2',
+      'anthropic/claude-sonnet-4',
+    ]);
+  });
+
+  it('still allows the council to be reduced to one manual reviewer', () => {
+    const next = reducer(initialState, { type: 'REMOVE_REVIEW_MODEL', index: 1 });
+
+    expect(next.reviewModels).toEqual(['google/gemini-3-pro-preview']);
   });
 });
 

@@ -1,5 +1,10 @@
 import { useReducer } from 'react';
-import { DEFAULT_DRAFT_MODEL, DEFAULT_REVIEW_MODEL } from '../constants/models';
+import {
+  DEFAULT_DRAFT_MODEL,
+  DEFAULT_REVIEW_MODEL,
+  DEFAULT_REVIEW_MODEL_IDS,
+  REVIEW_MODEL_ADD_ORDER,
+} from '../constants/models';
 import { createRun } from '../types/run';
 
 // Exported for direct testing of state transitions. Production code should
@@ -27,7 +32,7 @@ export const initialState = {
   // drafter / reviewer / finalizer prompt receives it as a hard rule.
   numberOfOutcomes: '',
   selectedModel: DEFAULT_DRAFT_MODEL,
-  reviewModels: [DEFAULT_REVIEW_MODEL],
+  reviewModels: [...DEFAULT_REVIEW_MODEL_IDS],
   humanReviewInput: '',
   pastedDraft: '',
 
@@ -152,7 +157,10 @@ export function reducer(state, action) {
     case 'ADD_REVIEW_MODEL':
       return {
         ...state,
-        reviewModels: [...state.reviewModels, DEFAULT_REVIEW_MODEL],
+        reviewModels: [
+          ...state.reviewModels,
+          REVIEW_MODEL_ADD_ORDER.find((id) => !state.reviewModels.includes(id)) || DEFAULT_REVIEW_MODEL,
+        ],
       };
 
     case 'REMOVE_REVIEW_MODEL':
