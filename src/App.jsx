@@ -1575,7 +1575,7 @@ function App() {
                       <span className="toolbar-hint">
                         {reviewModels.length > 1
                           ? 'Multiple reviewers will deliberate to produce a stronger critique'
-                          : 'Add more reviewers for multi-model deliberation'}
+                          : 'Deliberation needs at least two reviewers; add another model to compare.'}
                       </span>
                     </div>
 

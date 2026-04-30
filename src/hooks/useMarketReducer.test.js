@@ -17,6 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { reducer, initialState } from './useMarketReducer.js';
 import { createRun } from '../types/run.js';
+import { DEFAULT_REVIEW_MODELS, REVIEW_MODEL_ADD_ORDER } from '../constants/models.js';
 
 describe('useMarketReducer rigor field', () => {
   it('initialState defaults rigor to machine', () => {
@@ -39,6 +40,28 @@ describe('useMarketReducer rigor field', () => {
     expect(human.rigor).toBe('human');
     const reset = reducer(human, { type: 'RESET' });
     expect(reset.rigor).toBe('machine');
+  });
+});
+
+describe('review council defaults', () => {
+  it('starts with two default reviewer models', () => {
+    expect(initialState.reviewModels).toEqual(DEFAULT_REVIEW_MODELS);
+    expect(initialState.reviewModels.length).toBe(2);
+  });
+
+  it('adds the next unused model when expanding the council', () => {
+    const next = reducer(initialState, { type: 'ADD_REVIEW_MODEL' });
+
+    expect(next.reviewModels).toEqual([
+      ...DEFAULT_REVIEW_MODELS,
+      REVIEW_MODEL_ADD_ORDER.find((id) => !DEFAULT_REVIEW_MODELS.includes(id)),
+    ]);
+  });
+
+  it('still allows the council to be reduced to one manual reviewer', () => {
+    const next = reducer(initialState, { type: 'REMOVE_REVIEW_MODEL', index: 1 });
+
+    expect(next.reviewModels).toEqual([DEFAULT_REVIEW_MODELS[0]]);
   });
 });
 

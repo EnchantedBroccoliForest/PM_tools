@@ -7,19 +7,30 @@
  * initial state in the UI reducer.
  */
 
-import { DEFAULT_DRAFT_MODEL, DEFAULT_REVIEW_MODEL } from './constants/models.js';
+import {
+  DEFAULT_DRAFT_MODEL,
+  DEFAULT_REVIEW_MODEL,
+  DEFAULT_REVIEW_MODELS,
+} from './constants/models.js';
 
 // DEFAULT_DRAFT_MODEL is re-exported from constants/models.js by pipeline
 // callers that want the drafter default; no alias needed here.
 export { DEFAULT_DRAFT_MODEL };
 
 /**
- * Default reviewer council. The UI starts with a single reviewer; the CLI
- * mirrors that. Users can add up to 4 via flags or config.
+ * Default reviewer council. The UI and CLI start with two reviewers so
+ * "Review & Deliberate" produces a real council result by default. Users can
+ * add up to 4 via flags or config.
  */
-export const DEFAULT_REVIEWER_MODELS = [
-  { id: DEFAULT_REVIEW_MODEL, name: 'Gemini 3 Pro' },
-];
+const DEFAULT_REVIEWER_MODEL_NAMES = {
+  [DEFAULT_REVIEW_MODEL]: 'Gemini 3 Pro',
+  'anthropic/claude-opus-4.5': 'Claude Opus 4.5',
+};
+
+export const DEFAULT_REVIEWER_MODELS = DEFAULT_REVIEW_MODELS.map((id) => ({
+  id,
+  name: DEFAULT_REVIEWER_MODEL_NAMES[id] || id,
+}));
 
 /**
  * Default judge model for aggregation='judge' mode. The UI uses the first
