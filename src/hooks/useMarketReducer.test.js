@@ -42,6 +42,34 @@ describe('useMarketReducer rigor field', () => {
   });
 });
 
+describe('draft required-field touch state', () => {
+  it('starts with required draft fields untouched', () => {
+    expect(initialState.touchedFields).toEqual({
+      question: false,
+      startDate: false,
+      endDate: false,
+    });
+  });
+
+  it('marks one field touched', () => {
+    const next = reducer(initialState, { type: 'TOUCH_FIELD', field: 'question' });
+
+    expect(next.touchedFields.question).toBe(true);
+    expect(next.touchedFields.startDate).toBe(false);
+    expect(next.touchedFields.endDate).toBe(false);
+  });
+
+  it('marks all required draft fields touched', () => {
+    const next = reducer(initialState, { type: 'TOUCH_DRAFT_REQUIRED_FIELDS' });
+
+    expect(next.touchedFields).toEqual({
+      question: true,
+      startDate: true,
+      endDate: true,
+    });
+  });
+});
+
 describe('RUN_IMPORT rehydrates rigor from the run artifact', () => {
   it('imports rigor=human from a run produced under Human mode', () => {
     const importedRun = {
