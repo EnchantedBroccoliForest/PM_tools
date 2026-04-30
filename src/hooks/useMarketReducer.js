@@ -126,6 +126,9 @@ export function reducer(state, action) {
       };
     }
 
+    case 'SET_DATE_ERROR':
+      return { ...state, dateError: action.dateError ?? null };
+
     case 'TOUCH_FIELD':
       return {
         ...state,

@@ -68,6 +68,31 @@ describe('draft required-field touch state', () => {
       endDate: true,
     });
   });
+
+  it('SET_DATE_ERROR sets dateError without mutating dates or touched state', () => {
+    const seeded = {
+      ...initialState,
+      startDate: '2026-06-01T10:00',
+      endDate: '2026-06-30T23:30',
+      touchedFields: { question: true, startDate: true, endDate: true },
+    };
+    const next = reducer(seeded, {
+      type: 'SET_DATE_ERROR',
+      dateError: 'End date and time must be later than Start.',
+    });
+
+    expect(next.dateError).toBe('End date and time must be later than Start.');
+    expect(next.startDate).toBe('2026-06-01T10:00');
+    expect(next.endDate).toBe('2026-06-30T23:30');
+    expect(next.touchedFields).toEqual(seeded.touchedFields);
+  });
+
+  it('SET_DATE_ERROR with no dateError clears the field', () => {
+    const seeded = { ...initialState, dateError: 'previous error' };
+    const next = reducer(seeded, { type: 'SET_DATE_ERROR' });
+
+    expect(next.dateError).toBeNull();
+  });
 });
 
 describe('RUN_IMPORT rehydrates rigor from the run artifact', () => {

@@ -571,9 +571,7 @@ function App() {
     if (!validation.isValid) {
       dispatch({ type: 'TOUCH_DRAFT_REQUIRED_FIELDS' });
       dispatch({
-        type: 'SET_DATE',
-        field: 'endDate',
-        value: endDate,
+        type: 'SET_DATE_ERROR',
         dateError: validation.errors.startDate || validation.errors.endDate || null,
       });
       return;
