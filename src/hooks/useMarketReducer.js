@@ -19,7 +19,7 @@ export const initialState = {
   // 'human'   = softened reviewer prompts + humanizer applied to the final card.
   // Snapshotted onto the Run artifact at draft time so any mid-flow toggle
   // does not leak into stages that have already started.
-  rigor: 'machine', // 'machine' | 'human'
+  rigor: 'human', // 'machine' | 'human'
 
   // Input
   question: '',
