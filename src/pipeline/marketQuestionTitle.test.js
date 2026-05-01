@@ -78,4 +78,45 @@ describe('repairMarketQuestionTitle', () => {
     expect(result.logEntry.level).toBe('warn');
     expect(result.logEntry.message).toMatch(/rejected/);
   });
+
+  it('returns the original finalJson with a warn log when queryModel throws', async () => {
+    const verbose = {
+      ...SAMPLE_FINAL,
+      refinedQuestion:
+        'Will Team A win the 2026 finals according to the official scoreboard resolution source by 2026-06-15T23:59:59Z?',
+    };
+    const query = vi.fn().mockRejectedValue(new Error('network down'));
+
+    const result = await repairMarketQuestionTitle('m', verbose, 'human', { queryModel: query });
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(result.finalJson).toBe(verbose);
+    expect(result.repaired).toBe(false);
+    expect(result.usage).toBeNull();
+    expect(result.logEntry.level).toBe('warn');
+    expect(result.logEntry.message).toMatch(/network down/);
+  });
+
+  it('preserves all non-title fields verbatim when repairing', async () => {
+    const verbose = {
+      ...SAMPLE_FINAL,
+      refinedQuestion:
+        'Will Team A win the 2026 finals according to the official scoreboard resolution source by 2026-06-15T23:59:59Z?',
+    };
+    const query = vi.fn().mockResolvedValue({
+      content: JSON.stringify({ refinedQuestion: 'Will Team A win the 2026 finals?' }),
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      wallClockMs: 25,
+    });
+
+    const result = await repairMarketQuestionTitle('m', verbose, 'human', { queryModel: query });
+
+    expect(result.repaired).toBe(true);
+    expect(result.finalJson.outcomes).toEqual(verbose.outcomes);
+    expect(result.finalJson.marketStartTimeUTC).toBe(verbose.marketStartTimeUTC);
+    expect(result.finalJson.marketEndTimeUTC).toBe(verbose.marketEndTimeUTC);
+    expect(result.finalJson.shortDescription).toBe(verbose.shortDescription);
+    expect(result.finalJson.fullResolutionRules).toBe(verbose.fullResolutionRules);
+    expect(result.finalJson.edgeCases).toBe(verbose.edgeCases);
+  });
 });
