@@ -618,6 +618,7 @@ h1, h2, h3, h4,
 
 .form-group {
   margin-bottom: 1.25rem;
+  min-width: 0;
 }
 
 .form-group label {
@@ -663,6 +664,8 @@ h1, h2, h3, h4,
    ================================================ */
 .input {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
