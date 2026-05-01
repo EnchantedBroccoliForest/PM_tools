@@ -16,8 +16,11 @@ const DISALLOWED_PATTERNS = Object.freeze([
     re: /\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\s*(?:UTC|ET|EST|EDT|GMT)\b/i,
     reason: 'must not include exact clock times',
   },
+  // Multi-word resolver phrases only — bare verbs like "resolve" / "resolved"
+  // appear in legitimate trader-facing questions ("Will Congress resolve the
+  // debt ceiling…?") and matched too aggressively in earlier iterations.
   {
-    re: /\b(?:according to|as confirmed by|as measured by|resolution source|resolution criteria|will resolve|resolves?|resolved|oracle|outcome token|parimutuel|MECE|42\.space)\b/i,
+    re: /\b(?:according to|as confirmed by|as measured by|resolution source|resolution criteria|resolves to|resolves as|will resolve|oracle|outcome token|parimutuel|MECE|42\.space)\b/i,
     reason: 'must keep resolver mechanics out of the title',
   },
 ]);
@@ -27,7 +30,7 @@ function oneLine(value) {
 }
 
 export function getMarketQuestionTitleLimit(rigor = 'machine') {
-  return TITLE_LIMITS[rigor] || TITLE_LIMITS.machine;
+  return Object.hasOwn(TITLE_LIMITS, rigor) ? TITLE_LIMITS[rigor] : TITLE_LIMITS.machine;
 }
 
 export function validateMarketQuestionTitle(title, rigor = 'machine') {
