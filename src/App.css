@@ -279,7 +279,6 @@ h1, h2, h3, h4,
 .panel-body {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
   padding: 1rem;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
