@@ -38,6 +38,7 @@ import {
   validateDraftInputs,
 } from './util/draftInput';
 import { buildResolutionDescriptionMarkdown } from './util/resolutionDescription';
+import { isSafeExternalUrl, splitExternalUrlToken } from './util/externalUrl';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
@@ -111,7 +112,7 @@ function formatRelativeTime(timestamp) {
 
 function formatInline(text) {
   const elements = [];
-  const tokenPattern = /(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|_[^_]+_)/g;
+  const tokenPattern = /(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|_[^_]+_|https?:\/\/[^\s<>"'\])]+)/g;
   let lastIndex = 0;
   let match;
 
@@ -134,20 +135,17 @@ function formatInline(text) {
       }
     } else {
       const linkMatch = token.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
-      if (linkMatch && isSafeMarkdownUrl(linkMatch[2])) {
-        elements.push(
-          <a
-            key={key}
-            className="md-link"
-            href={linkMatch[2]}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            {linkMatch[1]}
-          </a>
-        );
+      if (linkMatch) {
+        elements.push(renderExternalLink(linkMatch[2], linkMatch[1], key, 'md-link') || token);
       } else {
-        elements.push(token);
+        const { href, suffix } = splitExternalUrlToken(token);
+        const link = renderExternalLink(href, href, key, 'md-link');
+        if (link) {
+          elements.push(link);
+          if (suffix) elements.push(suffix);
+        } else {
+          elements.push(token);
+        }
       }
     }
     lastIndex = match.index + token.length;
@@ -160,13 +158,29 @@ function formatInline(text) {
   return elements;
 }
 
-function isSafeMarkdownUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
-  } catch {
-    return false;
-  }
+function renderExternalLink(href, label, key, className) {
+  if (!isSafeExternalUrl(href)) return null;
+  return (
+    <a
+      key={key}
+      className={className}
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+    >
+      {label}
+    </a>
+  );
+}
+
+function SourceUrlLink({ url }) {
+  const link = renderExternalLink(
+    url,
+    <code>{url}</code>,
+    url,
+    'risk-gate__source-link'
+  );
+  return link || <code>{url}</code>;
 }
 
 // Parse the Ideate stage output into discrete ideas. The prompt asks the
@@ -2135,7 +2149,7 @@ function App() {
                                 <ul className="risk-gate__list">
                                   {unreachable.slice(0, 10).map((s) => (
                                     <li key={s.url}>
-                                      <code>{s.url}</code>
+                                      <SourceUrlLink url={s.url} />
                                       <span className="risk-gate__reasons">
                                         {' '}({originLabel(s.origin)})
                                       </span>
@@ -2152,7 +2166,7 @@ function App() {
                                 <ul className="risk-gate__list">
                                   {reachable.slice(0, 10).map((s) => (
                                     <li key={s.url}>
-                                      <code>{s.url}</code>
+                                      <SourceUrlLink url={s.url} />
                                       <span className="risk-gate__reasons">
                                         {' '}({originLabel(s.origin)})
                                       </span>

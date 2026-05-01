@@ -3058,6 +3058,22 @@ select.input optgroup {
   max-width: 100%;
 }
 
+.risk-gate__source-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.28);
+  text-underline-offset: 0.18em;
+}
+
+.risk-gate__source-link:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+.risk-gate__source-link code {
+  cursor: pointer;
+}
+
 .risk-gate__item {
   padding: 0.5rem 0.65rem;
   background: rgba(255, 255, 255, 0.03);
@@ -3231,6 +3247,10 @@ select.input optgroup {
 }
 
 .App.theme-light .run-trace__evidence-url {
+  text-decoration-color: rgba(139, 119, 90, 0.35);
+}
+
+.App.theme-light .risk-gate__source-link {
   text-decoration-color: rgba(139, 119, 90, 0.35);
 }
 
