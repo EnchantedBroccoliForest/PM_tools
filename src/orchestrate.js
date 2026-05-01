@@ -33,6 +33,7 @@ import { verifyClaims, structuralCheck } from './pipeline/verify.js';
 import { gatherEvidence } from './pipeline/gatherEvidence.js';
 import { routeClaims } from './pipeline/route.js';
 import { runStructuredReviewsParallel } from './pipeline/structuredReview.js';
+import { repairMarketQuestionTitle } from './pipeline/marketQuestionTitle.js';
 import { aggregate } from './pipeline/aggregate.js';
 import { RIGOR_RUBRIC } from './constants/rubric.js';
 import { enrichReferencesWithXData } from './pipeline/xapi.js';
@@ -365,7 +366,17 @@ async function runFinalizeStage(run, riskLevel, models, cost, callbacks) {
     { temperature: 0.3, maxTokens: DRAFT_MAX_TOKENS },
   );
   cost.record('accept', finalResult);
-  run.finalJson = tryParseJsonObject(finalResult.content) || { raw: finalResult.content };
+  const parsedFinalJson = tryParseJsonObject(finalResult.content) || { raw: finalResult.content };
+  const titleResult = await repairMarketQuestionTitle(
+    models.drafter,
+    parsedFinalJson,
+    run.input?.rigor || 'machine',
+  );
+  cost.record('title_repair', titleResult);
+  if (titleResult.logEntry) {
+    log(run, 'title_repair', titleResult.logEntry.level, titleResult.logEntry.message, callbacks);
+  }
+  run.finalJson = titleResult.finalJson;
   return gateResult;
 }
 

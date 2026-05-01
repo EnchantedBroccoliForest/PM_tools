@@ -34,6 +34,7 @@ import {
   buildStrictStructuredReviewRetryPrompt,
   buildUpdatePrompt,
   buildFinalizePrompt,
+  buildMarketQuestionTitleRepairPrompt,
   buildEarlyResolutionPrompt,
   buildIdeatePrompt,
   buildJudgeAggregatorPrompt,
@@ -323,6 +324,27 @@ describe('Human-mode bodies still carry load-bearing tokens', () => {
   it('buildFinalizePrompt human variant retains the conciseness rules', () => {
     const human = buildFinalizePrompt(SAMPLE.draftContent, SAMPLE.startDate, SAMPLE.endDate, SAMPLE.numberOfOutcomes, 'human');
     expect(human).toContain('CONCISENESS RULES');
+  });
+
+  it('buildFinalizePrompt gives refinedQuestion a concrete title budget', () => {
+    const machine = buildFinalizePrompt(SAMPLE.draftContent, SAMPLE.startDate, SAMPLE.endDate, SAMPLE.numberOfOutcomes, 'machine');
+    const human = buildFinalizePrompt(SAMPLE.draftContent, SAMPLE.startDate, SAMPLE.endDate, SAMPLE.numberOfOutcomes, 'human');
+
+    expect(machine).toContain('refinedQuestion: trader-facing market title, max 90 chars');
+    expect(human).toContain('refinedQuestion: trader-facing market title, max 70 chars');
+    expect(human).toMatch(/Keep resolver detail, sources, exact timestamps, edge cases, and protocol mechanics out of the title/);
+  });
+
+  it('buildMarketQuestionTitleRepairPrompt is title-only and preserves resolver fields', () => {
+    const prompt = buildMarketQuestionTitleRepairPrompt({
+      refinedQuestion: 'Will the official result resolve according to the source by 2026-06-15T23:59:59Z?',
+      outcomes: [],
+    }, 'human');
+
+    expect(prompt).toContain('Rewrite only the "refinedQuestion" field');
+    expect(prompt).toContain('Max 70 characters');
+    expect(prompt).toContain('"refinedQuestion": "short market question"');
+    expect(prompt).toContain('Keep all resolver detail in the other fields unchanged');
   });
 });
 

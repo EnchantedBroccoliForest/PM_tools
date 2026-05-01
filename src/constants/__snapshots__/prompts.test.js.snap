@@ -74,6 +74,7 @@ HARD RESTRICTION — OUTCOME SET SIZE: the market MUST have EXACTLY 4 Outcome To
 
 
 CONCISENESS RULES:
+- refinedQuestion: trader-facing market title, max 90 chars. Pattern: "Will/Which/Who + subject + outcome + date/window?" Keep resolver detail, sources, exact timestamps, edge cases, and protocol mechanics out of the title.
 - Cut all output text by at least 50% compared to the draft. Be terse and direct.
 - Use fragments and short declarative sentences. No filler, hedging, qualifiers, or redundant phrasing.
 - Do NOT repeat information across fields — each field must contain unique content only.
