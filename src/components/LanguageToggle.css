@@ -1,0 +1,71 @@
+/* ================================================
+   Language Toggle — upper-right floating pill
+   ================================================ */
+.language-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10000;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 36px;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  background: #1F1B29;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-2, #A1A1AA);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 150ms ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.language-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-1, #FFFFFF);
+  transform: translateY(-1px);
+}
+
+.language-toggle:focus-visible {
+  outline: 2px solid var(--neon-cyan, #4DD0E1);
+  outline-offset: 2px;
+}
+
+.language-toggle__current {
+  color: var(--text-1, #FFFFFF);
+}
+
+.language-toggle__sep {
+  opacity: 0.4;
+}
+
+.language-toggle__next {
+  opacity: 0.7;
+}
+
+.language-toggle:hover .language-toggle__next {
+  opacity: 1;
+}
+
+/* Light ambient mode */
+.ambient-light .language-toggle {
+  background: #FFFFFF;
+  border-color: rgba(0, 0, 0, 0.1);
+  color: rgba(0, 0, 0, 0.55);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.ambient-light .language-toggle:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.18);
+  color: rgba(0, 0, 0, 0.9);
+}
+
+.ambient-light .language-toggle__current {
+  color: rgba(0, 0, 0, 0.9);
+}

@@ -4,6 +4,7 @@ import {
   toDateTimeLocalValue,
   validateDatePair,
   validateDraftInputs,
+  VALIDATION_ERRORS,
 } from './draftInput.js';
 
 describe('draft input datetime helpers', () => {
@@ -28,9 +29,9 @@ describe('validateDraftInputs', () => {
 
     expect(result.isValid).toBe(false);
     expect(result.errors).toEqual({
-      question: 'Market question is required.',
-      startDate: 'Start date and time is required.',
-      endDate: 'End date and time is required.',
+      question: VALIDATION_ERRORS.QUESTION_REQUIRED,
+      startDate: VALIDATION_ERRORS.START_REQUIRED,
+      endDate: VALIDATION_ERRORS.END_REQUIRED,
     });
   });
 
@@ -42,7 +43,7 @@ describe('validateDraftInputs', () => {
     }, now);
 
     expect(result.isValid).toBe(false);
-    expect(result.errors.endDate).toBe('End date and time must be later than Start.');
+    expect(result.errors.endDate).toBe(VALIDATION_ERRORS.END_BEFORE_START);
   });
 
   it('rejects a start timestamp in the past', () => {
@@ -53,7 +54,7 @@ describe('validateDraftInputs', () => {
     }, now);
 
     expect(result.isValid).toBe(false);
-    expect(result.errors.startDate).toBe('Start date and time must be in the future.');
+    expect(result.errors.startDate).toBe(VALIDATION_ERRORS.START_PAST);
   });
 
   it('returns normalized UTC timestamps for valid input', () => {

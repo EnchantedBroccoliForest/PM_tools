@@ -32,6 +32,19 @@ export function toDateTimeLocalValue(value, fallbackTime = '00:00:00') {
   return iso ? iso.slice(0, 16) : '';
 }
 
+// Validation errors are returned as stable codes (not English strings) so
+// the UI layer can translate them at render time. See `validation.*` keys
+// in src/i18n.js for the rendered text.
+export const VALIDATION_ERRORS = {
+  QUESTION_REQUIRED: 'validation.question.required',
+  START_REQUIRED: 'validation.startDate.required',
+  START_INVALID: 'validation.startDate.invalid',
+  START_PAST: 'validation.startDate.past',
+  END_REQUIRED: 'validation.endDate.required',
+  END_INVALID: 'validation.endDate.invalid',
+  END_BEFORE_START: 'validation.endDate.beforeStart',
+};
+
 export function validateDraftInputs(input, now = Date.now()) {
   const question = typeof input?.question === 'string' ? input.question.trim() : '';
   const startRaw = typeof input?.startDate === 'string' ? input.startDate.trim() : '';
@@ -41,28 +54,28 @@ export function validateDraftInputs(input, now = Date.now()) {
   const errors = {};
 
   if (!question) {
-    errors.question = 'Market question is required.';
+    errors.question = VALIDATION_ERRORS.QUESTION_REQUIRED;
   }
 
   if (!startRaw) {
-    errors.startDate = 'Start date and time is required.';
+    errors.startDate = VALIDATION_ERRORS.START_REQUIRED;
   } else if (!startDateUTC) {
-    errors.startDate = 'Enter a valid UTC start date and time.';
+    errors.startDate = VALIDATION_ERRORS.START_INVALID;
   } else if (new Date(startDateUTC).getTime() <= now) {
-    errors.startDate = 'Start date and time must be in the future.';
+    errors.startDate = VALIDATION_ERRORS.START_PAST;
   }
 
   if (!endRaw) {
-    errors.endDate = 'End date and time is required.';
+    errors.endDate = VALIDATION_ERRORS.END_REQUIRED;
   } else if (!endDateUTC) {
-    errors.endDate = 'Enter a valid UTC end date and time.';
+    errors.endDate = VALIDATION_ERRORS.END_INVALID;
   }
 
   if (startDateUTC && endDateUTC) {
     const startMs = new Date(startDateUTC).getTime();
     const endMs = new Date(endDateUTC).getTime();
     if (endMs <= startMs) {
-      errors.endDate = 'End date and time must be later than Start.';
+      errors.endDate = VALIDATION_ERRORS.END_BEFORE_START;
     }
   }
 
