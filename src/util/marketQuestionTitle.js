@@ -25,6 +25,37 @@ const DISALLOWED_PATTERNS = Object.freeze([
   },
 ]);
 
+// Human-only patterns — stiff resolver phrasing that reads fine in a Machine
+// Mode question but feels bureaucratic to a trader-facing audience. These
+// run *in addition to* the shared patterns above when rigor === 'human'.
+// Kept conservative so legitimate trader questions still pass.
+const HUMAN_DISALLOWED_PATTERNS = Object.freeze([
+  {
+    re: /\bofficial\s+(?:result|results|source|sources)\b/i,
+    reason: 'human-mode title should not lean on resolver-style "official source/result" phrasing',
+  },
+  {
+    re: /\bas of\b/i,
+    reason: 'human-mode title should not include resolver "as of" cutoffs',
+  },
+  {
+    re: /\bby\s+(?:the\s+)?market\s+close\b/i,
+    reason: 'human-mode title should not reference "market close"',
+  },
+  {
+    re: /\bbased\s+on\b/i,
+    reason: 'human-mode title should not start a resolver clause with "based on"',
+  },
+  {
+    re: /\bconfirmed\s+by\b/i,
+    reason: 'human-mode title should not include "confirmed by" resolver phrasing',
+  },
+  {
+    re: /\bpublished\s+by\s+the\s+source\b/i,
+    reason: 'human-mode title should not include "published by the source" resolver phrasing',
+  },
+]);
+
 function oneLine(value) {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
 }
@@ -53,6 +84,12 @@ export function validateMarketQuestionTitle(title, rigor = 'machine') {
 
   for (const { re, reason } of DISALLOWED_PATTERNS) {
     if (re.test(normalized)) reasons.push(reason);
+  }
+
+  if (rigor === 'human') {
+    for (const { re, reason } of HUMAN_DISALLOWED_PATTERNS) {
+      if (re.test(normalized)) reasons.push(reason);
+    }
   }
 
   return {
