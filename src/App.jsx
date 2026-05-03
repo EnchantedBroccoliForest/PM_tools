@@ -505,10 +505,17 @@ function App() {
     : t('toolbar.reviewing');
   const draftValidation = validateDraftInputs({ question, startDate, endDate });
   const draftFieldErrors = draftValidation.errors;
-  const visibleFieldError = (field) =>
+  // Returns the validation error code for `field` (or null). Render-side
+  // code looks up `t(code)` to get the localized message; the boolean form
+  // is for class/attribute toggles that only need to know "is there one?".
+  const visibleFieldErrorCode = (field) =>
     touchedFields?.[field] ? draftFieldErrors[field] : null;
+  const visibleFieldError = (field) => {
+    const code = visibleFieldErrorCode(field);
+    return code ? t(code) : null;
+  };
   const inputClassName = (field) =>
-    visibleFieldError(field) ? 'input input--error' : 'input';
+    visibleFieldErrorCode(field) ? 'input input--error' : 'input';
 
   // Auto-scroll to active panel on mobile
   useEffect(() => {
@@ -726,12 +733,12 @@ function App() {
           type: 'RUN_LOG',
           stage: 'claims',
           level: 'error',
-          message: `Background claim extraction crashed: ${bgErr?.message || bgErr}`,
+          message: t('log.claimExtractionCrashed', { message: bgErr?.message || bgErr }),
         });
       });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || t('error.draft') });
-      dispatch({ type: 'RUN_LOG', stage: 'draft', level: 'error', message: err.message || 'Draft failed' });
+      dispatch({ type: 'RUN_LOG', stage: 'draft', level: 'error', message: err.message || t('log.draftFailed') });
     }
   };
 
@@ -887,7 +894,7 @@ function App() {
       dispatch({ type: 'RUN_SET_ROUTING', routing });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || t('error.review') });
-      dispatch({ type: 'RUN_LOG', stage: 'review', level: 'error', message: err.message || 'Review failed' });
+      dispatch({ type: 'RUN_LOG', stage: 'review', level: 'error', message: err.message || t('log.reviewFailed') });
     }
   };
 
@@ -939,12 +946,12 @@ function App() {
           type: 'RUN_LOG',
           stage: 'claims',
           level: 'error',
-          message: `Background claim extraction crashed: ${bgErr?.message || bgErr}`,
+          message: t('log.claimExtractionCrashed', { message: bgErr?.message || bgErr }),
         });
       });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || t('error.update') });
-      dispatch({ type: 'RUN_LOG', stage: 'update', level: 'error', message: err.message || 'Update failed' });
+      dispatch({ type: 'RUN_LOG', stage: 'update', level: 'error', message: err.message || t('log.updateFailed') });
       return;
     }
 
@@ -978,7 +985,7 @@ function App() {
         type: 'RUN_LOG',
         stage: 'early_resolution',
         level: 'error',
-        message: riskErr.message || 'Early resolution check failed',
+        message: riskErr.message || t('log.earlyResolutionFailed'),
       });
     }
 
@@ -1022,7 +1029,7 @@ function App() {
         type: 'RUN_LOG',
         stage: 'source_accessibility',
         level: 'error',
-        message: srcErr.message || 'Source accessibility check failed',
+        message: srcErr.message || t('log.sourceAccessibilityFailed'),
       });
     }
   };
@@ -1112,7 +1119,7 @@ function App() {
       dispatch({ type: 'RUN_SET_FINAL', finalJson: finalContent });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || t('error.finalize') });
-      dispatch({ type: 'RUN_LOG', stage: 'accept', level: 'error', message: err.message || 'Finalize failed' });
+      dispatch({ type: 'RUN_LOG', stage: 'accept', level: 'error', message: err.message || t('log.finalizeFailed') });
     }
   };
 
@@ -1144,7 +1151,7 @@ function App() {
         type: 'RUN_LOG',
         stage: 'claims',
         level: 'error',
-        message: `Background claim extraction crashed: ${bgErr?.message || bgErr}`,
+        message: t('log.claimExtractionCrashed', { message: bgErr?.message || bgErr }),
       });
     });
   };
@@ -1444,7 +1451,7 @@ function App() {
                 </div>
 
                 <ErrorMessage
-                  message={dateError}
+                  message={dateError ? t(dateError) : null}
                   onDismiss={() => dispatch({ type: 'SET_DATE', field: 'startDate', value: startDate, dateError: null })}
                   dismissLabel={t('common.dismiss')}
                 />

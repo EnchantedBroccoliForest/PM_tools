@@ -296,6 +296,27 @@ const EN = {
   'loading.rigorHuman': 'Human',
   'loading.rigorMachine': 'Machine',
 
+  // Validation (codes returned by util/draftInput.js)
+  'validation.question.required': 'Market question is required.',
+  'validation.startDate.required': 'Start date and time is required.',
+  'validation.startDate.invalid': 'Enter a valid UTC start date and time.',
+  'validation.startDate.past': 'Start date and time must be in the future.',
+  'validation.endDate.required': 'End date and time is required.',
+  'validation.endDate.invalid': 'Enter a valid UTC end date and time.',
+  'validation.endDate.beforeStart': 'End date and time must be later than Start.',
+
+  // Run-trace log fallbacks. Most log content is dynamic (raw model errors,
+  // counts, stage diagnostics) and stays in its source language; these are
+  // the static fallbacks the App emits when an underlying error has no
+  // message of its own.
+  'log.draftFailed': 'Draft failed',
+  'log.reviewFailed': 'Review failed',
+  'log.updateFailed': 'Update failed',
+  'log.finalizeFailed': 'Finalize failed',
+  'log.earlyResolutionFailed': 'Early resolution check failed',
+  'log.sourceAccessibilityFailed': 'Source accessibility check failed',
+  'log.claimExtractionCrashed': 'Background claim extraction crashed: {message}',
+
   // Errors
   'error.copy': 'Failed to copy to clipboard',
   'error.draft': 'Failed to generate draft',
@@ -599,6 +620,27 @@ const ZH = {
   // without a provider) continues to find them.
   'loading.rigorHuman': 'Human',
   'loading.rigorMachine': 'Machine',
+
+  // Validation (codes returned by util/draftInput.js)
+  'validation.question.required': '请填写市场问题。',
+  'validation.startDate.required': '请填写开始日期与时间。',
+  'validation.startDate.invalid': '请输入有效的 UTC 开始日期与时间。',
+  'validation.startDate.past': '开始日期与时间必须在未来。',
+  'validation.endDate.required': '请填写结束日期与时间。',
+  'validation.endDate.invalid': '请输入有效的 UTC 结束日期与时间。',
+  'validation.endDate.beforeStart': '结束日期与时间必须晚于开始时间。',
+
+  // Run-trace log fallbacks. Most log content is dynamic (raw model errors,
+  // counts, stage diagnostics) and stays in its source language; these are
+  // the static fallbacks the App emits when an underlying error has no
+  // message of its own.
+  'log.draftFailed': '起草失败',
+  'log.reviewFailed': '审阅失败',
+  'log.updateFailed': '更新失败',
+  'log.finalizeFailed': '定稿失败',
+  'log.earlyResolutionFailed': '提前结算检查失败',
+  'log.sourceAccessibilityFailed': '数据源可访问性检查失败',
+  'log.claimExtractionCrashed': '后台陈述提取崩溃:{message}',
 
   // Errors
   'error.copy': '复制到剪贴板失败',
