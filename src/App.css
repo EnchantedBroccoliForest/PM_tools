@@ -1484,6 +1484,224 @@ select.input optgroup {
   font-size: 0.8rem;
 }
 
+/* ================================================
+   Human Mode - compact market card
+   ================================================ */
+.market-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.1rem 1.2rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+}
+
+.market-card__question {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.4;
+}
+
+.market-card__description {
+  font-size: 0.9rem;
+  color: var(--text-2);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.market-card__period {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-card__period-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+
+.market-card__period-dates {
+  color: var(--text-1);
+}
+
+.market-card__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.market-card__heading {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-3);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.market-card__outcomes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.market-card__outcome {
+  font-size: 0.9rem;
+  color: var(--text-1);
+  line-height: 1.55;
+}
+
+.market-card__outcome-name {
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.market-card__outcome-win {
+  color: var(--text-2);
+}
+
+.market-card__verify {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.market-card__verify-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+}
+
+.market-card__bullets {
+  list-style: disc;
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text-2);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.market-card__bullets li {
+  margin: 0.18rem 0;
+}
+
+.market-card__bullets-more {
+  list-style: none;
+  margin-left: -1.25rem;
+  font-size: 0.8rem;
+  color: var(--text-3);
+  font-style: italic;
+}
+
+.market-card__risk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: rgba(244, 194, 17, 0.05);
+  border: 1px solid rgba(244, 194, 17, 0.18);
+  border-radius: var(--r-sm);
+  font-size: 0.85rem;
+  color: var(--text-2);
+}
+
+.market-card__risk-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  color: var(--text-3);
+}
+
+.market-card__risk-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.final-doc__details {
+  margin-top: 0.5rem;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: var(--r-sm);
+  padding: 0.65rem 0.85rem;
+}
+
+.final-doc__details > summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-3);
+  list-style: none;
+  user-select: none;
+}
+
+.final-doc__details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.final-doc__details > summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.4rem;
+  transition: transform 120ms ease;
+}
+
+.final-doc__details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.final-doc__details[open] > summary {
+  margin-bottom: 0.85rem;
+}
+
+.final-doc__details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.copy-btn--secondary {
+  margin-left: 0.4rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.copy-btn--secondary:hover {
+  opacity: 1;
+}
+
+/* Light theme overrides for market card */
+.App.theme-light .market-card {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
+  border-left-color: var(--accent);
+}
+
+.App.theme-light .market-card__risk {
+  background: rgba(180, 140, 20, 0.06);
+  border-color: rgba(180, 140, 20, 0.2);
+}
+
+.App.theme-light .final-doc__details {
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
 /* Time Display - base styles, layout overridden below */
 
 .time-display {

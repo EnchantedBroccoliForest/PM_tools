@@ -38,6 +38,8 @@ import {
   validateDraftInputs,
 } from './util/draftInput';
 import { buildResolutionDescriptionMarkdown } from './util/resolutionDescription';
+import { buildMarketCard, formatMarketCardCopy } from './util/marketCard';
+import { formatFullSpecCopy } from './util/finalCopy';
 import { isSafeExternalUrl, splitExternalUrlToken } from './util/externalUrl';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
@@ -459,6 +461,16 @@ function App() {
   const resolutionDescriptionMarkdown = finalContent && !finalContent.raw
     ? buildResolutionDescriptionMarkdown(finalContent)
     : '';
+
+  // Human Mode shows a compact "market card" first instead of the full
+  // resolver-style spec. Machine Mode keeps the existing detailed layout.
+  const isHumanFinal = displayRigor === 'human' && finalContent && !finalContent.raw;
+  const finalMarketCard = isHumanFinal
+    ? buildMarketCard(finalContent, {
+        riskLevel: earlyResolutionRiskLevel,
+        riskText: earlyResolutionRisk,
+      })
+    : null;
 
   // Phase 0 gate: Accept & Finalize is blocked when the early-resolution
   // analyst has flagged the updated draft as HIGH risk and the user has not
@@ -2320,21 +2332,22 @@ function App() {
                       <button
                         className={`copy-btn ${copiedId === 'full-output' ? 'copy-btn--copied' : ''}`}
                         onClick={() => {
-                          const text = [
-                            finalContent.refinedQuestion && `Question: ${finalContent.refinedQuestion}`,
-                            finalContent.shortDescription && `\nDescription: ${finalContent.shortDescription}`,
-                            `\nMarket Period: ${finalContent.marketStartTimeUTC} — ${finalContent.marketEndTimeUTC}`,
-                            finalContent.outcomes?.length > 0 && `\nOutcomes:\n${finalContent.outcomes.map((o, i) =>
-                              `${i + 1}. ${o.name}\n   Wins if: ${o.winCondition || 'N/A'}\n   Resolved by: ${o.resolutionCriteria}`
-                            ).join('\n')}`,
-                            finalContent.fullResolutionRules && `\nFull Resolution Rules:\n${finalContent.fullResolutionRules}`,
-                            finalContent.edgeCases && `\nEdge Cases:\n${finalContent.edgeCases}`,
-                          ].filter(Boolean).join('\n');
+                          const text = finalMarketCard
+                            ? formatMarketCardCopy(finalMarketCard)
+                            : formatFullSpecCopy(finalContent);
                           handleCopy(text, 'full-output');
                         }}
                       >
                         {copiedId === 'full-output' ? t('common.copied') : t('common.copyAll')}
                       </button>
+                      {isHumanFinal && (
+                        <button
+                          className={`copy-btn copy-btn--secondary ${copiedId === 'full-spec' ? 'copy-btn--copied' : ''}`}
+                          onClick={() => handleCopy(formatFullSpecCopy(finalContent), 'full-spec')}
+                        >
+                          {copiedId === 'full-spec' ? t('common.copied') : t('final.copyFullSpec')}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -2343,6 +2356,192 @@ function App() {
                       <div className="content-box content-box--rich stagger-item" style={{ '--stagger': 1 }}>
                         {renderContent(finalContent.raw)}
                       </div>
+                    </div>
+                  ) : isHumanFinal && finalMarketCard && !finalMarketCard.isRaw ? (
+                    <div className="final-doc final-doc--human">
+                      <div className="market-card stagger-item" style={{ '--stagger': 1 }}>
+                        {finalMarketCard.question && (
+                          <div className="market-card__question">{finalMarketCard.question}</div>
+                        )}
+                        {finalMarketCard.description && (
+                          <p className="market-card__description">{finalMarketCard.description}</p>
+                        )}
+                        {finalMarketCard.period && (
+                          <div className="market-card__period">
+                            <span className="market-card__period-label">{t('final.marketPeriod')}</span>
+                            <span className="market-card__period-dates">{finalMarketCard.period}</span>
+                          </div>
+                        )}
+
+                        {finalMarketCard.outcomes.length > 0 && (
+                          <div className="market-card__section">
+                            <h3 className="market-card__heading">
+                              {t('final.outcomes', { n: finalMarketCard.outcomes.length })}
+                            </h3>
+                            <ul className="market-card__outcomes">
+                              {finalMarketCard.outcomes.map((outcome, index) => {
+                                const showVerify =
+                                  outcome.resolutionCriteria &&
+                                  outcome.resolutionCriteria !== outcome.winCondition;
+                                return (
+                                  <li key={index} className="market-card__outcome">
+                                    <div className="market-card__outcome-line">
+                                      <span className="market-card__outcome-name">{outcome.name}:</span>{' '}
+                                      <span className="market-card__outcome-win">
+                                        {outcome.winCondition || t('final.seeResolution')}
+                                      </span>
+                                    </div>
+                                    {showVerify && (
+                                      <div className="market-card__verify">
+                                        <span className="market-card__verify-label">{t('final.verify')}</span>{' '}
+                                        {outcome.resolutionCriteria}
+                                      </div>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        )}
+
+                        {(finalMarketCard.settlementBullets.length > 0 || finalMarketCard.hiddenSettlementCount > 0) && (
+                          <div className="market-card__section">
+                            <h3 className="market-card__heading">{t('final.settlement')}</h3>
+                            <ul className="market-card__bullets">
+                              {finalMarketCard.settlementBullets.map((bullet, index) => (
+                                <li key={index}>{bullet}</li>
+                              ))}
+                              {finalMarketCard.hiddenSettlementCount > 0 && (
+                                <li className="market-card__bullets-more">
+                                  {t('final.moreInFullSpec', { n: finalMarketCard.hiddenSettlementCount })}
+                                </li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+
+                        {(finalMarketCard.edgeCaseBullets.length > 0 || finalMarketCard.hiddenEdgeCaseCount > 0) && (
+                          <div className="market-card__section">
+                            <h3 className="market-card__heading">{t('final.edgeCases')}</h3>
+                            <ul className="market-card__bullets">
+                              {finalMarketCard.edgeCaseBullets.map((bullet, index) => (
+                                <li key={index}>{bullet}</li>
+                              ))}
+                              {finalMarketCard.hiddenEdgeCaseCount > 0 && (
+                                <li className="market-card__bullets-more">
+                                  {t('final.moreInFullSpec', { n: finalMarketCard.hiddenEdgeCaseCount })}
+                                </li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+
+                        {finalMarketCard.risk && (finalMarketCard.risk.summary || finalMarketCard.risk.level) && (
+                          <div className={`market-card__risk market-card__risk--${finalMarketCard.risk.level || 'unknown'}`}>
+                            <span className="market-card__risk-label">{t('final.riskShort')}</span>
+                            {finalMarketCard.risk.level && finalMarketCard.risk.level !== 'unknown' && (
+                              <span className={`risk-gate__level risk-gate__level--${finalMarketCard.risk.level}`}>
+                                {finalMarketCard.risk.level === 'high'
+                                  ? t('gate.high')
+                                  : finalMarketCard.risk.level === 'medium'
+                                    ? t('gate.medium')
+                                    : finalMarketCard.risk.level === 'low'
+                                      ? t('gate.low')
+                                      : finalMarketCard.risk.level.toUpperCase()}
+                              </span>
+                            )}
+                            {finalMarketCard.risk.summary && (
+                              <span className="market-card__risk-summary">{finalMarketCard.risk.summary}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <details className="final-doc__details stagger-item" style={{ '--stagger': 2 }}>
+                        <summary>{t('final.showFullSpec')}</summary>
+                        <div className="final-doc__details-body">
+                          {resolutionDescriptionMarkdown && (
+                            <div className="final-doc__section final-doc__section--description">
+                              <div className="final-doc__section-header">
+                                <h3 className="final-doc__heading">{t('final.dashboardDescription')}</h3>
+                                <button
+                                  className={`copy-btn ${copiedId === 'description-markdown' ? 'copy-btn--copied' : ''}`}
+                                  onClick={() => handleCopy(resolutionDescriptionMarkdown, 'description-markdown')}
+                                >
+                                  {copiedId === 'description-markdown' ? t('common.copied') : t('common.copy')}
+                                </button>
+                              </div>
+                              <div className="final-doc__text final-doc__text--markdown">
+                                {renderContent(resolutionDescriptionMarkdown)}
+                              </div>
+                            </div>
+                          )}
+
+                          {finalContent.fullResolutionRules && (
+                            <div className="final-doc__section">
+                              <div className="final-doc__section-header">
+                                <h3 className="final-doc__heading">{t('final.resolutionRules')}</h3>
+                                <button
+                                  className={`copy-btn ${copiedId === 'rules' ? 'copy-btn--copied' : ''}`}
+                                  onClick={() => handleCopy(finalContent.fullResolutionRules, 'rules')}
+                                >
+                                  {copiedId === 'rules' ? t('common.copied') : t('common.copy')}
+                                </button>
+                              </div>
+                              <div className="final-doc__text">
+                                {renderContent(finalContent.fullResolutionRules)}
+                              </div>
+                            </div>
+                          )}
+
+                          {finalContent.edgeCases && (
+                            <div className="final-doc__section">
+                              <div className="final-doc__section-header">
+                                <h3 className="final-doc__heading">{t('final.edgeCases')}</h3>
+                                <button
+                                  className={`copy-btn ${copiedId === 'edge-cases' ? 'copy-btn--copied' : ''}`}
+                                  onClick={() => handleCopy(finalContent.edgeCases, 'edge-cases')}
+                                >
+                                  {copiedId === 'edge-cases' ? t('common.copied') : t('common.copy')}
+                                </button>
+                              </div>
+                              <div className="final-doc__text">
+                                {renderContent(finalContent.edgeCases)}
+                              </div>
+                            </div>
+                          )}
+
+                          {earlyResolutionRisk && (
+                            <div className="final-doc__section">
+                              <div className="final-doc__section-header">
+                                <h3 className="final-doc__heading">
+                                  {t('final.earlyResolutionRisk')}
+                                  {earlyResolutionRiskLevel && earlyResolutionRiskLevel !== 'unknown' && (
+                                    <span className={`risk-gate__level risk-gate__level--${earlyResolutionRiskLevel}`} style={{ marginLeft: '0.5rem' }}>
+                                      {earlyResolutionRiskLevel === 'high'
+                                        ? t('gate.high')
+                                        : earlyResolutionRiskLevel === 'medium'
+                                          ? t('gate.medium')
+                                          : earlyResolutionRiskLevel === 'low'
+                                            ? t('gate.low')
+                                            : earlyResolutionRiskLevel.toUpperCase()}
+                                    </span>
+                                  )}
+                                </h3>
+                                <button
+                                  className={`copy-btn ${copiedId === 'early-risk' ? 'copy-btn--copied' : ''}`}
+                                  onClick={() => handleCopy(earlyResolutionRisk, 'early-risk')}
+                                >
+                                  {copiedId === 'early-risk' ? t('common.copied') : t('common.copy')}
+                                </button>
+                              </div>
+                              <div className="final-doc__text final-doc__text--risk">
+                                {renderContent(earlyResolutionRisk)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </details>
                     </div>
                   ) : (
                     <div className="final-doc">
