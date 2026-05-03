@@ -27,9 +27,9 @@ export function normalizeUtcDateTime(value, fallbackTime = '00:00:00') {
   return '';
 }
 
-export function toDateTimeLocalValue(value, fallbackTime = '00:00:00') {
+export function toDateInputValue(value, fallbackTime = '00:00:00') {
   const iso = normalizeUtcDateTime(value, fallbackTime);
-  return iso ? iso.slice(0, 16) : '';
+  return iso ? iso.slice(0, 10) : '';
 }
 
 // Validation errors are returned as stable codes (not English strings) so
@@ -50,7 +50,7 @@ export function validateDraftInputs(input, now = Date.now()) {
   const startRaw = typeof input?.startDate === 'string' ? input.startDate.trim() : '';
   const endRaw = typeof input?.endDate === 'string' ? input.endDate.trim() : '';
   const startDateUTC = normalizeUtcDateTime(startRaw, '00:00:00');
-  const endDateUTC = normalizeUtcDateTime(endRaw, '23:59:59');
+  const endDateUTC = normalizeUtcDateTime(endRaw, '00:00:00');
   const errors = {};
 
   if (!question) {

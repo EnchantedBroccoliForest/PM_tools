@@ -1,22 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
   normalizeUtcDateTime,
-  toDateTimeLocalValue,
+  toDateInputValue,
   validateDatePair,
   validateDraftInputs,
   VALIDATION_ERRORS,
 } from './draftInput.js';
 
 describe('draft input datetime helpers', () => {
-  it('normalizes datetime-local values as UTC timestamps', () => {
+  it('normalizes date-only values to midnight UTC', () => {
+    expect(normalizeUtcDateTime('2026-06-01')).toBe('2026-06-01T00:00:00Z');
+  });
+
+  it('still accepts legacy datetime-local values', () => {
     expect(normalizeUtcDateTime('2026-06-01T09:30')).toBe('2026-06-01T09:30:00Z');
   });
 
-  it('keeps imported UTC timestamps displayable in datetime-local inputs', () => {
-    expect(toDateTimeLocalValue('2026-06-01T09:30:00Z')).toBe('2026-06-01T09:30');
+  it('renders imported UTC timestamps as date-only input values', () => {
+    expect(toDateInputValue('2026-06-01T09:30:00Z')).toBe('2026-06-01');
   });
 
-  it('preserves backward-compatible date-only values with fallback times', () => {
+  it('honors an explicit fallback time when provided', () => {
     expect(normalizeUtcDateTime('2026-06-01', '23:59:59')).toBe('2026-06-01T23:59:59Z');
   });
 });

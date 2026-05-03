@@ -42,8 +42,8 @@ const EN = {
   // Draft form
   'form.question': '42.space Market Question',
   'form.questionPlaceholder': 'e.g., Which artist tops the Billboard Hot 100 year-end chart 2026?',
-  'form.startDate': 'Start Date & Time',
-  'form.endDate': 'End Date & Time',
+  'form.startDate': 'Start Date',
+  'form.endDate': 'End Date',
   'form.utc': '(UTC)',
   'form.optional': '(optional)',
   'form.references': 'References',
@@ -306,12 +306,12 @@ const EN = {
 
   // Validation (codes returned by util/draftInput.js)
   'validation.question.required': 'Market question is required.',
-  'validation.startDate.required': 'Start date and time is required.',
-  'validation.startDate.invalid': 'Enter a valid UTC start date and time.',
-  'validation.startDate.past': 'Start date and time must be in the future.',
-  'validation.endDate.required': 'End date and time is required.',
-  'validation.endDate.invalid': 'Enter a valid UTC end date and time.',
-  'validation.endDate.beforeStart': 'End date and time must be later than Start.',
+  'validation.startDate.required': 'Start date is required.',
+  'validation.startDate.invalid': 'Enter a valid UTC start date.',
+  'validation.startDate.past': 'Start date must be in the future.',
+  'validation.endDate.required': 'End date is required.',
+  'validation.endDate.invalid': 'Enter a valid UTC end date.',
+  'validation.endDate.beforeStart': 'End date must be later than Start.',
 
   // Run-trace log fallbacks. Most log content is dynamic (raw model errors,
   // counts, stage diagnostics) and stays in its source language; these are
@@ -373,8 +373,8 @@ const ZH = {
   // Draft form
   'form.question': '42.space 市场问题',
   'form.questionPlaceholder': '例如:2026 年告示牌百强年终榜冠军是哪位艺人?',
-  'form.startDate': '开始日期与时间',
-  'form.endDate': '结束日期与时间',
+  'form.startDate': '开始日期',
+  'form.endDate': '结束日期',
   'form.utc': '(UTC)',
   'form.optional': '(可选)',
   'form.references': '参考资料',
@@ -639,12 +639,12 @@ const ZH = {
 
   // Validation (codes returned by util/draftInput.js)
   'validation.question.required': '请填写市场问题。',
-  'validation.startDate.required': '请填写开始日期与时间。',
-  'validation.startDate.invalid': '请输入有效的 UTC 开始日期与时间。',
-  'validation.startDate.past': '开始日期与时间必须在未来。',
-  'validation.endDate.required': '请填写结束日期与时间。',
-  'validation.endDate.invalid': '请输入有效的 UTC 结束日期与时间。',
-  'validation.endDate.beforeStart': '结束日期与时间必须晚于开始时间。',
+  'validation.startDate.required': '请填写开始日期。',
+  'validation.startDate.invalid': '请输入有效的 UTC 开始日期。',
+  'validation.startDate.past': '开始日期必须在未来。',
+  'validation.endDate.required': '请填写结束日期。',
+  'validation.endDate.invalid': '请输入有效的 UTC 结束日期。',
+  'validation.endDate.beforeStart': '结束日期必须晚于开始日期。',
 
   // Run-trace log fallbacks. Most log content is dynamic (raw model errors,
   // counts, stage diagnostics) and stays in its source language; these are

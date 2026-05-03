@@ -33,7 +33,7 @@ import { DRAFT_MAX_TOKENS } from './defaults';
 import { parseRiskLevel } from './util/riskLevel';
 import {
   normalizeUtcDateTime,
-  toDateTimeLocalValue,
+  toDateInputValue,
   validateDatePair,
   validateDraftInputs,
 } from './util/draftInput';
@@ -977,7 +977,7 @@ function App() {
           content: buildEarlyResolutionPrompt(
             updatedDraft,
             normalizeUtcDateTime(startDate, '00:00:00'),
-            normalizeUtcDateTime(endDate, '23:59:59'),
+            normalizeUtcDateTime(endDate, '00:00:00'),
             runRigor,
           ),
         },
@@ -1069,7 +1069,7 @@ function App() {
             content: buildFinalizePrompt(
               draftContent,
               normalizeUtcDateTime(startDate, '00:00:00'),
-              normalizeUtcDateTime(endDate, '23:59:59'),
+              normalizeUtcDateTime(endDate, '00:00:00'),
               numberOfOutcomes,
               runRigor,
             ),
@@ -1146,7 +1146,7 @@ function App() {
       input: {
         question,
         startDate: normalizeUtcDateTime(startDate, '00:00:00'),
-        endDate: normalizeUtcDateTime(endDate, '23:59:59'),
+        endDate: normalizeUtcDateTime(endDate, '00:00:00'),
         references,
         numberOfOutcomes,
         rigor,
@@ -1360,9 +1360,8 @@ function App() {
                     </label>
                     <input
                       id="startDate"
-                      type="datetime-local"
-                      step="60"
-                      value={toDateTimeLocalValue(startDate, '00:00:00')}
+                      type="date"
+                      value={toDateInputValue(startDate, '00:00:00')}
                       onChange={(e) => handleDateChange('startDate', e.target.value)}
                       onBlur={() => dispatch({ type: 'TOUCH_FIELD', field: 'startDate' })}
                       className={inputClassName('startDate')}
@@ -1392,9 +1391,8 @@ function App() {
                     </label>
                     <input
                       id="endDate"
-                      type="datetime-local"
-                      step="60"
-                      value={toDateTimeLocalValue(endDate, '23:59:59')}
+                      type="date"
+                      value={toDateInputValue(endDate, '00:00:00')}
                       onChange={(e) => handleDateChange('endDate', e.target.value)}
                       onBlur={() => dispatch({ type: 'TOUCH_FIELD', field: 'endDate' })}
                       className={inputClassName('endDate')}
@@ -1411,7 +1409,7 @@ function App() {
                     />
                     {endDate && (
                       <p id="endDate-hint" className="utc-hint">
-                        {formatUTCDateHint(endDate, '23:59:59')}
+                        {formatUTCDateHint(endDate, '00:00:00')}
                       </p>
                     )}
                     {visibleFieldError('endDate') && (
