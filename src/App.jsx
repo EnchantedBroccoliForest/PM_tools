@@ -2460,6 +2460,38 @@ function App() {
                       <details className="final-doc__details stagger-item" style={{ '--stagger': 2 }}>
                         <summary>{t('final.showFullSpec')}</summary>
                         <div className="final-doc__details-body">
+                          {/* Untruncated outcomes — the market card above
+                              caps win/resolution text via buildMarketCard().
+                              Without this block long resolver criteria would
+                              be invisible despite the "full spec" label. */}
+                          {finalContent.outcomes?.length > 0 && (
+                            <div className="final-doc__section">
+                              <h3 className="final-doc__heading">
+                                {t('final.outcomes', { n: finalContent.outcomes.length })}
+                              </h3>
+                              <div className="final-doc__outcomes">
+                                {finalContent.outcomes.map((outcome, index) => (
+                                  <div key={index} className="outcome-row">
+                                    <div className="outcome-row__header">
+                                      <span className="outcome-row__number">{index + 1}</span>
+                                      <span className="outcome-row__name">{outcome.name}</span>
+                                    </div>
+                                    {outcome.winCondition && (
+                                      <div className="outcome-row__win">
+                                        <strong>{t('final.winsIf')}</strong> {outcome.winCondition}
+                                      </div>
+                                    )}
+                                    {outcome.resolutionCriteria && (
+                                      <div className="outcome-row__criteria">
+                                        <strong>{t('final.resolvedBy')}</strong> {outcome.resolutionCriteria}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           {resolutionDescriptionMarkdown && (
                             <div className="final-doc__section final-doc__section--description">
                               <div className="final-doc__section-header">
