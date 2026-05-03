@@ -43,6 +43,8 @@ import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
 import AmbientModeToggle from './components/AmbientModeToggle';
+import LanguageToggle from './components/LanguageToggle';
+import { useLanguage } from './hooks/useLanguage';
 
 /** Lightweight markdown-ish rendering: **bold**, bullet lists, numbered lists */
 function renderContent(text) {
@@ -99,15 +101,15 @@ function renderContent(text) {
   return elements;
 }
 
-function formatRelativeTime(timestamp) {
+function formatRelativeTime(timestamp, t) {
   if (!timestamp) return '';
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 10) return 'just now';
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 10) return t('common.justNow');
+  if (seconds < 60) return t('common.secondsAgo', { n: seconds });
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t('common.minutesAgo', { n: minutes });
   const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
+  return t('common.hoursAgo', { n: hours });
 }
 
 function formatInline(text) {
@@ -188,7 +190,7 @@ function SourceUrlLink({ url }) {
 // each, so we split on top-level numbered starts and best-effort extract the
 // title from each block. The trailing "themes / follow-up" note (if any) is
 // captured as a postamble so it isn't absorbed into the last idea.
-function parseIdeateContent(rawText) {
+function parseIdeateContent(rawText, t) {
   if (!rawText || typeof rawText !== 'string') {
     return { preamble: '', ideas: [], postamble: '' };
   }
@@ -243,7 +245,7 @@ function parseIdeateContent(rawText) {
 
   const parsedIdeas = ideas.map((idea) => {
     const rawText = idea.lines.join('\n');
-    const { title, rest } = extractIdeaTitleAndRest(rawText, idea.number);
+    const { title, rest } = extractIdeaTitleAndRest(rawText, idea.number, t);
     return {
       number: idea.number,
       rawText,
@@ -261,7 +263,7 @@ function parseIdeateContent(rawText) {
 
 // Extract a clean title string and the "rest" of the idea body (everything
 // except the title line), for populating Draft Market's Reference field.
-function extractIdeaTitleAndRest(ideaText, number) {
+function extractIdeaTitleAndRest(ideaText, number, t) {
   const lines = ideaText.split('\n');
 
   // Strategy 1: find an explicit "**Title**" label anywhere in the idea.
@@ -311,7 +313,7 @@ function extractIdeaTitleAndRest(ideaText, number) {
     rest = ideaText.replace(/^\s*\d+[.)]\s*/, '');
   }
 
-  return { title: title || `Idea ${number}`, rest: rest.trim() };
+  return { title: title || t('ideas.fallbackTitle', { n: number }), rest: rest.trim() };
 }
 
 // Build the text that goes into the Draft Market "References" field when an
@@ -338,44 +340,50 @@ function reviewConfigsEqual(a, b) {
   return aModels.every((model, index) => model === bModels[index]);
 }
 
-function toSimpleRoutingReason(reason) {
+function toSimpleRoutingReason(reason, t) {
   if (!reason) return '';
-  if (reason === 'verification hard_fail') return 'Failed a verification check';
-  if (reason === 'verification soft_fail') return 'Flagged as a potential issue during verification';
-  if (reason === 'draft contradicts claim') return 'The draft contradicts this claim';
-  if (reason === 'not covered by draft') return 'Not clearly addressed in the draft';
-  if (reason === 'cited URL did not resolve') return 'A linked source could not be reached';
-  if (reason === 'run has a global blocker criticism') return 'A reviewer flagged a market-wide issue';
+  if (reason === 'verification hard_fail') return t('routingReason.verificationHard');
+  if (reason === 'verification soft_fail') return t('routingReason.verificationSoft');
+  if (reason === 'draft contradicts claim') return t('routingReason.draftContradicts');
+  if (reason === 'not covered by draft') return t('routingReason.notCovered');
+  if (reason === 'cited URL did not resolve') return t('routingReason.urlUnreachable');
+  if (reason === 'run has a global blocker criticism') return t('routingReason.globalBlocker');
   const blockerMatch = reason.match(/^(\d+)\s+blocker criticism\(s\)$/);
-  if (blockerMatch) return `Reviewers raised ${blockerMatch[1]} blocking concern${blockerMatch[1] === '1' ? '' : 's'}`;
+  if (blockerMatch) {
+    const n = blockerMatch[1];
+    return t(n === '1' ? 'routingReason.blockerCount' : 'routingReason.blockerCountPlural', { n });
+  }
   const majorMatch = reason.match(/^(\d+)\s+major criticism\(s\)$/);
-  if (majorMatch) return `Reviewers raised ${majorMatch[1]} major concern${majorMatch[1] === '1' ? '' : 's'}`;
+  if (majorMatch) {
+    const n = majorMatch[1];
+    return t(n === '1' ? 'routingReason.majorCount' : 'routingReason.majorCountPlural', { n });
+  }
   return reason;
 }
 
-function humanReadableClaimCategory(claimId) {
+function humanReadableClaimCategory(claimId, t) {
   if (!claimId) return '';
-  if (claimId.startsWith('claim.source')) return 'Resolution source';
-  if (claimId.startsWith('claim.threshold')) return 'Resolution rule';
-  if (claimId.startsWith('claim.mece')) return 'Outcome coverage';
-  if (claimId.startsWith('claim.edge')) return 'Edge case';
-  if (claimId.startsWith('claim.timing')) return 'Timing / deadline';
-  if (claimId.startsWith('claim.oracle')) return 'Oracle / data source';
-  return 'Claim';
+  if (claimId.startsWith('claim.source')) return t('claimCategory.resolutionSource');
+  if (claimId.startsWith('claim.threshold')) return t('claimCategory.resolutionRule');
+  if (claimId.startsWith('claim.mece')) return t('claimCategory.outcomeCoverage');
+  if (claimId.startsWith('claim.edge')) return t('claimCategory.edgeCase');
+  if (claimId.startsWith('claim.timing')) return t('claimCategory.timing');
+  if (claimId.startsWith('claim.oracle')) return t('claimCategory.oracle');
+  return t('claimCategory.claim');
 }
 
-function getSimpleBlockReasons(currentRun) {
+function getSimpleBlockReasons(currentRun, t) {
   const reasons = new Set();
   const routingItems = currentRun?.routing?.items || [];
   for (const item of routingItems) {
     if (item.severity !== 'blocking') continue;
     for (const reason of item.reasons || []) {
-      reasons.add(toSimpleRoutingReason(reason));
+      reasons.add(toSimpleRoutingReason(reason, t));
     }
   }
 
   if ((currentRun?.criticisms || []).some((c) => c.claimId === GLOBAL_CLAIM_ID && c.severity === 'blocker')) {
-    reasons.add('a blocker applies to the whole run');
+    reasons.add(t('routingReason.runBlocker'));
   }
   return Array.from(reasons);
 }
@@ -383,6 +391,7 @@ function getSimpleBlockReasons(currentRun) {
 function App() {
   const [state, dispatch] = useMarketReducer();
   const { mode: ambientMode, setMode: setAmbientMode, config: ambientConfig } = useAmbientMode();
+  const { t } = useLanguage();
   // Kicks off the initial OpenRouter model fetch + periodic refresh and
   // re-renders the app when the model list changes, so getModelName/abbrev
   // reflect the freshly fetched list.
@@ -485,11 +494,15 @@ function App() {
     hasReviews && !reviewConfigsEqual(currentReviewConfig, lastReviewConfig);
   const reviewAlreadyCurrent = hasReviews && !reviewConfigChanged;
   const updateDraftReady = hasReviews && !reviewConfigChanged;
-  const baseReviewActionLabel = reviewModels.length > 1 ? 'Review & Deliberate' : 'Review';
+  const baseReviewActionLabel = reviewModels.length > 1
+    ? t('toolbar.reviewAndDeliberate')
+    : t('toolbar.review');
   const reviewActionLabel = reviewConfigChanged
-    ? `Re-run ${baseReviewActionLabel}`
+    ? t('toolbar.rerun', { action: baseReviewActionLabel })
     : baseReviewActionLabel;
-  const reviewLoadingLabel = reviewModels.length > 1 ? 'Deliberating...' : 'Reviewing...';
+  const reviewLoadingLabel = reviewModels.length > 1
+    ? t('toolbar.deliberating')
+    : t('toolbar.reviewing');
   const draftValidation = validateDraftInputs({ question, startDate, endDate });
   const draftFieldErrors = draftValidation.errors;
   const visibleFieldError = (field) =>
@@ -527,7 +540,7 @@ function App() {
       dispatch({ type: 'SET_COPIED', id });
       setTimeout(() => dispatch({ type: 'SET_COPIED', id: null }), 2000);
     }).catch(() => {
-      dispatch({ type: 'SET_ERROR', error: 'Failed to copy to clipboard' });
+      dispatch({ type: 'SET_ERROR', error: t('error.copy') });
     });
   };
 
@@ -717,7 +730,7 @@ function App() {
         });
       });
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate draft' });
+      dispatch({ type: 'SET_ERROR', error: err.message || t('error.draft') });
       dispatch({ type: 'RUN_LOG', stage: 'draft', level: 'error', message: err.message || 'Draft failed' });
     }
   };
@@ -782,7 +795,7 @@ function App() {
 
       const successful = structuredResults.filter((r) => r.reviewProse !== null);
       if (successful.length === 0) {
-        throw new Error('All reviewers failed. Please try again.');
+        throw new Error(t('error.allReviewersFailed'));
       }
 
       // Shape successful structured reviews into the legacy `reviews[]`
@@ -873,7 +886,7 @@ function App() {
       });
       dispatch({ type: 'RUN_SET_ROUTING', routing });
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate review' });
+      dispatch({ type: 'SET_ERROR', error: err.message || t('error.review') });
       dispatch({ type: 'RUN_LOG', stage: 'review', level: 'error', message: err.message || 'Review failed' });
     }
   };
@@ -930,7 +943,7 @@ function App() {
         });
       });
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to update draft' });
+      dispatch({ type: 'SET_ERROR', error: err.message || t('error.update') });
       dispatch({ type: 'RUN_LOG', stage: 'update', level: 'error', message: err.message || 'Update failed' });
       return;
     }
@@ -959,7 +972,7 @@ function App() {
     } catch (riskErr) {
       dispatch({
         type: 'EARLY_RESOLUTION_ERROR',
-        error: riskErr.message || 'Failed to analyze early resolution risk',
+        error: riskErr.message || t('error.earlyResolution'),
       });
       dispatch({
         type: 'RUN_LOG',
@@ -1003,7 +1016,7 @@ function App() {
     } catch (srcErr) {
       dispatch({
         type: 'SOURCE_ACCESSIBILITY_ERROR',
-        error: srcErr.message || 'Failed to check source accessibility',
+        error: srcErr.message || t('error.sourceAccessibility'),
       });
       dispatch({
         type: 'RUN_LOG',
@@ -1098,7 +1111,7 @@ function App() {
       dispatch({ type: 'FINALIZE_SUCCESS', content: finalContent });
       dispatch({ type: 'RUN_SET_FINAL', finalJson: finalContent });
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to finalize market' });
+      dispatch({ type: 'SET_ERROR', error: err.message || t('error.finalize') });
       dispatch({ type: 'RUN_LOG', stage: 'accept', level: 'error', message: err.message || 'Finalize failed' });
     }
   };
@@ -1146,7 +1159,7 @@ function App() {
       ]);
       dispatch({ type: 'IDEATE_SUCCESS', content: result.content });
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: err.message || 'Failed to generate market ideas' });
+      dispatch({ type: 'SET_ERROR', error: err.message || t('error.ideate') });
     }
   };
 
@@ -1181,7 +1194,7 @@ function App() {
       URL.revokeObjectURL(url);
       dispatch({ type: 'RUN_EXPORT' });
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: `Failed to export run: ${err.message || err}` });
+      dispatch({ type: 'SET_ERROR', error: t('error.exportRun', { message: err.message || err }) });
     }
   };
 
@@ -1200,16 +1213,16 @@ function App() {
         const raw = JSON.parse(reader.result);
         const run = parseRun(raw);
         if (!run) {
-          dispatch({ type: 'SET_ERROR', error: 'Import failed: file is not a valid Run JSON.' });
+          dispatch({ type: 'SET_ERROR', error: t('error.importInvalid') });
           return;
         }
         dispatch({ type: 'RUN_IMPORT', run });
       } catch (err) {
-        dispatch({ type: 'SET_ERROR', error: `Import failed: ${err.message || err}` });
+        dispatch({ type: 'SET_ERROR', error: t('error.importGeneric', { message: err.message || err }) });
       }
     };
     reader.onerror = () => {
-      dispatch({ type: 'SET_ERROR', error: 'Failed to read import file.' });
+      dispatch({ type: 'SET_ERROR', error: t('error.readImport') });
     };
     reader.readAsText(file);
   };
@@ -1218,6 +1231,7 @@ function App() {
 
   return (
     <div className={`App ${ambientConfig.classes.join(' ')}`}>
+      <LanguageToggle />
       <AmbientModeToggle mode={ambientMode} setMode={setAmbientMode} />
       <div className="container">
 
@@ -1229,29 +1243,29 @@ function App() {
                 rigor onto the Run artifact (see RUN_START dispatches) so a
                 late toggle cannot leak into an in-flight pipeline. */}
             <div className="header__rigor">
-              <span className="rigor-toggle__label">Output style</span>
+              <span className="rigor-toggle__label">{t('header.outputStyle')}</span>
               <div className="rigor-toggle rigor-toggle--header mode-toggle">
                 <button
                   type="button"
                   className={`mode-toggle__btn rigor-toggle__btn rigor-toggle__btn--machine ${rigor === 'machine' ? 'mode-toggle__btn--active' : ''}`}
                   onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'machine' })}
                   disabled={anyLoading || !!draftContent}
-                  data-tooltip="Long-form, highly rigorous output for agents."
-                  aria-label="Machine mode: long-form, highly rigorous output for agents"
+                  data-tooltip={t('header.machineModeTooltip')}
+                  aria-label={t('header.machineModeAria')}
                 >
                   <span className="rigor-toggle__icon" aria-hidden="true">🤖</span>
-                  Machine Mode
+                  {t('header.machineMode')}
                 </button>
                 <button
                   type="button"
                   className={`mode-toggle__btn rigor-toggle__btn rigor-toggle__btn--human ${rigor === 'human' ? 'mode-toggle__btn--active' : ''}`}
                   onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'human' })}
                   disabled={anyLoading || !!draftContent}
-                  data-tooltip="Concise, human-readable output."
-                  aria-label="Human mode: concise, human-readable output"
+                  data-tooltip={t('header.humanModeTooltip')}
+                  aria-label={t('header.humanModeAria')}
                 >
                   <span className="rigor-toggle__icon" aria-hidden="true">🧑</span>
-                  Human Mode
+                  {t('header.humanMode')}
                 </button>
               </div>
             </div>
@@ -1270,7 +1284,7 @@ function App() {
             <div className="panel-header">
               <div className={`step ${currentStep >= 1 ? 'step--active' : ''} ${currentStep > 1 ? 'step--done' : ''}`}>
                 <div className="step__number">{currentStep > 1 ? <svg className="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : '1'}</div>
-                <div className="step__label">Setup</div>
+                <div className="step__label">{t('step.setup')}</div>
               </div>
             </div>
             <div className="panel-body">
@@ -1283,7 +1297,7 @@ function App() {
                   disabled={anyLoading}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.74V17h8v-2.26A7 7 0 0 0 12 2z" /></svg>
-                  Ideating
+                  {t('mode.ideating')}
                 </button>
                 <button
                   type="button"
@@ -1292,7 +1306,7 @@ function App() {
                   disabled={anyLoading}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-                  Draft Market
+                  {t('mode.draftMarket')}
                 </button>
               </div>
 
@@ -1300,7 +1314,7 @@ function App() {
               <div className="market-form">
                 <div className="form-group">
                   <label htmlFor="question">
-                    42.space Market Question <span className="required-marker" aria-hidden="true">*</span>
+                    {t('form.question')} <span className="required-marker" aria-hidden="true">*</span>
                   </label>
                   <input
                     id="question"
@@ -1308,7 +1322,7 @@ function App() {
                     value={question}
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'question', value: e.target.value })}
                     onBlur={() => dispatch({ type: 'TOUCH_FIELD', field: 'question' })}
-                    placeholder="e.g., Which artist tops the Billboard Hot 100 year-end chart 2026?"
+                    placeholder={t('form.questionPlaceholder')}
                     className={inputClassName('question')}
                     disabled={loading === 'draft'}
                     required
@@ -1323,7 +1337,7 @@ function App() {
                 <div className="form-row">
                   <div className="form-group">
                     <label htmlFor="startDate">
-                      Start Date &amp; Time <span className="label-hint">(UTC)</span> <span className="required-marker" aria-hidden="true">*</span>
+                      {t('form.startDate')} <span className="label-hint">{t('form.utc')}</span> <span className="required-marker" aria-hidden="true">*</span>
                     </label>
                     <input
                       id="startDate"
@@ -1355,7 +1369,7 @@ function App() {
                   </div>
                   <div className="form-group">
                     <label htmlFor="endDate">
-                      End Date &amp; Time <span className="label-hint">(UTC)</span> <span className="required-marker" aria-hidden="true">*</span>
+                      {t('form.endDate')} <span className="label-hint">{t('form.utc')}</span> <span className="required-marker" aria-hidden="true">*</span>
                     </label>
                     <input
                       id="endDate"
@@ -1389,13 +1403,13 @@ function App() {
 
                 <div className="form-group">
                   <label htmlFor="references">
-                    References <span className="label-hint">(optional)</span>
+                    {t('form.references')} <span className="label-hint">{t('form.optional')}</span>
                   </label>
                   <textarea
                     id="references"
                     value={references}
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'references', value: e.target.value })}
-                    placeholder="Paste links or notes for the AI to reference, one per line..."
+                    placeholder={t('form.referencesPlaceholder')}
                     className="input textarea"
                     disabled={loading === 'draft'}
                   />
@@ -1403,7 +1417,7 @@ function App() {
 
                 <div className="form-group">
                   <label htmlFor="numberOfOutcomes">
-                    Number of Outcomes <span className="label-hint">(optional)</span>
+                    {t('form.numberOfOutcomes')} <span className="label-hint">{t('form.optional')}</span>
                   </label>
                   <input
                     id="numberOfOutcomes"
@@ -1412,14 +1426,14 @@ function App() {
                     step="1"
                     value={numberOfOutcomes}
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'numberOfOutcomes', value: e.target.value })}
-                    placeholder="Leave blank to let the drafter choose"
+                    placeholder={t('form.numberOfOutcomesPlaceholder')}
                     className="input"
                     disabled={loading === 'draft'}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="model">Drafting Model</label>
+                  <label htmlFor="model">{t('form.draftingModel')}</label>
                   <ModelSelect
                     id="model"
                     value={selectedModel}
@@ -1432,8 +1446,9 @@ function App() {
                 <ErrorMessage
                   message={dateError}
                   onDismiss={() => dispatch({ type: 'SET_DATE', field: 'startDate', value: startDate, dateError: null })}
+                  dismissLabel={t('common.dismiss')}
                 />
-                <ErrorMessage message={error} onDismiss={handleDismissError} />
+                <ErrorMessage message={error} onDismiss={handleDismissError} dismissLabel={t('common.dismiss')} />
 
                 <button
                   type="button"
@@ -1444,12 +1459,12 @@ function App() {
                   {loading === 'draft' ? (
                     <>
                       <span className="spinner" />
-                      Drafting...
+                      {t('form.drafting')}
                     </>
                   ) : (
                     <>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-                      Draft Market
+                      {t('form.draftMarket')}
                     </>
                   )}
                 </button>
@@ -1459,17 +1474,17 @@ function App() {
               {mode === 'review' && (
               <div className="market-form">
                 <div className="form-group">
-                  <label htmlFor="pastedDraft">Paste Existing Draft</label>
+                  <label htmlFor="pastedDraft">{t('form.pasteExistingDraft')}</label>
                   <textarea
                     id="pastedDraft"
                     value={pastedDraft}
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'pastedDraft', value: e.target.value })}
-                    placeholder="Paste your existing market draft here..."
+                    placeholder={t('form.pasteExistingDraftPlaceholder')}
                     className="input textarea textarea--tall"
                   />
                 </div>
 
-                <ErrorMessage message={error} onDismiss={handleDismissError} />
+                <ErrorMessage message={error} onDismiss={handleDismissError} dismissLabel={t('common.dismiss')} />
 
                 <button
                   type="button"
@@ -1478,7 +1493,7 @@ function App() {
                   onClick={handleSubmitPastedDraft}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                  Submit for Review
+                  {t('form.submitForReview')}
                 </button>
               </div>
               )}
@@ -1486,19 +1501,19 @@ function App() {
               {mode === 'ideating' && (
               <div className="market-form">
                 <div className="form-group">
-                  <label htmlFor="ideatingInput">Vague Direction</label>
+                  <label htmlFor="ideatingInput">{t('form.vagueDirection')}</label>
                   <textarea
                     id="ideatingInput"
                     value={ideatingInput}
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'ideatingInput', value: e.target.value })}
-                    placeholder="Describe a rough area of interest — e.g., 'esports finals season 2026', 'upcoming awards races', 'memecoin narratives'. The model will brainstorm 42.space-shaped multi-outcome market ideas."
+                    placeholder={t('form.vagueDirectionPlaceholder')}
                     className="input textarea textarea--tall"
                     disabled={loading === 'ideate'}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="ideatingModel">Ideation Model</label>
+                  <label htmlFor="ideatingModel">{t('form.ideationModel')}</label>
                   <ModelSelect
                     id="ideatingModel"
                     value={ideatingModel}
@@ -1508,7 +1523,7 @@ function App() {
                   />
                 </div>
 
-                <ErrorMessage message={error} onDismiss={handleDismissError} />
+                <ErrorMessage message={error} onDismiss={handleDismissError} dismissLabel={t('common.dismiss')} />
 
                 <button
                   type="button"
@@ -1519,12 +1534,12 @@ function App() {
                   {loading === 'ideate' ? (
                     <>
                       <span className="spinner" />
-                      Ideating...
+                      {t('form.ideating')}
                     </>
                   ) : (
                     <>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.74V17h8v-2.26A7 7 0 0 0 12 2z" /></svg>
-                      Generate Ideas
+                      {t('form.generateIdeas')}
                     </>
                   )}
                 </button>
@@ -1539,31 +1554,31 @@ function App() {
                   <Enter className="draft-output-section">
                     <div className="col-panel col-panel--draft">
                       <div className="col-panel-header">
-                        <h2>Market Ideas</h2>
+                        <h2>{t('ideas.heading')}</h2>
                         <div className="col-panel-actions">
-                          <span className="model-badge" data-tooltip={getModelName(ideatingModel)} tabIndex={0} role="img" aria-label={`Model: ${getModelName(ideatingModel)}`}>{getModelAbbrev(ideatingModel)}</span>
+                          <span className="model-badge" data-tooltip={getModelName(ideatingModel)} tabIndex={0} role="img" aria-label={t('common.modelAria', { name: getModelName(ideatingModel) })}>{getModelAbbrev(ideatingModel)}</span>
                           <button
                             type="button"
                             className="copy-btn"
                             onClick={handleIdeate}
                             disabled={!ideatingInput.trim() || loading === 'ideate'}
-                            title="Generate a fresh batch of 3 ideas"
-                            aria-label="Refresh ideas"
+                            title={t('ideas.refreshTitle')}
+                            aria-label={t('ideas.refreshAria')}
                           >
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-1px', marginRight: 4 }}><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" /><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" /></svg>
-                            Refresh
+                            {t('ideas.refresh')}
                           </button>
                           <button
                             className={`copy-btn ${copiedId === 'ideating' ? 'copy-btn--copied' : ''}`}
                             onClick={() => handleCopy(ideatingContent, 'ideating')}
                           >
-                            {copiedId === 'ideating' ? 'Copied!' : 'Copy'}
+                            {copiedId === 'ideating' ? t('common.copied') : t('common.copy')}
                           </button>
                         </div>
                       </div>
                       <div className="content-box content-box--rich">
                         {(() => {
-                          const { preamble, ideas, postamble } = parseIdeateContent(ideatingContent);
+                          const { preamble, ideas, postamble } = parseIdeateContent(ideatingContent, t);
                           if (ideas.length === 0) {
                             // Fallback: the LLM didn't number its output, so
                             // render the raw content without per-idea buttons.
@@ -1588,8 +1603,8 @@ function App() {
                                         type="button"
                                         className="ideate-idea__use-btn"
                                         onClick={() => handleUseIdeaForDraft(idea)}
-                                        title="Use this idea in Draft Market"
-                                        aria-label={`Use idea ${idea.number} in Draft Market`}
+                                        title={t('ideas.useTitle')}
+                                        aria-label={t('ideas.useAria', { n: idea.number })}
                                       >
                                         &rarr;
                                       </button>
@@ -1626,30 +1641,30 @@ function App() {
                   <div className={`col-panel col-panel--draft ${draftJustUpdated ? 'col-panel--just-updated' : ''}`}>
                     <div className="col-panel-header">
                       <div className="draft-title-group">
-                        <h2>Draft</h2>
+                        <h2>{t('draft.heading')}</h2>
                         {draftVersions.length > 0 && (
-                          <span className="version-badge" title={`Version ${viewingVersionIndex + 1} of ${draftVersions.length}`}>
+                          <span className="version-badge" title={t('draft.versionTitle', { current: viewingVersionIndex + 1, total: draftVersions.length })}>
                             v{viewingVersionIndex + 1}
                             {draftVersions.length > 1 && <span className="version-badge__total">/{draftVersions.length}</span>}
                           </span>
                         )}
                         {displayedVersion && (
                           <span className="version-timestamp">
-                            {isViewingLatest && displayedVersion.source === 'update' ? 'Updated ' : ''}
-                            {formatRelativeTime(displayedVersion.timestamp)}
+                            {isViewingLatest && displayedVersion.source === 'update' ? t('draft.updated') : ''}
+                            {formatRelativeTime(displayedVersion.timestamp, t)}
                           </span>
                         )}
                       </div>
                       <div className="col-panel-actions">
                         {draftVersions.length > 1 && (
-                          <div className="version-switcher" role="group" aria-label="Draft version history">
+                          <div className="version-switcher" role="group" aria-label={t('draft.versionHistoryAria')}>
                             <button
                               type="button"
                               className="version-switcher__btn"
                               disabled={viewingVersionIndex === 0}
                               onClick={() => dispatch({ type: 'SET_VIEWING_VERSION', index: viewingVersionIndex - 1 })}
-                              aria-label="Previous version"
-                              title="Previous version"
+                              aria-label={t('draft.previousVersion')}
+                              title={t('draft.previousVersion')}
                             >
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
                             </button>
@@ -1658,31 +1673,31 @@ function App() {
                               className="version-switcher__btn"
                               disabled={isViewingLatest}
                               onClick={() => dispatch({ type: 'SET_VIEWING_VERSION', index: viewingVersionIndex + 1 })}
-                              aria-label="Next version"
-                              title="Next version"
+                              aria-label={t('draft.nextVersion')}
+                              title={t('draft.nextVersion')}
                             >
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
                             </button>
                           </div>
                         )}
-                        <span className="model-badge" data-tooltip={getModelName(selectedModel)} tabIndex={0} role="img" aria-label={`Model: ${getModelName(selectedModel)}`}>{getModelAbbrev(selectedModel)}</span>
+                        <span className="model-badge" data-tooltip={getModelName(selectedModel)} tabIndex={0} role="img" aria-label={t('common.modelAria', { name: getModelName(selectedModel) })}>{getModelAbbrev(selectedModel)}</span>
                         <button
                           className={`copy-btn ${copiedId === 'draft' ? 'copy-btn--copied' : ''}`}
                           onClick={() => handleCopy(displayedDraftContent, 'draft')}
                         >
-                          {copiedId === 'draft' ? 'Copied!' : 'Copy'}
+                          {copiedId === 'draft' ? t('common.copied') : t('common.copy')}
                         </button>
                       </div>
                     </div>
                     {!isViewingLatest && (
                       <div className="version-banner">
-                        <span>Viewing an earlier version (v{viewingVersionIndex + 1} of {draftVersions.length})</span>
+                        <span>{t('draft.viewingEarlier', { current: viewingVersionIndex + 1, total: draftVersions.length })}</span>
                         <button
                           type="button"
                           className="version-banner__btn"
                           onClick={() => dispatch({ type: 'SET_VIEWING_VERSION', index: latestVersionIndex })}
                         >
-                          Jump to latest
+                          {t('draft.jumpToLatest')}
                         </button>
                       </div>
                     )}
@@ -1703,7 +1718,7 @@ function App() {
             <div className="panel-header">
               <div className={`step ${currentStep >= 2 ? 'step--active' : ''} ${currentStep > 2 ? 'step--done' : ''}`}>
                 <div className="step__number">{currentStep > 2 ? <svg className="step__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : '2'}</div>
-                <div className="step__label">Draft & Review</div>
+                <div className="step__label">{t('step.draftReview')}</div>
               </div>
             </div>
             <div className="panel-body">
@@ -1712,7 +1727,7 @@ function App() {
                   <div className="placeholder-icon">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
                   </div>
-                  <p>Complete setup and draft a market to continue</p>
+                  <p>{t('placeholder.draftReview')}</p>
                 </div>
               ) : (
                 <Enter className="draft-review-section">
@@ -1721,7 +1736,7 @@ function App() {
                   <div className="action-toolbar">
                     {/* Multi-reviewer selector */}
                     <div className="toolbar-group">
-                      <label>Review Council</label>
+                      <label>{t('toolbar.reviewCouncil')}</label>
                       <div className="review-models-list">
                         {reviewModels.map((modelId, idx) => (
                           <div key={idx} className="review-model-row">
@@ -1740,7 +1755,7 @@ function App() {
                                 className="remove-reviewer-btn"
                                 onClick={() => dispatch({ type: 'REMOVE_REVIEW_MODEL', index: idx })}
                                 disabled={anyLoading}
-                                title="Remove reviewer"
+                                title={t('toolbar.removeReviewer')}
                               >
                                 &times;
                               </button>
@@ -1754,14 +1769,14 @@ function App() {
                             onClick={() => dispatch({ type: 'ADD_REVIEW_MODEL' })}
                             disabled={anyLoading}
                           >
-                            + Add Reviewer
+                            {t('toolbar.addReviewer')}
                           </button>
                         )}
                       </div>
                       <span className="toolbar-hint">
                         {reviewModels.length > 1
-                          ? 'Multiple reviewers will deliberate to produce a stronger critique'
-                          : 'Deliberation needs at least two reviewers; add another model to compare'}
+                          ? t('toolbar.councilHintMulti')
+                          : t('toolbar.councilHintSingle')}
                       </span>
                     </div>
 
@@ -1771,7 +1786,7 @@ function App() {
                         per-item rubric votes are rolled up into the final
                         aggregation decision. */}
                     <div className="toolbar-group">
-                      <label htmlFor="aggregation-protocol">Aggregation</label>
+                      <label htmlFor="aggregation-protocol">{t('toolbar.aggregation')}</label>
                       <select
                         id="aggregation-protocol"
                         className="toolbar-select"
@@ -1792,12 +1807,9 @@ function App() {
                         ))}
                       </select>
                       <span className="toolbar-hint">
-                        {aggregationProtocol === 'majority' &&
-                          'Plurality vote per rubric item; ties escalate.'}
-                        {aggregationProtocol === 'unanimity' &&
-                          'Every reviewer must agree; a single "no" fails the item.'}
-                        {aggregationProtocol === 'judge' &&
-                          'A judge model reads all votes and renders the verdict.'}
+                        {aggregationProtocol === 'majority' && t('toolbar.aggMajority')}
+                        {aggregationProtocol === 'unanimity' && t('toolbar.aggUnanimity')}
+                        {aggregationProtocol === 'judge' && t('toolbar.aggJudge')}
                       </span>
                     </div>
 
@@ -1812,7 +1824,7 @@ function App() {
                           onClick={handleReview}
                           title={
                             reviewAlreadyCurrent
-                              ? 'This review already reflects the selected council. Update the draft or change the council to review again.'
+                              ? t('toolbar.reviewAlreadyCurrent')
                               : undefined
                           }
                         >
@@ -1830,7 +1842,7 @@ function App() {
                         </button>
                         {reviewConfigChanged && (
                           <span className="toolbar-hint">
-                            Council changed; rerun review before updating.
+                            {t('toolbar.councilChanged')}
                           </span>
                         )}
                       </div>
@@ -1846,12 +1858,12 @@ function App() {
                             {loading === 'update' ? (
                               <>
                                 <span className="spinner" />
-                                Updating...
+                                {t('toolbar.updating')}
                               </>
                             ) : (
                               <>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
-                                Update Draft
+                                {t('toolbar.updateDraft')}
                               </>
                             )}
                           </button>
@@ -1867,25 +1879,25 @@ function App() {
                             onClick={handleAccept}
                             title={
                               reviewConfigChanged
-                                ? 'Rerun review with the selected council and update the draft before finalizing.'
+                                ? t('toolbar.acceptTitleConfigChanged')
                                 : needsRiskAck
-                                ? 'Acknowledge the HIGH early-resolution risk below before finalizing.'
+                                ? t('toolbar.acceptTitleNeedsRiskAck')
                                 : needsRoutingAck
-                                  ? 'Resolve or acknowledge the blocking claims flagged by the rigor pipeline before finalizing.'
+                                  ? t('toolbar.acceptTitleNeedsRoutingAck')
                                   : needsSourceAck
-                                    ? 'One or more data sources in the resolution rule are unreachable. Fix the sources and re-run Update, or acknowledge to finalize anyway.'
+                                    ? t('toolbar.acceptTitleNeedsSourceAck')
                                     : undefined
                             }
                           >
                             {loading === 'accept' ? (
                               <>
                                 <span className="spinner" />
-                                Finalizing...
+                                {t('toolbar.finalizing')}
                               </>
                             ) : (
                               <>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                Accept & Finalize
+                                {t('toolbar.acceptFinalize')}
                               </>
                             )}
                           </button>
@@ -1902,16 +1914,22 @@ function App() {
                       role={earlyResolutionRiskLevel === 'high' ? 'alert' : 'status'}
                     >
                       <div className="risk-gate__header">
-                        <span className="risk-gate__label">Early-Resolution Risk</span>
+                        <span className="risk-gate__label">{t('gate.earlyLabel')}</span>
                         {loading === 'early-resolution' ? (
                           <span className="risk-gate__level risk-gate__level--checking">
-                            <span className="spinner" /> Checking…
+                            <span className="spinner" /> {t('gate.checking')}
                           </span>
                         ) : (
                           <span className={`risk-gate__level risk-gate__level--${earlyResolutionRiskLevel}`}>
                             {earlyResolutionRiskLevel === 'unknown'
-                              ? 'Unknown'
-                              : (earlyResolutionRiskLevel || '').toUpperCase()}
+                              ? t('gate.unknown')
+                              : earlyResolutionRiskLevel === 'high'
+                                ? t('gate.high')
+                                : earlyResolutionRiskLevel === 'medium'
+                                  ? t('gate.medium')
+                                  : earlyResolutionRiskLevel === 'low'
+                                    ? t('gate.low')
+                                    : (earlyResolutionRiskLevel || '').toUpperCase()}
                           </span>
                         )}
                       </div>
@@ -1923,16 +1941,14 @@ function App() {
                       {needsRiskAck && (
                         <div className="risk-gate__actions">
                           <p className="risk-gate__warning">
-                            This market may resolve before its end date. Acknowledge the risk to unlock Finalize,
-                            or revise the draft (e.g. add an explicit early-resolution clause, shorten the window,
-                            or tighten the outcome set).
+                            {t('gate.earlyWarning')}
                           </p>
                           <button
                             type="button"
                             className="risk-gate__ack-btn"
                             onClick={() => dispatch({ type: 'ACKNOWLEDGE_EARLY_RESOLUTION' })}
                           >
-                            Acknowledge HIGH risk & unlock Finalize
+                            {t('gate.earlyAck')}
                           </button>
                         </div>
                       )}
@@ -1948,14 +1964,14 @@ function App() {
                       role={currentRun.routing.overall === 'blocked' ? 'alert' : 'status'}
                     >
                       <div className="risk-gate__header">
-                        <span className="risk-gate__label">Rigor Routing</span>
+                        <span className="risk-gate__label">{t('gate.routingLabel')}</span>
                         <span className={`risk-gate__level risk-gate__level--${currentRun.routing.overall === 'blocked' ? 'high' : 'medium'}`}>
-                          {currentRun.routing.overall === 'blocked' ? 'BLOCKED' : 'NEEDS UPDATE'}
+                          {currentRun.routing.overall === 'blocked' ? t('gate.routingBlocked') : t('gate.routingNeedsUpdate')}
                         </span>
                       </div>
                       <div className="risk-gate__body">
                         <p className="risk-gate__hint">
-                          These checks verify that the draft's claims — resolution sources, rules, edge cases — are consistent and well-supported.
+                          {t('gate.routingHint')}
                         </p>
                         {(() => {
                           const grouped = groupRoutingBySeverity(currentRun.routing);
@@ -1979,7 +1995,7 @@ function App() {
 
                           const renderCard = (item, shared) => {
                             const claim = claimsById.get(item.claimId);
-                            const category = humanReadableClaimCategory(item.claimId);
+                            const category = humanReadableClaimCategory(item.claimId, t);
                             const uniqueReasons = (item.reasons || []).filter((r) => !shared.has(r));
                             const hasText = claim && claim.text && claim.text.trim();
                             // Drop cards that add nothing specific — no claim text AND no unique reasons.
@@ -1992,13 +2008,13 @@ function App() {
                                   <span className="risk-gate__claim-text">{claim.text}</span>
                                 ) : (
                                   <span className="risk-gate__claim-text risk-gate__claim-text--faint">
-                                    <code>{item.claimId}</code> (claim text unavailable)
+                                    <code>{item.claimId}</code> {t('gate.routingClaimUnavailable')}
                                   </span>
                                 )}
                                 {uniqueReasons.length > 0 && (
                                   <ul className="risk-gate__reason-list">
                                     {uniqueReasons.map((r, i) => (
-                                      <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
+                                      <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r, t)}</li>
                                     ))}
                                   </ul>
                                 )}
@@ -2017,11 +2033,11 @@ function App() {
                             return (
                               <div className="risk-gate__shared-banner">
                                 <span className="risk-gate__shared-title">
-                                  Affecting all {total} flagged claim{total === 1 ? '' : 's'}:
+                                  {t(total === 1 ? 'gate.routingAffectingOne' : 'gate.routingAffectingMany', { n: total })}
                                 </span>
                                 <ul className="risk-gate__reason-list">
                                   {Array.from(shared).map((r, i) => (
-                                    <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r)}</li>
+                                    <li key={i} className="risk-gate__reason-item">{toSimpleRoutingReason(r, t)}</li>
                                   ))}
                                 </ul>
                               </div>
@@ -2035,14 +2051,14 @@ function App() {
                             <>
                               {grouped.blocking.length > 0 && (
                                 <>
-                                  <p className="risk-gate__subheading risk-gate__subheading--blocking">Must fix before finalizing ({grouped.blocking.length}):</p>
+                                  <p className="risk-gate__subheading risk-gate__subheading--blocking">{t('gate.routingMustFix', { n: grouped.blocking.length })}</p>
                                   {renderSharedBanner(blocking.shared, grouped.blocking.length)}
                                   {blocking.cards.length > 0 && <ul className="risk-gate__list">{blocking.cards}</ul>}
                                 </>
                               )}
                               {grouped.targeted_review.length > 0 && (
                                 <>
-                                  <p className="risk-gate__subheading risk-gate__subheading--review">Worth reviewing ({grouped.targeted_review.length}):</p>
+                                  <p className="risk-gate__subheading risk-gate__subheading--review">{t('gate.routingWorthReviewing', { n: grouped.targeted_review.length })}</p>
                                   {renderSharedBanner(targeted.shared, grouped.targeted_review.length)}
                                   {targeted.cards.length > 0 && <ul className="risk-gate__list">{targeted.cards}</ul>}
                                 </>
@@ -2053,26 +2069,25 @@ function App() {
                       </div>
                       {needsRoutingAck && (
                         <div className="risk-gate__actions">
-                          {getSimpleBlockReasons(currentRun).length > 0 && (
+                          {getSimpleBlockReasons(currentRun, t).length > 0 && (
                             <>
-                              <p className="risk-gate__subheading">Why it is blocked:</p>
+                              <p className="risk-gate__subheading">{t('gate.routingWhyBlocked')}</p>
                               <ul className="risk-gate__list">
-                                {getSimpleBlockReasons(currentRun).map((reason) => (
+                                {getSimpleBlockReasons(currentRun, t).map((reason) => (
                                   <li key={reason}>{reason}</li>
                                 ))}
                               </ul>
                             </>
                           )}
                           <p className="risk-gate__warning">
-                            The draft is blocked because one or more claims have serious issues.
-                            Re-run Review → Update to fix them, or acknowledge to finalize anyway.
+                            {t('gate.routingWarning')}
                           </p>
                           <button
                             type="button"
                             className="risk-gate__ack-btn"
                             onClick={() => dispatch({ type: 'ACKNOWLEDGE_ROUTING' })}
                           >
-                            Acknowledge blocking claims & unlock Finalize
+                            {t('gate.routingAck')}
                           </button>
                         </div>
                       )}
@@ -2086,20 +2101,20 @@ function App() {
                     const status = sourceAccessibility?.status || null;
                     const isChecking = loading === 'source-accessibility';
                     const STATUS_META = {
-                      ok:               { level: 'low',     label: 'REACHABLE' },
-                      some_unreachable: { level: 'medium',  label: 'PARTIAL' },
-                      all_unreachable:  { level: 'high',    label: 'ALL UNREACHABLE' },
-                      no_sources:       { level: 'unknown', label: 'NO SOURCES' },
-                      error:            { level: 'unknown', label: 'ERROR' },
+                      ok:               { level: 'low',     label: t('gate.sourceReachable') },
+                      some_unreachable: { level: 'medium',  label: t('gate.sourcePartial') },
+                      all_unreachable:  { level: 'high',    label: t('gate.sourceAllUnreachable') },
+                      no_sources:       { level: 'unknown', label: t('gate.sourceNoSources') },
+                      error:            { level: 'unknown', label: t('gate.sourceError') },
                     };
-                    const meta = STATUS_META[status] || { level: 'checking', label: 'UNKNOWN' };
+                    const meta = STATUS_META[status] || { level: 'checking', label: t('gate.sourceUnknown') };
                     const gateLevel = meta.level;
                     const levelLabel = isChecking ? null : meta.label;
                     const originLabel = (origin) => {
-                      if (origin === 'source_claim') return 'source claim';
-                      if (origin === 'resolution_section') return 'resolution section';
-                      if (origin === 'references') return 'references block';
-                      if (origin === 'draft_body') return 'draft body';
+                      if (origin === 'source_claim') return t('origin.sourceClaim');
+                      if (origin === 'resolution_section') return t('origin.resolutionSection');
+                      if (origin === 'references') return t('origin.references');
+                      if (origin === 'draft_body') return t('origin.draftBody');
                       return origin;
                     };
                     const sources = sourceAccessibility?.sources || [];
@@ -2111,10 +2126,10 @@ function App() {
                         role={needsSourceAck ? 'alert' : 'status'}
                       >
                         <div className="risk-gate__header">
-                          <span className="risk-gate__label">Data Source Accessibility</span>
+                          <span className="risk-gate__label">{t('gate.sourceLabel')}</span>
                           {isChecking ? (
                             <span className="risk-gate__level risk-gate__level--checking">
-                              <span className="spinner" /> Checking…
+                              <span className="spinner" /> {t('gate.checking')}
                             </span>
                           ) : (
                             <span className={`risk-gate__level risk-gate__level--${gateLevel}`}>
@@ -2125,26 +2140,22 @@ function App() {
                         {!isChecking && sourceAccessibility && (
                           <div className="risk-gate__body">
                             <p className="risk-gate__hint">
-                              Probes each data source in the resolution rule to confirm the oracle will actually be
-                              able to read it at settlement time. Unreachable sources risk a market that cannot
-                              resolve — fix them before finalizing.
+                              {t('gate.sourceHint')}
                             </p>
                             {status === 'no_sources' && (
                               <p>
-                                No machine-readable URLs were found in the draft, its resolution section, references,
-                                or source claims. Add explicit source URLs to the resolution rules before finalizing.
+                                {t('gate.sourceNoSourcesText')}
                               </p>
                             )}
                             {status === 'error' && (
                               <p>
-                                Accessibility check failed: {sourceAccessibility.error || 'unknown error'}.
-                                This does not block Finalize, but you should verify the sources manually.
+                                {t('gate.sourceErrorText', { error: sourceAccessibility.error || t('gate.unknownError') })}
                               </p>
                             )}
                             {unreachable.length > 0 && (
                               <>
                                 <p className="risk-gate__subheading">
-                                  Unreachable ({unreachable.length}):
+                                  {t('gate.sourceUnreachableHeading', { n: unreachable.length })}
                                 </p>
                                 <ul className="risk-gate__list">
                                   {unreachable.slice(0, 10).map((s) => (
@@ -2161,7 +2172,7 @@ function App() {
                             {reachable.length > 0 && (
                               <>
                                 <p className="risk-gate__subheading">
-                                  Reachable ({reachable.length}):
+                                  {t('gate.sourceReachableHeading', { n: reachable.length })}
                                 </p>
                                 <ul className="risk-gate__list">
                                   {reachable.slice(0, 10).map((s) => (
@@ -2181,15 +2192,15 @@ function App() {
                           <div className="risk-gate__actions">
                             <p className="risk-gate__warning">
                               {status === 'all_unreachable'
-                                ? 'None of the cited data sources resolved from the browser. The oracle cannot read a source it cannot reach — revise the draft with working URLs before finalizing, or acknowledge to finalize anyway.'
-                                : 'Some cited data sources did not resolve from the browser. Revise the draft with working URLs, or acknowledge to finalize anyway.'}
+                                ? t('gate.sourceWarningAll')
+                                : t('gate.sourceWarningSome')}
                             </p>
                             <button
                               type="button"
                               className="risk-gate__ack-btn"
                               onClick={() => dispatch({ type: 'ACKNOWLEDGE_SOURCE_ACCESSIBILITY' })}
                             >
-                              Acknowledge unreachable sources & unlock Finalize
+                              {t('gate.sourceAck')}
                             </button>
                           </div>
                         )}
@@ -2200,14 +2211,14 @@ function App() {
                   {/* Your Feedback */}
                   <div className="col-panel col-panel--review">
                     <div className="human-review-section">
-                      <h2>Your Feedback</h2>
-                      <span className="hint">Optional — included when you click Update Draft</span>
+                      <h2>{t('feedback.heading')}</h2>
+                      <span className="hint">{t('feedback.hint')}</span>
                       <textarea
                         value={humanReviewInput}
                         onChange={(e) =>
                           dispatch({ type: 'SET_FIELD', field: 'humanReviewInput', value: e.target.value })
                         }
-                        placeholder="Add your own critiques or additional feedback..."
+                        placeholder={t('feedback.placeholder')}
                         className="input textarea"
                         disabled={loading === 'update'}
                       />
@@ -2227,14 +2238,14 @@ function App() {
                       {deliberatedReview && (
                         <Enter>
                           <div className="col-panel-header">
-                            <h2>Deliberated Review</h2>
+                            <h2>{t('reviews.deliberated')}</h2>
                             <div className="col-panel-actions">
-                              <span className="model-badge deliberation-badge" data-tooltip="Council Deliberation" tabIndex={0} role="img" aria-label="Council Deliberation">C</span>
+                              <span className="model-badge deliberation-badge" data-tooltip={t('reviews.councilDeliberation')} tabIndex={0} role="img" aria-label={t('reviews.councilDeliberation')}>C</span>
                               <button
                                 className={`copy-btn ${copiedId === 'deliberated' ? 'copy-btn--copied' : ''}`}
                                 onClick={() => handleCopy(deliberatedReview, 'deliberated')}
                               >
-                                {copiedId === 'deliberated' ? 'Copied!' : 'Copy'}
+                                {copiedId === 'deliberated' ? t('common.copied') : t('common.copy')}
                               </button>
                             </div>
                           </div>
@@ -2247,14 +2258,14 @@ function App() {
                       {reviews.map((review, idx) => (
                         <Enter key={idx} className={deliberatedReview ? 'individual-review' : ''}>
                           <div className="col-panel-header">
-                            <h2>{deliberatedReview ? `Reviewer ${idx + 1}` : 'Agent Review'}</h2>
+                            <h2>{deliberatedReview ? t('reviews.reviewerN', { n: idx + 1 }) : t('reviews.agentReview')}</h2>
                             <div className="col-panel-actions">
-                              <span className="model-badge" data-tooltip={review.modelName} tabIndex={0} role="img" aria-label={`Model: ${review.modelName}`}>{getModelAbbrev(review.model)}</span>
+                              <span className="model-badge" data-tooltip={review.modelName} tabIndex={0} role="img" aria-label={t('common.modelAria', { name: review.modelName })}>{getModelAbbrev(review.model)}</span>
                               <button
                                 className={`copy-btn ${copiedId === `review-${idx}` ? 'copy-btn--copied' : ''}`}
                                 onClick={() => handleCopy(review.content, `review-${idx}`)}
                               >
-                                {copiedId === `review-${idx}` ? 'Copied!' : 'Copy'}
+                                {copiedId === `review-${idx}` ? t('common.copied') : t('common.copy')}
                               </button>
                             </div>
                           </div>
@@ -2278,7 +2289,7 @@ function App() {
             <div className="panel-header">
               <div className={`step ${currentStep >= 3 ? 'step--active' : ''}`}>
                 <div className="step__number">3</div>
-                <div className="step__label">Finalize</div>
+                <div className="step__label">{t('step.finalize')}</div>
               </div>
             </div>
             <div className="panel-body">
@@ -2287,7 +2298,7 @@ function App() {
                   <div className="placeholder-icon">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                   </div>
-                  <p>Draft, review, and update your market to finalize</p>
+                  <p>{t('placeholder.finalize')}</p>
                 </div>
               ) : loading === 'accept' ? (
                 <LLMLoadingState phase="accept" meta={loadingMeta} rigor={displayRigor} />
@@ -2297,7 +2308,7 @@ function App() {
                     <div className="final-header__icon">
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                     </div>
-                    <h2>Final Market Details</h2>
+                    <h2>{t('final.heading')}</h2>
                     <div className="final-header__actions">
                       <button
                         className={`copy-btn ${copiedId === 'full-output' ? 'copy-btn--copied' : ''}`}
@@ -2315,7 +2326,7 @@ function App() {
                           handleCopy(text, 'full-output');
                         }}
                       >
-                        {copiedId === 'full-output' ? 'Copied!' : 'Copy All'}
+                        {copiedId === 'full-output' ? t('common.copied') : t('common.copyAll')}
                       </button>
                     </div>
                   </div>
@@ -2341,7 +2352,7 @@ function App() {
 
                       {/* Market Period */}
                       <div className="final-doc__period stagger-item" style={{ '--stagger': 3 }}>
-                        <span className="final-doc__period-label">Market Period</span>
+                        <span className="final-doc__period-label">{t('final.marketPeriod')}</span>
                         <span className="final-doc__period-dates">
                           {finalContent.marketStartTimeUTC} &mdash; {finalContent.marketEndTimeUTC}
                         </span>
@@ -2350,12 +2361,12 @@ function App() {
                       {resolutionDescriptionMarkdown && (
                         <div className="final-doc__section final-doc__section--description stagger-item" style={{ '--stagger': 4 }}>
                           <div className="final-doc__section-header">
-                            <h3 className="final-doc__heading">Description</h3>
+                            <h3 className="final-doc__heading">{t('final.description')}</h3>
                             <button
                               className={`copy-btn ${copiedId === 'description-markdown' ? 'copy-btn--copied' : ''}`}
                               onClick={() => handleCopy(resolutionDescriptionMarkdown, 'description-markdown')}
                             >
-                              {copiedId === 'description-markdown' ? 'Copied!' : 'Copy'}
+                              {copiedId === 'description-markdown' ? t('common.copied') : t('common.copy')}
                             </button>
                           </div>
                           <div className="final-doc__text final-doc__text--markdown">
@@ -2367,7 +2378,7 @@ function App() {
                       {/* Outcomes */}
                       {finalContent.outcomes?.length > 0 && (
                         <div className="final-doc__section stagger-item" style={{ '--stagger': 5 }}>
-                          <h3 className="final-doc__heading">Outcomes ({finalContent.outcomes.length})</h3>
+                          <h3 className="final-doc__heading">{t('final.outcomes', { n: finalContent.outcomes.length })}</h3>
                           <div className="final-doc__outcomes">
                             {finalContent.outcomes.map((outcome, index) => (
                               <div
@@ -2381,11 +2392,11 @@ function App() {
                                 </div>
                                 {outcome.winCondition && (
                                   <div className="outcome-row__win">
-                                    <strong>Wins if:</strong> {outcome.winCondition}
+                                    <strong>{t('final.winsIf')}</strong> {outcome.winCondition}
                                   </div>
                                 )}
                                 <div className="outcome-row__criteria">
-                                  <strong>Resolved by:</strong> {outcome.resolutionCriteria}
+                                  <strong>{t('final.resolvedBy')}</strong> {outcome.resolutionCriteria}
                                 </div>
                               </div>
                             ))}
@@ -2397,12 +2408,12 @@ function App() {
                       {finalContent.fullResolutionRules && (
                         <div className="final-doc__section stagger-item" style={{ '--stagger': 8 }}>
                           <div className="final-doc__section-header">
-                            <h3 className="final-doc__heading">Resolution Rules</h3>
+                            <h3 className="final-doc__heading">{t('final.resolutionRules')}</h3>
                             <button
                               className={`copy-btn ${copiedId === 'rules' ? 'copy-btn--copied' : ''}`}
                               onClick={() => handleCopy(finalContent.fullResolutionRules, 'rules')}
                             >
-                              {copiedId === 'rules' ? 'Copied!' : 'Copy'}
+                              {copiedId === 'rules' ? t('common.copied') : t('common.copy')}
                             </button>
                           </div>
                           <div className="final-doc__text">
@@ -2414,7 +2425,7 @@ function App() {
                       {/* Edge Cases */}
                       {finalContent.edgeCases && (
                         <div className="final-doc__section stagger-item" style={{ '--stagger': 8 }}>
-                          <h3 className="final-doc__heading">Edge Cases</h3>
+                          <h3 className="final-doc__heading">{t('final.edgeCases')}</h3>
                           <div className="final-doc__text">
                             {renderContent(finalContent.edgeCases)}
                           </div>
@@ -2427,20 +2438,26 @@ function App() {
                         <div className="final-doc__section stagger-item" style={{ '--stagger': 8 }}>
                           <div className="final-doc__section-header">
                             <h3 className="final-doc__heading">
-                              Early Resolution Risk
+                              {t('final.earlyResolutionRisk')}
                               {earlyResolutionRiskLevel && earlyResolutionRiskLevel !== 'unknown' && (
                                 <span className={`risk-gate__level risk-gate__level--${earlyResolutionRiskLevel}`} style={{ marginLeft: '0.5rem' }}>
-                                  {earlyResolutionRiskLevel.toUpperCase()}
+                                  {earlyResolutionRiskLevel === 'high'
+                                    ? t('gate.high')
+                                    : earlyResolutionRiskLevel === 'medium'
+                                      ? t('gate.medium')
+                                      : earlyResolutionRiskLevel === 'low'
+                                        ? t('gate.low')
+                                        : earlyResolutionRiskLevel.toUpperCase()}
                                 </span>
                               )}
                             </h3>
                             <div className="col-panel-actions">
-                              <span className="model-badge" data-tooltip={getModelName(selectedModel)} tabIndex={0} role="img" aria-label={`Model: ${getModelName(selectedModel)}`}>{getModelAbbrev(selectedModel)}</span>
+                              <span className="model-badge" data-tooltip={getModelName(selectedModel)} tabIndex={0} role="img" aria-label={t('common.modelAria', { name: getModelName(selectedModel) })}>{getModelAbbrev(selectedModel)}</span>
                               <button
                                 className={`copy-btn ${copiedId === 'early-risk' ? 'copy-btn--copied' : ''}`}
                                 onClick={() => handleCopy(earlyResolutionRisk, 'early-risk')}
                               >
-                                {copiedId === 'early-risk' ? 'Copied!' : 'Copy'}
+                                {copiedId === 'early-risk' ? t('common.copied') : t('common.copy')}
                               </button>
                             </div>
                           </div>
@@ -2456,14 +2473,12 @@ function App() {
                       the loading spinner so users can confirm which mode
                       this market was produced under after the run is done. */}
                   <p className={`final-doc__rigor-footer final-doc__rigor-footer--${displayRigor}`}>
-                    {displayRigor === 'human'
-                      ? 'Produced in Human mode (prompts softened, text polished).'
-                      : 'Produced in Machine mode (full rigor).'}
+                    {displayRigor === 'human' ? t('final.rigorHuman') : t('final.rigorMachine')}
                   </p>
 
                   <button className="reset-button" onClick={handleReset}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
-                    Create Another Market
+                    {t('final.createAnother')}
                   </button>
                 </div>
               )}
@@ -2482,17 +2497,17 @@ function App() {
             onClick={handleToggleRunTrace}
             aria-expanded={runTraceOpen}
           >
-            <span id="run-trace-heading">Run trace</span>
+            <span id="run-trace-heading">{t('trace.heading')}</span>
             <span className="run-trace__chevron" aria-hidden="true">
               {runTraceOpen ? '▾' : '▸'}
             </span>
             {currentRun && (
               <span className="run-trace__summary">
-                {currentRun.drafts.length} draft{currentRun.drafts.length === 1 ? '' : 's'}
+                {t(currentRun.drafts.length === 1 ? 'trace.summaryDrafts' : 'trace.summaryDraftsPlural', { n: currentRun.drafts.length })}
                 {' · '}
-                {currentRun.claims.length} claim{currentRun.claims.length === 1 ? '' : 's'}
+                {t(currentRun.claims.length === 1 ? 'trace.summaryClaims' : 'trace.summaryClaimsPlural', { n: currentRun.claims.length })}
                 {' · '}
-                {currentRun.cost.totalTokensIn + currentRun.cost.totalTokensOut} tok
+                {t('trace.summaryTokens', { n: currentRun.cost.totalTokensIn + currentRun.cost.totalTokensOut })}
               </span>
             )}
           </button>
@@ -2506,10 +2521,10 @@ function App() {
                   onClick={handleExportRun}
                   disabled={!currentRun}
                 >
-                  Export run as JSON
+                  {t('trace.exportRun')}
                 </button>
                 <label className="run-trace__button run-trace__button--import">
-                  Import run
+                  {t('trace.importRun')}
                   <input
                     type="file"
                     accept="application/json,.json"
@@ -2521,7 +2536,7 @@ function App() {
 
               {!currentRun && (
                 <p className="run-trace__empty">
-                  No run yet. Generate or submit a draft to start a run.
+                  {t('trace.empty')}
                 </p>
               )}
 
@@ -2529,24 +2544,24 @@ function App() {
                 <>
                   <div className="run-trace__section">
                     <h4 className="run-trace__heading">
-                      Run {currentRun.runId}
+                      {t('trace.run', { id: currentRun.runId })}
                     </h4>
                     <div className="run-trace__kv">
-                      <span>Started</span>
+                      <span>{t('trace.started')}</span>
                       <span>{new Date(currentRun.startedAt).toLocaleString()}</span>
                     </div>
                     <div className="run-trace__kv">
-                      <span>Question</span>
-                      <span>{currentRun.input?.question || '(none)'}</span>
+                      <span>{t('trace.question')}</span>
+                      <span>{currentRun.input?.question || t('common.none')}</span>
                     </div>
                   </div>
 
                   <div className="run-trace__section">
                     <h4 className="run-trace__heading">
-                      Drafts ({currentRun.drafts.length})
+                      {t('trace.draftsHeading', { n: currentRun.drafts.length })}
                     </h4>
                     {currentRun.drafts.length === 0 ? (
-                      <p className="run-trace__empty">No drafts yet.</p>
+                      <p className="run-trace__empty">{t('trace.noDrafts')}</p>
                     ) : (
                       <ol className="run-trace__list">
                         {currentRun.drafts.map((d, i) => (
@@ -2570,11 +2585,11 @@ function App() {
 
                   <div className="run-trace__section">
                     <h4 className="run-trace__heading">
-                      Claims ({currentRun.claims.length})
+                      {t('trace.claimsHeading', { n: currentRun.claims.length })}
                     </h4>
                     {currentRun.claims.length === 0 ? (
                       <p className="run-trace__empty">
-                        No claims extracted yet.
+                        {t('trace.noClaims')}
                       </p>
                     ) : (
                       <ul className="run-trace__list">
@@ -2595,19 +2610,19 @@ function App() {
                   {currentRun.aggregation && (
                     <div className="run-trace__section">
                       <h4 className="run-trace__heading">
-                        Aggregation ({currentRun.aggregation.protocol}) —{' '}
+                        {t('trace.aggregationHeading', { protocol: currentRun.aggregation.protocol })} —{' '}
                         <span className={`run-trace__verdict run-trace__verdict--${currentRun.aggregation.overall}`}>
                           {currentRun.aggregation.overall}
                         </span>
                       </h4>
                       {currentRun.aggregation.judgeRationale && (
                         <p className="run-trace__judge-rationale">
-                          Judge: {currentRun.aggregation.judgeRationale}
+                          {t('trace.judge', { rationale: currentRun.aggregation.judgeRationale })}
                         </p>
                       )}
                       {currentRun.aggregation.checklist.length === 0 ? (
                         <p className="run-trace__empty">
-                          No checklist items recorded.
+                          {t('trace.noChecklist')}
                         </p>
                       ) : (
                         <ul className="run-trace__list">
@@ -2657,7 +2672,7 @@ function App() {
                   {currentRun.criticisms.length > 0 && (
                     <div className="run-trace__section">
                       <h4 className="run-trace__heading">
-                        Criticisms ({currentRun.criticisms.length})
+                        {t('trace.criticismsHeading', { n: currentRun.criticisms.length })}
                       </h4>
                       <ul className="run-trace__list">
                         {currentRun.criticisms.map((c) => (
@@ -2686,7 +2701,7 @@ function App() {
                   {currentRun.verification.length > 0 && (
                     <div className="run-trace__section">
                       <h4 className="run-trace__heading">
-                        Verification ({currentRun.verification.length})
+                        {t('trace.verificationHeading', { n: currentRun.verification.length })}
                         {(() => {
                           const counts = currentRun.verification.reduce(
                             (acc, v) => {
@@ -2696,9 +2711,9 @@ function App() {
                             {}
                           );
                           const parts = [];
-                          if (counts.pass) parts.push(`${counts.pass} pass`);
-                          if (counts.soft_fail) parts.push(`${counts.soft_fail} soft`);
-                          if (counts.hard_fail) parts.push(`${counts.hard_fail} hard`);
+                          if (counts.pass) parts.push(t('trace.verifyPass', { n: counts.pass }));
+                          if (counts.soft_fail) parts.push(t('trace.verifySoft', { n: counts.soft_fail }));
+                          if (counts.hard_fail) parts.push(t('trace.verifyHard', { n: counts.hard_fail }));
                           return parts.length > 0 ? (
                             <span className="run-trace__summary">
                               {' — '}
@@ -2727,7 +2742,7 @@ function App() {
                                 <code className="run-trace__claim-id">{v.claimId}</code>
                                 {v.citationResolves === false && (
                                   <span className="run-trace__badge run-trace__verdict--fail">
-                                    url missing
+                                    {t('trace.urlMissing')}
                                   </span>
                                 )}
                               </div>
@@ -2752,15 +2767,15 @@ function App() {
                   {currentRun.routing && currentRun.routing.items.length > 0 && (
                     <div className="run-trace__section">
                       <h4 className="run-trace__heading">
-                        Routing
+                        {t('trace.routingHeading')}
                         <span className={`run-trace__badge run-trace__routing--${currentRun.routing.overall}`}>
                           {currentRun.routing.overall}
                         </span>
                         <span className="run-trace__summary">
                           {' — '}
-                          {currentRun.routing.items.filter((i) => i.severity === 'blocking').length} blocking,{' '}
-                          {currentRun.routing.items.filter((i) => i.severity === 'targeted_review').length} targeted,{' '}
-                          {currentRun.routing.items.filter((i) => i.severity === 'ok').length} ok
+                          {t('trace.routingBlocking', { n: currentRun.routing.items.filter((i) => i.severity === 'blocking').length })},{' '}
+                          {t('trace.routingTargeted', { n: currentRun.routing.items.filter((i) => i.severity === 'targeted_review').length })},{' '}
+                          {t('trace.routingOk', { n: currentRun.routing.items.filter((i) => i.severity === 'ok').length })}
                         </span>
                       </h4>
                       <ul className="run-trace__list">
@@ -2780,7 +2795,7 @@ function App() {
                               </div>
                               {item.reasons.length > 0 && (
                                 <div className="run-trace__routing-reasons">
-                                  {item.reasons.map(toSimpleRoutingReason).join('; ')}
+                                  {item.reasons.map((r) => toSimpleRoutingReason(r, t)).join('; ')}
                                 </div>
                               )}
                             </li>
@@ -2796,7 +2811,7 @@ function App() {
                   {currentRun.evidence.length > 0 && (
                     <div className="run-trace__section">
                       <h4 className="run-trace__heading">
-                        Evidence ({currentRun.evidence.length})
+                        {t('trace.evidenceHeading', { n: currentRun.evidence.length })}
                         {(() => {
                           // Summarise resolve status: look up each evidence's
                           // owning source-claim verification (if any) and
@@ -2817,8 +2832,8 @@ function App() {
                           return (
                             <span className="run-trace__summary">
                               {' — '}
-                              {resolved} resolved
-                              {failed > 0 ? `, ${failed} failed` : ''}
+                              {t('trace.evidenceResolved', { n: resolved })}
+                              {failed > 0 ? t('trace.evidenceFailed', { n: failed }) : ''}
                             </span>
                           );
                         })()}
@@ -2862,17 +2877,17 @@ function App() {
                   )}
 
                   <div className="run-trace__section">
-                    <h4 className="run-trace__heading">Cost</h4>
+                    <h4 className="run-trace__heading">{t('trace.cost')}</h4>
                     <div className="run-trace__kv">
-                      <span>Tokens in</span>
+                      <span>{t('trace.tokensIn')}</span>
                       <span>{currentRun.cost.totalTokensIn}</span>
                     </div>
                     <div className="run-trace__kv">
-                      <span>Tokens out</span>
+                      <span>{t('trace.tokensOut')}</span>
                       <span>{currentRun.cost.totalTokensOut}</span>
                     </div>
                     <div className="run-trace__kv">
-                      <span>Wall clock</span>
+                      <span>{t('trace.wallClock')}</span>
                       <span>{(currentRun.cost.wallClockMs / 1000).toFixed(1)}s</span>
                     </div>
                     {Object.keys(currentRun.cost.byStage).length > 0 && (
@@ -2880,7 +2895,7 @@ function App() {
                         {Object.entries(currentRun.cost.byStage).map(([stage, tokens]) => (
                           <div key={stage} className="run-trace__kv">
                             <span>↳ {stage}</span>
-                            <span>{tokens} tok</span>
+                            <span>{t('trace.tokens', { n: tokens })}</span>
                           </div>
                         ))}
                       </div>
@@ -2890,7 +2905,7 @@ function App() {
                   {currentRun.log.length > 0 && (
                     <div className="run-trace__section">
                       <h4 className="run-trace__heading">
-                        Log ({currentRun.log.length})
+                        {t('trace.logHeading', { n: currentRun.log.length })}
                       </h4>
                       <ul className="run-trace__list">
                         {currentRun.log.map((entry, i) => (
