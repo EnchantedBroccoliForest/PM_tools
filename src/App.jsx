@@ -977,7 +977,7 @@ function App() {
           content: buildEarlyResolutionPrompt(
             updatedDraft,
             normalizeUtcDateTime(startDate, '00:00:00'),
-            normalizeUtcDateTime(endDate, '00:00:00'),
+            normalizeUtcDateTime(endDate, '23:59:59'),
             runRigor,
           ),
         },
@@ -1069,7 +1069,7 @@ function App() {
             content: buildFinalizePrompt(
               draftContent,
               normalizeUtcDateTime(startDate, '00:00:00'),
-              normalizeUtcDateTime(endDate, '00:00:00'),
+              normalizeUtcDateTime(endDate, '23:59:59'),
               numberOfOutcomes,
               runRigor,
             ),
@@ -1146,7 +1146,7 @@ function App() {
       input: {
         question,
         startDate: normalizeUtcDateTime(startDate, '00:00:00'),
-        endDate: normalizeUtcDateTime(endDate, '00:00:00'),
+        endDate: normalizeUtcDateTime(endDate, '23:59:59'),
         references,
         numberOfOutcomes,
         rigor,
@@ -1392,7 +1392,7 @@ function App() {
                     <input
                       id="endDate"
                       type="date"
-                      value={toDateInputValue(endDate, '00:00:00')}
+                      value={toDateInputValue(endDate, '23:59:59')}
                       onChange={(e) => handleDateChange('endDate', e.target.value)}
                       onBlur={() => dispatch({ type: 'TOUCH_FIELD', field: 'endDate' })}
                       className={inputClassName('endDate')}
@@ -1409,7 +1409,7 @@ function App() {
                     />
                     {endDate && (
                       <p id="endDate-hint" className="utc-hint">
-                        {formatUTCDateHint(endDate, '00:00:00')}
+                        {formatUTCDateHint(endDate, '23:59:59')}
                       </p>
                     )}
                     {visibleFieldError('endDate') && (

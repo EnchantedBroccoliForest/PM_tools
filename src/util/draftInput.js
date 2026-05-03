@@ -50,7 +50,7 @@ export function validateDraftInputs(input, now = Date.now()) {
   const startRaw = typeof input?.startDate === 'string' ? input.startDate.trim() : '';
   const endRaw = typeof input?.endDate === 'string' ? input.endDate.trim() : '';
   const startDateUTC = normalizeUtcDateTime(startRaw, '00:00:00');
-  const endDateUTC = normalizeUtcDateTime(endRaw, '00:00:00');
+  const endDateUTC = normalizeUtcDateTime(endRaw, '23:59:59');
   const errors = {};
 
   if (!question) {
