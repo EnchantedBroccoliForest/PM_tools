@@ -33,7 +33,7 @@ import { DRAFT_MAX_TOKENS } from './defaults';
 import { parseRiskLevel } from './util/riskLevel';
 import {
   normalizeUtcDateTime,
-  toDateTimeLocalValue,
+  toDateInputValue,
   validateDatePair,
   validateDraftInputs,
 } from './util/draftInput';
@@ -1360,9 +1360,8 @@ function App() {
                     </label>
                     <input
                       id="startDate"
-                      type="datetime-local"
-                      step="60"
-                      value={toDateTimeLocalValue(startDate, '00:00:00')}
+                      type="date"
+                      value={toDateInputValue(startDate, '00:00:00')}
                       onChange={(e) => handleDateChange('startDate', e.target.value)}
                       onBlur={() => dispatch({ type: 'TOUCH_FIELD', field: 'startDate' })}
                       className={inputClassName('startDate')}
@@ -1392,9 +1391,8 @@ function App() {
                     </label>
                     <input
                       id="endDate"
-                      type="datetime-local"
-                      step="60"
-                      value={toDateTimeLocalValue(endDate, '23:59:59')}
+                      type="date"
+                      value={toDateInputValue(endDate, '23:59:59')}
                       onChange={(e) => handleDateChange('endDate', e.target.value)}
                       onBlur={() => dispatch({ type: 'TOUCH_FIELD', field: 'endDate' })}
                       className={inputClassName('endDate')}

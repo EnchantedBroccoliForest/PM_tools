@@ -27,9 +27,9 @@ export function normalizeUtcDateTime(value, fallbackTime = '00:00:00') {
   return '';
 }
 
-export function toDateTimeLocalValue(value, fallbackTime = '00:00:00') {
+export function toDateInputValue(value, fallbackTime = '00:00:00') {
   const iso = normalizeUtcDateTime(value, fallbackTime);
-  return iso ? iso.slice(0, 16) : '';
+  return iso ? iso.slice(0, 10) : '';
 }
 
 // Validation errors are returned as stable codes (not English strings) so
