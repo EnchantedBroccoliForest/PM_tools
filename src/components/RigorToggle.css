@@ -1,8 +1,8 @@
 /* ================================================
-   Ambient Mode Toggle — circular icon button
+   Rigor Toggle (Machine / Human) — circular icon
    Sits inside .top-right-controls (see App.css)
    ================================================ */
-.ambient-toggle {
+.rigor-icon-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -18,30 +18,35 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.ambient-toggle:hover {
+.rigor-icon-toggle:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.18);
   transform: translateY(-1px);
 }
 
-.ambient-toggle:focus-visible {
+.rigor-icon-toggle:focus-visible {
   outline: 2px solid var(--neon-cyan, #4DD0E1);
   outline-offset: 2px;
 }
 
-.ambient-toggle__icon {
+.rigor-icon-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rigor-icon-toggle__icon {
   font-size: 16px;
   line-height: 1;
 }
 
-.ambient-light .ambient-toggle {
+.ambient-light .rigor-icon-toggle {
   background: #FFFFFF;
   border-color: rgba(0, 0, 0, 0.1);
   color: rgba(0, 0, 0, 0.55);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
-.ambient-light .ambient-toggle:hover {
+.ambient-light .rigor-icon-toggle:hover:not(:disabled) {
   background: rgba(0, 0, 0, 0.04);
   border-color: rgba(0, 0, 0, 0.18);
   color: rgba(0, 0, 0, 0.9);

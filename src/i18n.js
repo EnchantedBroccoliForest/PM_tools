@@ -20,6 +20,10 @@ const EN = {
   'header.machineModeAria': 'Machine mode: long-form, highly rigorous output for agents',
   'header.humanModeAria': 'Human mode: concise, human-readable output',
 
+  // Rigor icon toggle
+  'rigor.switchTo': 'Switch to {label}',
+  'rigor.switchToAria': 'Switch output style to {label}',
+
   // Language toggle
   'language.toggleAria': 'Switch language',
   'language.switchTo': 'Switch to {label}',
@@ -350,6 +354,10 @@ const ZH = {
   'header.humanModeTooltip': '简洁易读的输出。',
   'header.machineModeAria': '机器模式:面向智能体的长篇、严谨输出',
   'header.humanModeAria': '人类模式:简洁易读的输出',
+
+  // Rigor icon toggle
+  'rigor.switchTo': '切换到{label}',
+  'rigor.switchToAria': '将输出风格切换到{label}',
 
   // Language toggle
   'language.toggleAria': '切换语言',

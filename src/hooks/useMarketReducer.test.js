@@ -1,17 +1,13 @@
 /**
- * Phase 4 reducer tests for the rigor field.
+ * Reducer tests for the rigor field.
  *
- * The Phase 1 plumbing relies on three properties of the reducer:
- *
- *   - rigor lands on initialState as 'machine' (the protocol-safe default
- *     so any handler that misses a rigor read still gets the strict path).
+ *   - rigor lands on initialState as 'human' (the human-readable default so
+ *     casual users get readable output without flipping a toggle).
  *   - SET_FIELD can move rigor between values (the toggle's only writer).
- *   - RESET restores rigor to 'machine' along with the rest of the
- *     pipeline state, so a Reset always lands the next run on Machine
- *     unless the user explicitly toggles it again.
+ *   - RESET restores rigor to the initialState default ('human').
  *   - RUN_IMPORT (rehydrateFromRun) restores the rigor the run was
  *     originally produced under, falling back to 'machine' for runs
- *     exported before Phase 1 existed.
+ *     exported before the rigor field existed.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -20,26 +16,26 @@ import { createRun } from '../types/run.js';
 import { DEFAULT_REVIEW_MODEL_IDS } from '../constants/models.js';
 
 describe('useMarketReducer rigor field', () => {
-  it('initialState defaults rigor to machine', () => {
-    expect(initialState.rigor).toBe('machine');
+  it('initialState defaults rigor to human', () => {
+    expect(initialState.rigor).toBe('human');
   });
 
-  it('SET_FIELD updates rigor to human', () => {
-    const next = reducer(initialState, { type: 'SET_FIELD', field: 'rigor', value: 'human' });
-    expect(next.rigor).toBe('human');
-  });
-
-  it('SET_FIELD updates rigor back to machine', () => {
-    const intermediate = reducer(initialState, { type: 'SET_FIELD', field: 'rigor', value: 'human' });
-    const next = reducer(intermediate, { type: 'SET_FIELD', field: 'rigor', value: 'machine' });
+  it('SET_FIELD updates rigor to machine', () => {
+    const next = reducer(initialState, { type: 'SET_FIELD', field: 'rigor', value: 'machine' });
     expect(next.rigor).toBe('machine');
   });
 
-  it('RESET restores rigor to machine after a Human-mode run', () => {
-    const human = reducer(initialState, { type: 'SET_FIELD', field: 'rigor', value: 'human' });
-    expect(human.rigor).toBe('human');
-    const reset = reducer(human, { type: 'RESET' });
-    expect(reset.rigor).toBe('machine');
+  it('SET_FIELD updates rigor back to human', () => {
+    const intermediate = reducer(initialState, { type: 'SET_FIELD', field: 'rigor', value: 'machine' });
+    const next = reducer(intermediate, { type: 'SET_FIELD', field: 'rigor', value: 'human' });
+    expect(next.rigor).toBe('human');
+  });
+
+  it('RESET restores rigor to human after a Machine-mode run', () => {
+    const machine = reducer(initialState, { type: 'SET_FIELD', field: 'rigor', value: 'machine' });
+    expect(machine.rigor).toBe('machine');
+    const reset = reducer(machine, { type: 'RESET' });
+    expect(reset.rigor).toBe('human');
   });
 });
 
