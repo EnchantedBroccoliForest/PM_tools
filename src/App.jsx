@@ -41,6 +41,7 @@ import { buildResolutionDescriptionMarkdown } from './util/resolutionDescription
 import { buildMarketCard, formatMarketCardCopy } from './util/marketCard';
 import { formatFullSpecCopy } from './util/finalCopy';
 import { isSafeExternalUrl, splitExternalUrlToken } from './util/externalUrl';
+import { buildReferenceFromIdea } from './util/ideationHandoff';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
@@ -317,14 +318,6 @@ function extractIdeaTitleAndRest(ideaText, number, t) {
   }
 
   return { title: title || t('ideas.fallbackTitle', { n: number }), rest: rest.trim() };
-}
-
-// Build the text that goes into the Draft Market "References" field when an
-// idea's arrow button is clicked. Includes the idea's context (Outcome Set,
-// Why it's interesting, Resolvability, Suggested timeframe) so the drafting
-// model has the same framing the ideator used.
-function buildReferenceFromIdea(idea) {
-  return (idea.rest || idea.rawText || '').trim();
 }
 
 function buildReviewConfig(reviewModels, aggregationProtocol) {
@@ -1154,7 +1147,7 @@ function App() {
     dispatch({
       type: 'USE_IDEA_FOR_DRAFT',
       question: idea.title || '',
-      references: buildReferenceFromIdea(idea),
+      references: buildReferenceFromIdea(idea, ideatingReferences),
     });
   };
 
