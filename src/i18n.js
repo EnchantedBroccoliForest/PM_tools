@@ -66,6 +66,7 @@ const EN = {
   // Ideating form
   'form.vagueDirection': 'Vague Direction',
   'form.vagueDirectionPlaceholder': "Describe a rough area of interest — e.g., 'esports finals season 2026', 'upcoming awards races', 'memecoin narratives'. The model will brainstorm 42.space-shaped multi-outcome market ideas.",
+  'form.ideatingReferencesPlaceholder': 'Paste links, datasets, articles, or notes for the ideator to ground its suggestions in. References are weighted FAR above the vague direction — every idea will be anchored to this material.',
   'form.ideationModel': 'Ideation Model',
   'form.ideating': 'Ideating...',
   'form.generateIdeas': 'Generate Ideas',
@@ -401,6 +402,7 @@ const ZH = {
   // Ideating form
   'form.vagueDirection': '模糊方向',
   'form.vagueDirectionPlaceholder': "描述一个大致的兴趣方向 — 例如:'2026 电竞总决赛季'、'即将到来的颁奖季'、'Meme 币叙事'。模型将围绕 42.space 形态构思多结果市场创意。",
+  'form.ideatingReferencesPlaceholder': '粘贴链接、数据集、文章或备注,作为构思的依据。参考资料的权重远高于模糊方向——每个创意都将以这些材料为锚点。',
   'form.ideationModel': '构思模型',
   'form.ideating': '构思中……',
   'form.generateIdeas': '生成创意',

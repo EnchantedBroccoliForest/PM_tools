@@ -422,6 +422,7 @@ function App() {
     humanReviewInput,
     pastedDraft,
     ideatingInput,
+    ideatingReferences,
     ideatingModel,
     ideatingContent,
     loading,
@@ -1175,7 +1176,7 @@ function App() {
     try {
       const result = await queryModel(ideatingModel, [
         { role: 'system', content: getSystemPrompt('ideator', rigor) },
-        { role: 'user', content: buildIdeatePrompt(ideatingInput, rigor) },
+        { role: 'user', content: buildIdeatePrompt(ideatingInput, rigor, ideatingReferences) },
       ]);
       dispatch({ type: 'IDEATE_SUCCESS', content: result.content });
     } catch (err) {
@@ -1504,6 +1505,20 @@ function App() {
                     onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'ideatingInput', value: e.target.value })}
                     placeholder={t('form.vagueDirectionPlaceholder')}
                     className="input textarea textarea--tall"
+                    disabled={loading === 'ideate'}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="ideatingReferences">
+                    {t('form.references')} <span className="label-hint">{t('form.optional')}</span>
+                  </label>
+                  <textarea
+                    id="ideatingReferences"
+                    value={ideatingReferences}
+                    onChange={(e) => dispatch({ type: 'SET_FIELD', field: 'ideatingReferences', value: e.target.value })}
+                    placeholder={t('form.ideatingReferencesPlaceholder')}
+                    className="input textarea"
                     disabled={loading === 'ideate'}
                   />
                 </div>
