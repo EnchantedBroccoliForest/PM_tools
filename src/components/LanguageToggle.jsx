@@ -1,23 +1,25 @@
-import { LANGUAGE_LABELS } from '../i18n';
+import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from '../i18n';
 import { useLanguage } from '../hooks/useLanguage';
 import './LanguageToggle.css';
 
 export default function LanguageToggle() {
   const { lang, setLang, t } = useLanguage();
-  const next = lang === 'en' ? 'zh' : 'en';
-  const nextLabel = LANGUAGE_LABELS[next];
 
   return (
-    <button
-      type="button"
-      className={`language-toggle language-toggle--${lang}`}
-      onClick={() => setLang(next)}
-      title={t('language.switchTo', { label: nextLabel })}
-      aria-label={t('language.toggleAria')}
-    >
-      <span className="language-toggle__current">{LANGUAGE_LABELS[lang]}</span>
-      <span className="language-toggle__sep" aria-hidden="true">/</span>
-      <span className="language-toggle__next">{nextLabel}</span>
-    </button>
+    <div className="language-toggle">
+      <select
+        className="language-toggle__select"
+        value={lang}
+        onChange={(e) => setLang(e.target.value)}
+        aria-label={t('language.toggleAria')}
+      >
+        {SUPPORTED_LANGUAGES.map((code) => (
+          <option key={code} value={code}>
+            {LANGUAGE_LABELS[code]}
+          </option>
+        ))}
+      </select>
+      <span className="language-toggle__chevron" aria-hidden="true">▾</span>
+    </div>
   );
 }

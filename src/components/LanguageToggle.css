@@ -1,71 +1,81 @@
 /* ================================================
-   Language Toggle — upper-right floating pill
+   Language Toggle — dropdown
+   Sits inside .top-right-controls (see App.css)
    ================================================ */
 .language-toggle {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 10000;
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
   height: 36px;
-  padding: 0 0.85rem;
   border-radius: 999px;
   background: #1F1B29;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--text-2, #A1A1AA);
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 150ms ease;
+  color: var(--text-1, #FFFFFF);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
 
 .language-toggle:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.18);
-  color: var(--text-1, #FFFFFF);
   transform: translateY(-1px);
 }
 
-.language-toggle:focus-visible {
+.language-toggle:focus-within {
   outline: 2px solid var(--neon-cyan, #4DD0E1);
   outline-offset: 2px;
 }
 
-.language-toggle__current {
+.language-toggle__select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: transparent;
+  border: 0;
+  outline: none;
+  height: 100%;
+  padding: 0 1.6rem 0 0.85rem;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.language-toggle__select option {
+  background: #1F1B29;
   color: var(--text-1, #FFFFFF);
 }
 
-.language-toggle__sep {
-  opacity: 0.4;
-}
-
-.language-toggle__next {
-  opacity: 0.7;
-}
-
-.language-toggle:hover .language-toggle__next {
-  opacity: 1;
+.language-toggle__chevron {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--text-2, #A1A1AA);
+  pointer-events: none;
 }
 
 /* Light ambient mode */
 .ambient-light .language-toggle {
   background: #FFFFFF;
   border-color: rgba(0, 0, 0, 0.1);
-  color: rgba(0, 0, 0, 0.55);
+  color: rgba(0, 0, 0, 0.9);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .ambient-light .language-toggle:hover {
   background: rgba(0, 0, 0, 0.04);
   border-color: rgba(0, 0, 0, 0.18);
+}
+
+.ambient-light .language-toggle__select option {
+  background: #FFFFFF;
   color: rgba(0, 0, 0, 0.9);
 }
 
-.ambient-light .language-toggle__current {
-  color: rgba(0, 0, 0, 0.9);
+.ambient-light .language-toggle__chevron {
+  color: rgba(0, 0, 0, 0.55);
 }

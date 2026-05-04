@@ -46,6 +46,7 @@ import { useAmbientMode } from './hooks/useAmbientMode';
 import ModelSelect from './components/ModelSelect';
 import AmbientModeToggle from './components/AmbientModeToggle';
 import LanguageToggle from './components/LanguageToggle';
+import RigorToggle from './components/RigorToggle';
 import { useLanguage } from './hooks/useLanguage';
 
 /** Lightweight markdown-ish rendering: **bold**, bullet lists, numbered lists */
@@ -1250,45 +1251,23 @@ function App() {
 
   return (
     <div className={`App ${ambientConfig.classes.join(' ')}`}>
-      <LanguageToggle />
-      <AmbientModeToggle mode={ambientMode} setMode={setAmbientMode} />
+      {/* Floating header controls — locked once a draft exists so the run
+          keeps the rigor it started with. Downstream stages also snapshot
+          rigor onto the Run artifact (see RUN_START dispatches) so a late
+          toggle cannot leak into an in-flight pipeline. */}
+      <div className="top-right-controls">
+        <RigorToggle
+          rigor={rigor}
+          onChange={(value) => dispatch({ type: 'SET_FIELD', field: 'rigor', value })}
+          disabled={anyLoading || !!draftContent}
+        />
+        <LanguageToggle />
+        <AmbientModeToggle mode={ambientMode} setMode={setAmbientMode} />
+      </div>
       <div className="container">
 
         {/* Header */}
         <header className="header">
-          <div className="header__top-row">
-            {/* Rigor Toggle — locks once a draft exists so the run keeps the
-                rigor it started with. The downstream stages also snapshot
-                rigor onto the Run artifact (see RUN_START dispatches) so a
-                late toggle cannot leak into an in-flight pipeline. */}
-            <div className="header__rigor">
-              <span className="rigor-toggle__label">{t('header.outputStyle')}</span>
-              <div className="rigor-toggle rigor-toggle--header mode-toggle">
-                <button
-                  type="button"
-                  className={`mode-toggle__btn rigor-toggle__btn rigor-toggle__btn--machine ${rigor === 'machine' ? 'mode-toggle__btn--active' : ''}`}
-                  onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'machine' })}
-                  disabled={anyLoading || !!draftContent}
-                  data-tooltip={t('header.machineModeTooltip')}
-                  aria-label={t('header.machineModeAria')}
-                >
-                  <span className="rigor-toggle__icon" aria-hidden="true">🤖</span>
-                  {t('header.machineMode')}
-                </button>
-                <button
-                  type="button"
-                  className={`mode-toggle__btn rigor-toggle__btn rigor-toggle__btn--human ${rigor === 'human' ? 'mode-toggle__btn--active' : ''}`}
-                  onClick={() => dispatch({ type: 'SET_FIELD', field: 'rigor', value: 'human' })}
-                  disabled={anyLoading || !!draftContent}
-                  data-tooltip={t('header.humanModeTooltip')}
-                  aria-label={t('header.humanModeAria')}
-                >
-                  <span className="rigor-toggle__icon" aria-hidden="true">🧑</span>
-                  {t('header.humanMode')}
-                </button>
-              </div>
-            </div>
-          </div>
           {/* Progress bar */}
           <div className="progress-bar" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
             <div className="progress-bar__fill" style={{ width: `${progressPercent}%` }} />
