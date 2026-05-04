@@ -1,11 +1,11 @@
 /**
- * Aggregation protocols for Phase 2 review.
+ * Aggregation protocols for structured review.
  *
  * Takes the rubric and all reviewer votes and renders an Aggregation record
  * (as defined in types/run.js). Three protocols are available:
  *
- *   - majority:  for each rubric item, majority verdict wins. Ties on no/yes
- *                pass; ties involving unsure escalate. Overall decision is
+ *   - majority:  for each rubric item, majority verdict wins. Ties escalate
+ *                so disagreement reaches the user. Overall decision is
  *                the worst per-item decision (fail > escalate > pass).
  *
  *   - unanimity: every reviewer must vote yes on every item for a pass. A
@@ -85,9 +85,7 @@ function rollupOverall(checklist) {
 
 /**
  * Majority protocol. Count yes/no/unsure per item; pick the plurality.
- * Plurality ties: if yes and no are tied, item passes (bias toward the
- * draft — the user is the one who wrote it, and `no` votes without a
- * majority are not strong evidence). Any tie involving unsure escalates.
+ * Plurality ties escalate instead of being silently resolved.
  *
  * @param {Array<{id:string, question:string, votes:Array, decision:string}>} checklist
  */
@@ -182,8 +180,7 @@ export function aggregateUnanimity(rubric, allVotes) {
  * @param {string} judgeModelId   OpenRouter model id used for the judge
  * @param {'machine'|'human'} [rigor]  selects the rigor variant of the judge
  *                                     system prompt and the user-prompt
- *                                     builder. Phase 2 keeps both buckets
- *                                     byte-identical.
+ *                                     builder.
  * @returns {Promise<JudgeAggregationResult>}
  */
 export async function aggregateJudge(rubric, allVotes, judgeModelId, rigor = 'machine') {

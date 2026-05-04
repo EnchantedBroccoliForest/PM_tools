@@ -1,7 +1,7 @@
 /**
  * Pipeline orchestrator for the Phase 6 eval harness.
  *
- * This module runs the full PM_tools pipeline against a fixture, end-to-end,
+ * This module runs the full 42_creator_tool pipeline against a fixture, end-to-end,
  * without the React UI. It delegates to the production `orchestrate()` from
  * `src/orchestrate.js` so there is a single authoritative pipeline sequence.
  * Only the LLM client and URL-reachability fetch are mocked.
@@ -41,7 +41,7 @@ const FIXTURE_JUDGE_MODEL = 'mock/judge';
  * @property {string} fixtureId
  * @property {string} bucket
  * @property {import('../src/types/run.js').Run} run
- * @property {{allowed:boolean, blockedByRisk:boolean, blockedByRouting:boolean, blockedByVerification:boolean}} gate
+ * @property {{allowed:boolean, blockedByRisk:boolean, blockedByRouting:boolean, blockedByVerification:boolean, blockedBySources:boolean}} gate
  * @property {{level:string, text:string}} risk
  * @property {object} ablation
  * @property {boolean} reviewSkipped           true when selective escalation skipped Phase 2
@@ -116,6 +116,7 @@ export async function runFixture(fixture, ablation, options = {}) {
       blockedByRisk: gates.risk?.blocked || false,
       blockedByRouting: gates.routing?.blocked || false,
       blockedByVerification: gates.verification?.blocked || false,
+      blockedBySources: gates.sources?.blocked || false,
     };
 
     // Detect whether review was skipped by checking the log.

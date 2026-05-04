@@ -4,7 +4,7 @@ import { getMarketQuestionTitleLimit } from '../util/marketQuestionTitle.js';
 // 42.space protocol context — single source of truth
 // ---------------------------------------------------------------------------
 //
-// PM_tools is used EXCLUSIVELY to draft markets for 42.space (formerly
+// 42_creator_tool is used EXCLUSIVELY to draft markets for 42.space (formerly
 // Alkimiya). 42 is NOT a Conditional-Token-Framework (CTF) prediction market
 // like Polymarket or Kalshi. Its mechanism is fundamentally different and
 // every prompt downstream must reflect that. The block below is injected into

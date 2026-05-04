@@ -1,7 +1,7 @@
 {
   "id": "rag-typo-url",
   "bucket": "rag-trap",
-  "description": "Cited URL has a typo (\"bloomberq\") that resolves to NXDOMAIN. Same gate as rag-dead-url: soft_fail and targeted_review.",
+  "description": "Cited URL has a typo (\"bloomberq\") that resolves to NXDOMAIN. The claim routes to targeted_review and the pre-finalize source gate blocks.",
   "input": {
     "question": "Will the S&P 500 close above 7000 by 2027-12-31?",
     "startDate": "2027-01-01",
@@ -33,6 +33,7 @@
     "expected_citation_resolves_all": false,
     "expected_has_soft_fail": true,
     "expected_routing_overall": "needs_update",
-    "expected_finalize_allowed": true
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_sources": true
   }
 }

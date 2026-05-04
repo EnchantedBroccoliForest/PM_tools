@@ -1,20 +1,13 @@
 /**
  * Run artifact schema.
  *
- * A Run is the canonical, claim-level record of everything the PM_tools
+ * A Run is the canonical, claim-level record of everything the 42_creator_tool
  * pipeline produces for one market-drafting session: drafts, criticisms,
  * claims, evidence, verification results, aggregation decisions, final JSON,
  * cost accounting, and a structured event log.
  *
- * Later phases hang rigor features off of these structures: Phase 2 populates
- * Aggregation, Phase 3 populates Verification, Phase 4 populates Evidence,
- * Phase 5 reads claim uncertainty to route, Phase 6 diffs runs across
- * ablations. Phase 1 only needs to build the skeleton without changing
- * observable behaviour.
- *
- * JSDoc typedefs are the source of truth for the types; zod schemas below
- * mirror them and are used for parse-time validation (LLM JSON output in
- * Phase 1, imported run files via the Run trace panel).
+ * JSDoc typedefs are mirrored by the zod schemas below and used for
+ * parse-time validation of imported run files and LLM JSON output.
  */
 
 import { z } from 'zod';
@@ -33,7 +26,7 @@ export const GLOBAL_CLAIM_ID = 'global';
  * @property {string} id                  stable id, e.g. "claim.outcome.0.resolutionCriteria"
  * @property {'question'|'outcome_win'|'outcome_criterion'|'edge_case'|'source'|'timestamp'|'threshold'|'other'} category
  * @property {string} text                the atomic claim, one sentence
- * @property {string[]} sourceRefs        ids into evidence[] (populated in Phase 3)
+ * @property {string[]} sourceRefs        ids into evidence[]
  */
 
 /**
@@ -143,6 +136,7 @@ export const GLOBAL_CLAIM_ID = 'global';
  * @property {Verification[]} verification
  * @property {Routing|null} routing
  * @property {Aggregation|null} aggregation
+ * @property {Object|null} sourceAccessibility
  * @property {Object|null} finalJson
  * @property {RunCost} cost
  * @property {LogEntry[]} log
@@ -251,8 +245,8 @@ export const EvidenceSchema = z.object({
   shortId: z.string().optional(),
 });
 
-// Phase 5: per-claim routing record. Produced deterministically from
-// verification + criticism + evidence; no LLM calls are involved.
+// Per-claim routing is produced deterministically from verification,
+// criticism, and evidence records; no LLM calls are involved.
 export const ClaimRoutingSchema = z.object({
   claimId: z.string(),
   severity: z.enum(['ok', 'targeted_review', 'blocking']),
@@ -291,7 +285,26 @@ export const LogEntrySchema = z.object({
   shortId: z.string().optional(),
 });
 
-// ------------------------------ Phase 2 prompt-response schemas ------------
+export const SourceCheckEntrySchema = z.object({
+  url: z.string(),
+  origin: z.enum(['resolution_section', 'source_claim', 'references', 'draft_body']),
+  claimId: z.string().nullable(),
+  accessible: z.boolean(),
+});
+
+export const SourceCheckResultSchema = z.object({
+  status: z.enum(['ok', 'some_unreachable', 'all_unreachable', 'no_sources', 'error']),
+  sources: z.array(SourceCheckEntrySchema),
+  checkedAt: z.number(),
+  wallClockMs: z.number(),
+  error: z.string().nullable().optional().default(null),
+  logEntry: z.object({
+    level: z.enum(['info', 'warn', 'error']),
+    message: z.string(),
+  }).nullable().optional().default(null),
+});
+
+// ------------------------------ prompt-response schemas --------------------
 //
 // These schemas validate the JSON produced by the structured reviewer and
 // judge aggregator prompts. They are narrower than the Run-level schemas
@@ -338,9 +351,8 @@ export const JudgeAggregatorResponseSchema = z.object({
   rationale: z.string().default(''),
 });
 
-// Phase 3: batched draft-entailment verifier response. Each entry
-// corresponds to one claim id. Unknown/invented ids are dropped by the
-// verify pipeline with a warn log.
+// Batched draft-entailment verifier response. Each entry corresponds to one
+// claim id. Unknown/invented ids are dropped with a warn log.
 export const EntailmentVerdictSchema = z.object({
   id: z.string().min(1),
   entailment: z.enum(['entailed', 'contradicted', 'not_covered', 'not_applicable']),
@@ -356,7 +368,7 @@ export const GatesSchema = z.object({
   risk: z.object({ level: z.enum(['low', 'medium', 'high']), blocked: z.boolean() }),
   routing: z.object({ overall: z.enum(['clean', 'needs_update', 'blocked']), blocked: z.boolean() }),
   verification: z.object({ hasHardFail: z.boolean(), blocked: z.boolean() }),
-  sources: z.object({ status: z.enum(['ok', 'some_unreachable', 'all_unreachable', 'no_sources']), blocked: z.boolean() }),
+  sources: z.object({ status: z.enum(['ok', 'some_unreachable', 'all_unreachable', 'no_sources', 'error']), blocked: z.boolean() }),
 });
 
 export const RunSchema = z.object({
@@ -380,10 +392,10 @@ export const RunSchema = z.object({
   claims: z.array(ClaimSchema),
   evidence: z.array(EvidenceSchema),
   verification: z.array(VerificationSchema),
-  // routing is defaulted to null so runs exported before Phase 5 can
-  // still be imported without failing schema validation.
+  // routing is defaulted to null so older exports can still be imported.
   routing: RoutingSchema.nullable().default(null),
   aggregation: AggregationSchema.nullable(),
+  sourceAccessibility: SourceCheckResultSchema.nullable().default(null),
   finalJson: z.record(z.string(), z.unknown()).nullable(),
   cost: RunCostSchema,
   log: z.array(LogEntrySchema),
@@ -442,6 +454,7 @@ export function createRun(input) {
     verification: [],
     routing: null,
     aggregation: null,
+    sourceAccessibility: null,
     finalJson: null,
     cost: createEmptyCost(),
     log: [],

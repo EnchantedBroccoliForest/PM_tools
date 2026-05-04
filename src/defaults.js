@@ -1,5 +1,5 @@
 /**
- * Default configuration for the PM_tools pipeline.
+ * Default configuration for the 42_creator_tool pipeline.
  *
  * Shared by the React app (via useMarketReducer) and the CLI/orchestrator
  * so both consumers agree on model IDs, reviewer lists, and option defaults.

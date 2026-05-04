@@ -51,6 +51,7 @@
     "expected_routing_overall": "blocked",
     "expected_aggregation_overall": "fail",
     "expected_finalize_allowed": false,
+    "expected_blocked_by_sources": true,
     "expected_blocked_by_routing": true,
     "expected_blocking_count": "gte-1"
   }

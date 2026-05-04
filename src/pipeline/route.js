@@ -64,6 +64,24 @@
 import { GLOBAL_CLAIM_ID } from '../types/run.js';
 
 /**
+ * Build a blocking Routing record for failures that happen before a claim
+ * list exists, such as a failed claim-extraction pass. There are no claim
+ * ids to focus, but downstream gates still need a clear "do not finalize"
+ * signal.
+ *
+ * @returns {Routing}
+ */
+export function blockedRouting() {
+  return {
+    items: [],
+    overall: 'blocked',
+    hasBlocking: true,
+    hasTargetedReview: false,
+    focusClaimIds: [],
+  };
+}
+
+/**
  * @typedef {Object} RouteClaimsInput
  * @property {Claim[]} claims
  * @property {Verification[]} verifications
@@ -176,11 +194,14 @@ export function routeClaims(input) {
   // the first draft has been extracted, and also what an import of a
   // minimal run looks like.
   if (claims.length === 0) {
+    const hasGlobalBlocker = criticisms.some((c) => c?.claimId === GLOBAL_CLAIM_ID && c.severity === 'blocker');
+    const hasGlobalMajor = criticisms.some((c) => c?.claimId === GLOBAL_CLAIM_ID && c.severity === 'major');
+    if (hasGlobalBlocker) return blockedRouting();
     return {
       items: [],
-      overall: 'clean',
+      overall: hasGlobalMajor ? 'needs_update' : 'clean',
       hasBlocking: false,
-      hasTargetedReview: false,
+      hasTargetedReview: hasGlobalMajor,
       focusClaimIds: [],
     };
   }

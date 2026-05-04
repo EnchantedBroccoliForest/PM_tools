@@ -1,7 +1,7 @@
 /**
  * Headless pipeline orchestrator.
  *
- * Runs the full PM_tools pipeline (draft → extract claims → verify → gather
+ * Runs the full 42_creator_tool pipeline (draft → extract claims → verify → gather
  * evidence → route → review → aggregate → update → risk → finalize) without
  * any React UI. Takes a config object, returns a Run artifact.
  *
@@ -31,7 +31,8 @@ import { extractClaims } from './pipeline/extractClaims.js';
 import { tryParseJsonObject } from './pipeline/llmJson.js';
 import { verifyClaims, structuralCheck } from './pipeline/verify.js';
 import { gatherEvidence } from './pipeline/gatherEvidence.js';
-import { routeClaims } from './pipeline/route.js';
+import { blockedRouting, routeClaims } from './pipeline/route.js';
+import { checkResolutionSources } from './pipeline/checkSources.js';
 import { runStructuredReviewsParallel } from './pipeline/structuredReview.js';
 import { repairMarketQuestionTitle } from './pipeline/marketQuestionTitle.js';
 import { aggregate } from './pipeline/aggregate.js';
@@ -162,7 +163,9 @@ async function runClaimPipeline(run, draftText, models, options, fetchImpl, cost
   if (run.claims.length === 0) {
     run.verification = [];
     run.evidence = [];
-    run.routing = routeClaims({ claims: [], verifications: [], criticisms: run.criticisms || [] });
+    run.routing = claimResult.logEntry?.level === 'error'
+      ? blockedRouting()
+      : routeClaims({ claims: [], verifications: [], criticisms: run.criticisms || [] });
     return;
   }
 
@@ -331,27 +334,51 @@ async function runRiskStage(run, models, cost, callbacks) {
 }
 
 /**
- * Run the finalizer and record whether the Accept gate allowed the final
- * JSON. Gate logic mirrors App.jsx's handleAccept.
+ * Probe the resolution sources named by the updated draft before finalize.
+ * The source gate is part of the shared headless pipeline, not a UI-only
+ * check, so CLI and eval runs fail closed when cited data is unreachable.
+ */
+async function runSourceAccessibilityStage(run, referencesStr, fetchImpl, cost, callbacks) {
+  const latestDraft = run.drafts[run.drafts.length - 1].content;
+  const checkResult = await checkResolutionSources({
+    draftContent: latestDraft,
+    references: referencesStr,
+    claims: run.claims || [],
+    fetchImpl,
+    timeoutMs: 3000,
+  });
+  cost.record('source_accessibility', { usage: null, wallClockMs: checkResult.wallClockMs });
+  run.sourceAccessibility = checkResult;
+  if (checkResult.logEntry) {
+    log(run, 'source_accessibility', checkResult.logEntry.level, checkResult.logEntry.message, callbacks);
+  }
+  return checkResult;
+}
+
+/**
+ * Run the finalizer and record whether the Accept gate allowed the final JSON.
  */
 async function runFinalizeStage(run, riskLevel, models, cost, callbacks) {
   const latestDraft = run.drafts[run.drafts.length - 1].content;
   const routingOverall = run.routing?.overall || 'clean';
+  const sourceStatus = run.sourceAccessibility?.status || 'no_sources';
   const blockedByRisk = riskLevel === 'high';
   const blockedByRouting = routingOverall === 'blocked';
   const blockedByVerification = (run.verification || []).some((v) => v.verdict === 'hard_fail');
+  const blockedBySources = sourceStatus === 'some_unreachable' || sourceStatus === 'all_unreachable';
 
   const gateResult = {
-    allowed: !blockedByRisk && !blockedByRouting && !blockedByVerification,
+    allowed: !blockedByRisk && !blockedByRouting && !blockedByVerification && !blockedBySources,
     blockedByRisk,
     blockedByRouting,
     blockedByVerification,
+    blockedBySources,
   };
 
   if (!gateResult.allowed) {
     log(
       run, 'accept', 'error',
-      `Finalize blocked: risk=${blockedByRisk}, routing=${blockedByRouting}, verification=${blockedByVerification}`,
+      `Finalize blocked: risk=${blockedByRisk}, routing=${blockedByRouting}, verification=${blockedByVerification}, sources=${blockedBySources}`,
       callbacks,
     );
     return gateResult;
@@ -394,10 +421,8 @@ function buildGates(run, riskLevel) {
   const routingOverall = run.routing?.overall || 'clean';
   const hasHardFail = (run.verification || []).some((v) => v.verdict === 'hard_fail');
 
-  // Source status: derive from evidence. If no evidence was gathered, the
-  // status depends on whether there were any URLs to check.
-  let sourcesStatus = 'no_sources';
-  if (run.evidence && run.evidence.length > 0) {
+  let sourcesStatus = run.sourceAccessibility?.status || 'no_sources';
+  if (!run.sourceAccessibility && run.evidence && run.evidence.length > 0) {
     // If any source-claim verification has citationResolves === false,
     // some sources are unreachable.
     const sourceVerifs = (run.verification || []).filter((v) => {
@@ -419,14 +444,14 @@ function buildGates(run, riskLevel) {
     risk: { level, blocked: level === 'high' },
     routing: { overall: routingOverall, blocked: routingOverall === 'blocked' },
     verification: { hasHardFail, blocked: hasHardFail },
-    sources: { status: sourcesStatus, blocked: sourcesStatus === 'all_unreachable' },
+    sources: { status: sourcesStatus, blocked: sourcesStatus === 'some_unreachable' || sourcesStatus === 'all_unreachable' },
   };
 }
 
 // ------------------------------------------------- public entry point
 
 /**
- * Run the full PM_tools pipeline headlessly.
+ * Run the full 42_creator_tool pipeline headlessly.
  *
  * @param {object} config
  * @param {object} config.input
@@ -646,7 +671,17 @@ async function _orchestrateInner(config, signal) {
     return run;
   }
 
-  // --- 6. Finalize ---
+  // --- 6. Source accessibility ---
+  ok = await stage('source_accessibility', async () => {
+    await runSourceAccessibilityStage(run, referencesStr, fetchImpl, cost, callbacks);
+  });
+  if (!ok || run.status === 'error') {
+    run.cost = cost.snapshot();
+    run.gates = buildGates(run, riskLevel);
+    return run;
+  }
+
+  // --- 7. Finalize ---
   if (options.skipFinalize) {
     run.status = 'partial';
     run.cost = cost.snapshot();

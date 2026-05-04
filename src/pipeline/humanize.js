@@ -22,9 +22,9 @@
  *      → outcome mappings) that a drifting model could otherwise sneak in.
  */
 
-import { queryModel } from '../api/openrouter';
-import { getSystemPrompt, buildHumanizerPrompt } from '../constants/prompts';
-import { tryParseJsonObject } from './llmJson';
+import { queryModel } from '../api/openrouter.js';
+import { getSystemPrompt, buildHumanizerPrompt } from '../constants/prompts.js';
+import { tryParseJsonObject } from './llmJson.js';
 
 // Fields the humanizer is NOT allowed to modify. Restored from the original
 // after parsing the model's response.
