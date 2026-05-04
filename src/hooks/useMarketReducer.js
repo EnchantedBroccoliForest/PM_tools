@@ -43,6 +43,7 @@ export const initialState = {
 
   // Ideating
   ideatingInput: '',
+  ideatingReferences: '',
   ideatingModel: DEFAULT_DRAFT_MODEL,
   ideatingContent: null,
 
