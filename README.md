@@ -72,11 +72,17 @@ The CLI accepts `--rigor=machine|human` (default `machine`); `eval/run.js` accep
 The repository ships a headless CLI (`bin/pm-tools.js`, exposed as `pm-tools`) that runs the full pipeline — including claim extraction, verification, evidence, review, aggregation, update, risk analysis, and finalization — without the React UI. It shares its orchestrator (`src/orchestrate.js`) with the eval harness, so CLI runs are byte-identical in behavior to CI runs.
 
 ```bash
+# Use without installing globally
+npx pm-tools --help
+
+# Or install the command
+npm install -g pm-tools
+
 # Run the full pipeline
 npx pm-tools draft -q "Will BTC exceed 100k?" --start 2026-06-01 --end 2026-09-01
 
-# Verbose output with summary format
-npx pm-tools draft -q "..." --start ... --end ... --verbose --format summary
+# Verbose output with the narrative report format
+npx pm-tools draft -q "..." --start ... --end ... --verbose --level report
 
 # Brainstorm market ideas
 npx pm-tools ideate -d "AI regulation in the EU"
@@ -88,7 +94,7 @@ npx pm-tools validate < run.json
 echo '{"input":{"question":"...","startDate":"...","endDate":"..."}}' | npx pm-tools draft
 ```
 
-Key flags: `--drafter`, `--reviewers`, `--aggregation` (majority/unanimity/judge), `--escalation` (always/selective), `--rigor` (machine/human, default machine), `--feedback`, `--output`, `--format` (json/summary), `--no-finalize`, `--no-review`, `--timeout`.
+Key flags: `--drafter`, `--reviewers`, `--aggregation` (majority/unanimity/judge), `--escalation` (always/selective), `--rigor` (machine/human, default machine), `--feedback`, `--output`, `--format` (json/report/html), `--level` (headline/report/full), `--no-finalize`, `--no-review`, `--timeout`.
 
 ## Architecture
 
