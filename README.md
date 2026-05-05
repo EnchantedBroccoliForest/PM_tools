@@ -107,6 +107,9 @@ text.
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
 export PM_TOOLS_SERVICE_TOKEN=change-me
+export PM_TOOLS_MAX_CONCURRENT_REVIEWS=2
+export PM_TOOLS_RATE_LIMIT_MAX=20
+export PM_TOOLS_RATE_LIMIT_WINDOW_MS=60000
 
 npm run serve -- --host 127.0.0.1 --port 8787
 ```
@@ -140,6 +143,20 @@ reviewer feedback is in `reviews[].reviewProse`; structured findings are in
 When binding to a non-localhost host such as `0.0.0.0`, set
 `PM_TOOLS_SERVICE_TOKEN` or pass `--token`; the service refuses unauthenticated
 network-facing binds by default.
+
+Security and cost controls:
+
+- `PM_TOOLS_SERVICE_TOKEN` protects `POST /review`; send it as
+  `Authorization: Bearer <token>` or `X-PM-Tools-Token: <token>`.
+- `PM_TOOLS_MAX_BODY_BYTES` caps JSON request body size. Default: `1048576`.
+- `PM_TOOLS_MAX_CONCURRENT_REVIEWS` caps simultaneous review jobs. Default: `2`.
+- `PM_TOOLS_RATE_LIMIT_MAX` caps review requests per client window. Default: `20`.
+- `PM_TOOLS_RATE_LIMIT_WINDOW_MS` sets the rate-limit window. Default: `60000`.
+
+These in-process controls are meant to prevent accidental exposure and API
+credit burn. For an internet-facing deployment, also put the service behind a
+reverse proxy / platform rate limiter / WAF and keep the OpenRouter key only on
+the server.
 
 ## Architecture
 

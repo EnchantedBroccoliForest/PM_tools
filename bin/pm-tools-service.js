@@ -13,6 +13,11 @@ FLAGS
   --host                    Bind host (default: 127.0.0.1)
   --port                    Bind port (default: 8787, or PORT/PM_TOOLS_PORT)
   --token                   Bearer token required by POST /review
+  --max-concurrent          Max simultaneous review jobs (default: 2)
+  --rate-limit-max          Max POST /review requests per client window
+                            (default: 20)
+  --rate-limit-window-ms    Rate-limit window in milliseconds
+                            (default: 60000)
   --allow-unauthenticated   Allow non-localhost service without a token
   --help, -h                Show this help
 
@@ -23,6 +28,13 @@ ENVIRONMENT
   PM_TOOLS_HOST              Default host
   PM_TOOLS_PORT              Default port
   PM_TOOLS_CORS_ORIGIN       CORS origin, default *
+  PM_TOOLS_MAX_BODY_BYTES    Max JSON request body size, default 1048576
+  PM_TOOLS_MAX_CONCURRENT_REVIEWS
+                             Max simultaneous review jobs, default 2
+  PM_TOOLS_RATE_LIMIT_MAX    Max POST /review requests per client window,
+                             default 20
+  PM_TOOLS_RATE_LIMIT_WINDOW_MS
+                             Rate-limit window, default 60000
 
 ENDPOINTS
   GET  /health
@@ -47,6 +59,9 @@ async function main() {
       host: { type: 'string' },
       port: { type: 'string' },
       token: { type: 'string' },
+      'max-concurrent': { type: 'string' },
+      'rate-limit-max': { type: 'string' },
+      'rate-limit-window-ms': { type: 'string' },
       'allow-unauthenticated': { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
     },
@@ -77,7 +92,14 @@ async function main() {
     process.exit(2);
   }
 
-  const server = await startReviewServer({ host, port, token });
+  const server = await startReviewServer({
+    host,
+    port,
+    token,
+    maxConcurrentReviews: values['max-concurrent'],
+    rateLimitMax: values['rate-limit-max'],
+    rateLimitWindowMs: values['rate-limit-window-ms'],
+  });
   const address = server.address();
   const actualHost = typeof address === 'object' && address ? address.address : host;
   const actualPort = typeof address === 'object' && address ? address.port : port;
