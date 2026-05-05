@@ -121,7 +121,7 @@ function parseArgs(argv) {
 }
 
 const HELP = `
-PM_tools — Phase 6 regression eval harness
+42_creator_tool regression eval harness
 
 Usage:
   node eval/run.js [flags]
@@ -168,7 +168,7 @@ function formatSummary(metrics, ablation) {
   const lines = [];
   lines.push('');
   lines.push('========================================================');
-  lines.push(`  PM_tools eval — ${metrics.fixtureCount} fixtures`);
+  lines.push(`  42_creator_tool eval — ${metrics.fixtureCount} fixtures`);
   lines.push(`  aggregation=${ablation.aggregation} escalation=${ablation.escalation} evidence=${ablation.evidence} verifiers=${ablation.verifiers}`);
   lines.push('--------------------------------------------------------');
   lines.push(`  Accuracy                : ${pct(metrics.accuracy)}`);

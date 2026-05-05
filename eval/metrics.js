@@ -21,6 +21,7 @@
  *   - expected_blocked_by_risk       boolean
  *   - expected_blocked_by_routing    boolean
  *   - expected_blocked_by_verification boolean
+ *   - expected_blocked_by_sources    boolean
  *   - expected_has_hard_fail         boolean   (any verification with verdict=hard_fail)
  *   - expected_has_soft_fail         boolean   (any verification with verdict=soft_fail)
  *   - expected_has_contradicted      boolean   (any entailment=contradicted)
@@ -80,6 +81,8 @@ function assertOne(key, expected, result) {
       return { key, expected, actual: result.gate.blockedByRouting, passed: result.gate.blockedByRouting === expected };
     case 'expected_blocked_by_verification':
       return { key, expected, actual: result.gate.blockedByVerification, passed: result.gate.blockedByVerification === expected };
+    case 'expected_blocked_by_sources':
+      return { key, expected, actual: result.gate.blockedBySources, passed: result.gate.blockedBySources === expected };
     case 'expected_has_hard_fail': {
       const actual = ver.some((v) => v.verdict === 'hard_fail');
       return { key, expected, actual, passed: actual === expected };

@@ -1,10 +1,10 @@
 /**
  * Reducer tests for the rigor field.
  *
- *   - rigor lands on initialState as 'human' (the human-readable default so
- *     casual users get readable output without flipping a toggle).
+ *   - rigor lands on initialState as 'machine' so browser runs use the
+ *     protocol-safe default unless the user opts into Human mode.
  *   - SET_FIELD can move rigor between values (the toggle's only writer).
- *   - RESET restores rigor to the initialState default ('human').
+ *   - RESET restores rigor to the initialState default ('machine').
  *   - RUN_IMPORT (rehydrateFromRun) restores the rigor the run was
  *     originally produced under, falling back to 'machine' for runs
  *     exported before the rigor field existed.
@@ -16,12 +16,13 @@ import { createRun } from '../types/run.js';
 import { DEFAULT_REVIEW_MODEL_IDS } from '../constants/models.js';
 
 describe('useMarketReducer rigor field', () => {
-  it('initialState defaults rigor to human', () => {
-    expect(initialState.rigor).toBe('human');
+  it('initialState defaults rigor to machine', () => {
+    expect(initialState.rigor).toBe('machine');
   });
 
   it('SET_FIELD updates rigor to machine', () => {
-    const next = reducer(initialState, { type: 'SET_FIELD', field: 'rigor', value: 'machine' });
+    const human = reducer(initialState, { type: 'SET_FIELD', field: 'rigor', value: 'human' });
+    const next = reducer(human, { type: 'SET_FIELD', field: 'rigor', value: 'machine' });
     expect(next.rigor).toBe('machine');
   });
 
@@ -31,11 +32,11 @@ describe('useMarketReducer rigor field', () => {
     expect(next.rigor).toBe('human');
   });
 
-  it('RESET restores rigor to human after a Machine-mode run', () => {
-    const machine = reducer(initialState, { type: 'SET_FIELD', field: 'rigor', value: 'machine' });
-    expect(machine.rigor).toBe('machine');
-    const reset = reducer(machine, { type: 'RESET' });
-    expect(reset.rigor).toBe('human');
+  it('RESET restores rigor to machine after a Human-mode run', () => {
+    const human = reducer(initialState, { type: 'SET_FIELD', field: 'rigor', value: 'human' });
+    expect(human.rigor).toBe('human');
+    const reset = reducer(human, { type: 'RESET' });
+    expect(reset.rigor).toBe('machine');
   });
 });
 

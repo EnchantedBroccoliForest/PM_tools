@@ -1,7 +1,7 @@
 {
   "id": "rag-mixed-sources",
   "bucket": "rag-trap",
-  "description": "One source URL is dead but the other resolves. gatherEvidence treats the claim as resolvable — any working URL counts — and the pipeline finalizes cleanly.",
+  "description": "One source URL is dead but the other resolves. gatherEvidence treats the source claim as resolvable, while the stricter pre-finalize source gate blocks until the dead backup is removed or fixed.",
   "input": {
     "question": "Will the referenced event occur by 2027-12-31?",
     "startDate": "2027-01-01",
@@ -30,7 +30,8 @@
   },
   "expectedProperties": {
     "expected_citation_resolves_all": true,
-    "expected_finalize_allowed": true,
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_sources": true,
     "expected_routing_overall": "clean"
   }
 }

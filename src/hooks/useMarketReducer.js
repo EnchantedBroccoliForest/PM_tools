@@ -19,7 +19,7 @@ export const initialState = {
   // 'human'   = softened reviewer prompts + humanizer applied to the final card.
   // Snapshotted onto the Run artifact at draft time so any mid-flow toggle
   // does not leak into stages that have already started.
-  rigor: 'human', // 'machine' | 'human'
+  rigor: 'machine', // 'machine' | 'human'
 
   // Input
   question: '',
@@ -36,8 +36,8 @@ export const initialState = {
   humanReviewInput: '',
   pastedDraft: '',
 
-  // Phase 2: aggregation protocol used when rolling up per-item reviewer
-  // votes into Aggregation.overall. 'majority' | 'unanimity' | 'judge'.
+  // Aggregation protocol used when rolling up per-item reviewer votes into
+  // Aggregation.overall. 'majority' | 'unanimity' | 'judge'.
   // 'judge' makes one extra LLM call using the first review model.
   aggregationProtocol: 'majority',
 
@@ -75,10 +75,8 @@ export const initialState = {
   earlyResolutionRiskLevel: null,    // 'low' | 'medium' | 'high' | 'unknown' | null
   earlyResolutionAcknowledged: false,
 
-  // Phase 5: routing-based Accept gate. Any `blocking` routing item (or
-  // global blocker criticism) blocks finalize until the user explicitly
-  // acknowledges that they accept the risk. Re-running the pipeline with
-  // a fresh draft resets this to false.
+  // Routing-based Accept gate. Any `blocking` routing item or global blocker
+  // criticism blocks finalize until the user explicitly acknowledges it.
   routingAcknowledged: false,
 
   // Pre-finalize data-source accessibility gate. Runs after the
@@ -91,11 +89,8 @@ export const initialState = {
   sourceAccessibility: null,
   sourceAccessibilityAcknowledged: false,
 
-  // Phase 1: canonical Run artifact. Every handler that performs an LLM call
-  // appends to this in parallel with the legacy view-state fields. The
-  // view-state fields (draftContent, reviews, deliberatedReview, finalContent)
-  // stay in place during Phase 1 so existing UI keeps working unchanged; in
-  // later phases they become derived views of currentRun.
+  // Canonical Run artifact. View-state fields still exist for rendering, but
+  // exports and trace panels should read from currentRun.
   /** @type {import('../types/run').Run|null} */
   currentRun: null,
 
@@ -110,13 +105,16 @@ function clearEarlyResolution(state) {
     earlyResolutionRisk: null,
     earlyResolutionRiskLevel: null,
     earlyResolutionAcknowledged: false,
-    // Phase 5: a new draft always resets the routing acknowledgement so
-    // the user has to re-confirm any surviving blocking claims.
+    // A new draft always resets the routing acknowledgement so the user has
+    // to re-confirm any surviving blocking claims.
     routingAcknowledged: false,
     // Source-accessibility gate is per-draft: a fresh draft invalidates
     // any prior reachability check and drops any prior acknowledgement.
     sourceAccessibility: null,
     sourceAccessibilityAcknowledged: false,
+    currentRun: state.currentRun
+      ? { ...state.currentRun, sourceAccessibility: null }
+      : state.currentRun,
   };
 }
 
@@ -341,37 +339,44 @@ export function reducer(state, action) {
         loadingMeta: null,
         sourceAccessibility: action.result,
         sourceAccessibilityAcknowledged: false,
+        currentRun: state.currentRun
+          ? { ...state.currentRun, sourceAccessibility: action.result }
+          : state.currentRun,
       };
 
-    case 'SOURCE_ACCESSIBILITY_ERROR':
+    case 'SOURCE_ACCESSIBILITY_ERROR': {
+      const result = {
+        status: 'error',
+        sources: [],
+        checkedAt: Date.now(),
+        wallClockMs: 0,
+        error: action.error,
+        logEntry: {
+          level: 'error',
+          message: `Source accessibility: ${action.error}`,
+        },
+      };
       return {
         ...state,
         loading: null,
         loadingMeta: null,
-        sourceAccessibility: {
-          status: 'error',
-          sources: [],
-          checkedAt: Date.now(),
-          wallClockMs: 0,
-          error: action.error,
-          logEntry: {
-            level: 'error',
-            message: `Source accessibility: ${action.error}`,
-          },
-        },
+        sourceAccessibility: result,
         // Errors do NOT block Accept — we only block on confirmed
         // unreachable sources. The UI surfaces the error message.
         sourceAccessibilityAcknowledged: false,
+        currentRun: state.currentRun
+          ? { ...state.currentRun, sourceAccessibility: result }
+          : state.currentRun,
       };
+    }
 
     case 'ACKNOWLEDGE_SOURCE_ACCESSIBILITY':
       return { ...state, sourceAccessibilityAcknowledged: true };
 
-    // ----- Phase 1: Run artifact plumbing ------------------------------
+    // ----- Run artifact plumbing ---------------------------------------
     //
-    // Every RUN_* action operates on state.currentRun. They are additive to
-    // the legacy view-state fields above (draftContent, reviews, ...) so
-    // that ignoring the Run panel leaves the UI unchanged.
+    // Every RUN_* action operates on state.currentRun and keeps the exported
+    // artifact in sync with the rendered workflow.
 
     case 'RUN_START':
       // Starts a fresh run from the current input. Called at the top of
@@ -566,7 +571,7 @@ export function reducer(state, action) {
 }
 
 /**
- * Rebuild the legacy view-state fields from a freshly imported Run. This is
+ * Rebuild the view-state fields from a freshly imported Run. This is
  * what makes the round-trip acceptance criterion work: exporting then
  * re-importing a run renders the same UI as the original.
  */
@@ -585,10 +590,8 @@ function rehydrateFromRun(state, run) {
     references: run.input?.references || '',
     numberOfOutcomes: run.input?.numberOfOutcomes || '',
     rigor: run.input?.rigor || 'machine',
-    // View-state rebuild. Criticisms/aggregation are Phase 2 concerns so we
-    // don't try to map them back to the legacy `reviews[]` shape here — the
-    // run-trace panel is the authoritative view of imported runs. The main
-    // UI still renders the latest draft and final JSON.
+    // View-state rebuild. The run-trace panel is authoritative for imported
+    // review details; the main UI still renders the latest draft and final JSON.
     draftContent: lastDraft ? lastDraft.content : null,
     draftVersions: drafts.map((d) => ({
       content: d.content,
@@ -609,7 +612,7 @@ function rehydrateFromRun(state, run) {
     earlyResolutionAcknowledged: false,
     // Source-accessibility gate is also not persisted; an imported run has
     // to be re-checked if the user wants the gate to gate Accept.
-    sourceAccessibility: null,
+    sourceAccessibility: run.sourceAccessibility || null,
     sourceAccessibilityAcknowledged: false,
     touchedFields: {
       question: false,

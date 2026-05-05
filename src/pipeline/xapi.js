@@ -1,5 +1,5 @@
 /**
- * xAPI Twitter/X integration for the PM_tools pipeline.
+ * xAPI Twitter/X integration for the 42_creator_tool pipeline.
  *
  * Provides URL detection, profile/tweet lookup, timeline search, and
  * reference enrichment via the xAPI REST API (https://action.xapi.to).

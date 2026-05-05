@@ -23,7 +23,7 @@ import { runStructuredReviewsParallel } from './pipeline/structuredReview';
 import { aggregate } from './pipeline/aggregate';
 import { verifyClaims } from './pipeline/verify';
 import { gatherEvidence } from './pipeline/gatherEvidence';
-import { routeClaims, groupRoutingBySeverity } from './pipeline/route';
+import { blockedRouting, routeClaims, groupRoutingBySeverity } from './pipeline/route';
 import { checkResolutionSources } from './pipeline/checkSources';
 import { humanizeFinalJson } from './pipeline/humanize';
 import { repairMarketQuestionTitle } from './pipeline/marketQuestionTitle';
@@ -402,10 +402,8 @@ function App() {
   const panel2Ref = useRef(null);
   const panel3Ref = useRef(null);
   const draftOutputRef = useRef(null);
-  // Phase 5: a mirror of `currentRun` kept in a ref so async handlers that
-  // fire successive dispatches (claim extract → verify → evidence → route)
-  // can read the latest criticism/claim set synchronously without waiting
-  // for React to re-render. Updated via useEffect below.
+  // Mirror `currentRun` in a ref so async handlers can read the latest
+  // criticism and claim state between reducer dispatches.
   const currentRunRef = useRef(null);
 
   const {
@@ -455,10 +453,8 @@ function App() {
   const displayedDraftContent = displayedVersion ? displayedVersion.content : draftContent;
   const isViewingLatest = viewingVersionIndex === latestVersionIndex;
 
-  // Phase 3: rigor for display surfaces (loading-state chip, finalized
-  // footer). Reads from the Run snapshot so an in-flight run keeps showing
-  // its frozen rigor even if the user starts a new draft from a different
-  // toggle position; falls back to live state for the pre-RUN_START case.
+  // Read rigor from the Run snapshot so in-flight runs keep showing the
+  // frozen mode selected at draft time.
   const displayRigor = currentRun?.input?.rigor ?? rigor;
   const resolutionDescriptionMarkdown = finalContent && !finalContent.raw
     ? buildResolutionDescriptionMarkdown(finalContent)
@@ -474,17 +470,13 @@ function App() {
       })
     : null;
 
-  // Phase 0 gate: Accept & Finalize is blocked when the early-resolution
-  // analyst has flagged the updated draft as HIGH risk and the user has not
-  // yet acknowledged it. Low / Medium / Unknown do not block.
+  // Accept & Finalize is blocked when the early-resolution analyst flags
+  // HIGH risk and the user has not acknowledged it.
   const needsRiskAck =
     earlyResolutionRiskLevel === 'high' && !earlyResolutionAcknowledged;
 
-  // Phase 5: the routing gate is independent of the early-resolution gate.
-  // Any claim flagged 'blocking' (or a global blocker criticism, which
-  // the router encodes as overall === 'blocked') prevents Accept until
-  // the user explicitly acknowledges. A `needs_update` overall does NOT
-  // block — it's surfaced as a warning in the Run trace panel only.
+  // Blocking routing findings require explicit acknowledgement. A
+  // `needs_update` rollup is surfaced as a warning, not a hard gate.
   const routingOverall = currentRun?.routing?.overall || 'clean';
   const needsRoutingAck = routingOverall === 'blocked' && !routingAcknowledged;
 
@@ -595,10 +587,8 @@ function App() {
   // Kick off claim extraction in the background for a draft and fold the
   // result (and any log entries) into the current run. Never throws.
   //
-  // Phase 3: chains into verification automatically. Verification needs
-  // both the freshly extracted claims and the draft text, so piggybacking
-  // on extraction keeps the two in sync — every time claims change,
-  // verifications are refreshed against the same draft snapshot.
+  // Verification needs both the freshly extracted claims and the draft text,
+  // so claim extraction and verification stay paired to the same snapshot.
   const runClaimExtractorAndRecord = async (draftText) => {
     const result = await extractClaims(selectedModel, draftText);
     dispatch({
@@ -618,88 +608,92 @@ function App() {
       });
     }
 
-    // Chain into verification. If extraction returned no claims (either
-    // because the draft is empty or because the extractor failed twice)
-    // the verifier logs a skip and returns immediately.
-    if (result.claims.length > 0) {
-      const vResult = await verifyClaims(result.claims, draftText, selectedModel);
-      recordCost('verify', vResult);
-      dispatch({
-        type: 'RUN_SET_VERIFICATION',
-        verification: vResult.verifications,
-      });
-      if (vResult.logEntry) {
-        dispatch({
-          type: 'RUN_LOG',
-          stage: 'verify',
-          level: vResult.logEntry.level,
-          message: vResult.logEntry.message,
-        });
-      }
-
-      // Phase 4: evidence gathering. Harvest URLs from the references
-      // block and source claims, resolve them in parallel via no-cors
-      // fetch, and fold the resolve results back into the verification
-      // list. This can only downgrade a source-claim verdict from pass
-      // to soft_fail when all URLs fail; it never upgrades an existing
-      // hard_fail. The evidence record itself (ids, claim linkage, URLs)
-      // is written to currentRun.evidence unconditionally so the Run
-      // trace panel can show the harvested citations.
-      const eResult = await gatherEvidence({
-        references,
-        claims: result.claims,
-        verifications: vResult.verifications,
-      });
-      dispatch({
-        type: 'RUN_COST',
-        stage: 'evidence',
-        tokensIn: 0,
-        tokensOut: 0,
-        wallClockMs: eResult.wallClockMs,
-      });
-      dispatch({ type: 'RUN_SET_EVIDENCE', evidence: eResult.evidence });
-      // Re-dispatch verifications with the citation-resolve overrides
-      // applied. We always overwrite here, even if nothing changed, so
-      // that exporting immediately after gatherEvidence returns reflects
-      // the latest state without a race against a stale setState.
-      dispatch({
-        type: 'RUN_SET_VERIFICATION',
-        verification: eResult.updatedVerifications,
-      });
-      if (eResult.logEntry) {
-        dispatch({
-          type: 'RUN_LOG',
-          stage: 'evidence',
-          level: eResult.logEntry.level,
-          message: eResult.logEntry.message,
-        });
-      }
-
-      // Phase 5: uncertainty-based routing. Pure sync computation over
-      // the claim set, the post-evidence verification list, and whatever
-      // criticisms the review pass has already accumulated (read from
-      // currentRunRef so we pick up criticisms dispatched earlier in
-      // this same handler without waiting for a re-render). Produces a
-      // per-claim severity + a run-level overall the Accept gate reads.
-      const latestCriticisms = currentRunRef.current?.criticisms || [];
-      const routing = routeClaims({
-        claims: result.claims,
-        verifications: eResult.updatedVerifications,
-        criticisms: latestCriticisms,
-        evidence: eResult.evidence,
-      });
+    // Failed extraction is a blocking condition. Clearing the downstream
+    // artifacts prevents an updated draft from inheriting stale checks from
+    // the previous version.
+    if (result.claims.length === 0) {
+      const routing = result.logEntry?.level === 'error'
+        ? blockedRouting()
+        : routeClaims({ claims: [], verifications: [], criticisms: currentRunRef.current?.criticisms || [] });
+      dispatch({ type: 'RUN_SET_VERIFICATION', verification: [] });
+      dispatch({ type: 'RUN_SET_EVIDENCE', evidence: [] });
       dispatch({ type: 'RUN_SET_ROUTING', routing });
+      if (routing.overall === 'blocked') {
+        dispatch({
+          type: 'RUN_LOG',
+          stage: 'route',
+          level: 'error',
+          message: 'Routing: blocked because claim extraction produced no usable claims.',
+        });
+      }
+      return { claims: [], verifications: [], evidence: [], routing };
+    }
+
+    const vResult = await verifyClaims(result.claims, draftText, selectedModel);
+    recordCost('verify', vResult);
+    dispatch({
+      type: 'RUN_SET_VERIFICATION',
+      verification: vResult.verifications,
+    });
+    if (vResult.logEntry) {
       dispatch({
         type: 'RUN_LOG',
-        stage: 'route',
-        level: routing.overall === 'blocked' ? 'error' : routing.overall === 'needs_update' ? 'warn' : 'info',
-        message:
-          `Routing: overall=${routing.overall}, ` +
-          `${routing.items.filter((i) => i.severity === 'blocking').length} blocking, ` +
-          `${routing.items.filter((i) => i.severity === 'targeted_review').length} targeted, ` +
-          `${routing.items.filter((i) => i.severity === 'ok').length} ok.`,
+        stage: 'verify',
+        level: vResult.logEntry.level,
+        message: vResult.logEntry.message,
       });
     }
+
+    const eResult = await gatherEvidence({
+      references,
+      claims: result.claims,
+      verifications: vResult.verifications,
+    });
+    dispatch({
+      type: 'RUN_COST',
+      stage: 'evidence',
+      tokensIn: 0,
+      tokensOut: 0,
+      wallClockMs: eResult.wallClockMs,
+    });
+    dispatch({ type: 'RUN_SET_EVIDENCE', evidence: eResult.evidence });
+    dispatch({
+      type: 'RUN_SET_VERIFICATION',
+      verification: eResult.updatedVerifications,
+    });
+    if (eResult.logEntry) {
+      dispatch({
+        type: 'RUN_LOG',
+        stage: 'evidence',
+        level: eResult.logEntry.level,
+        message: eResult.logEntry.message,
+      });
+    }
+
+    const latestCriticisms = currentRunRef.current?.criticisms || [];
+    const routing = routeClaims({
+      claims: result.claims,
+      verifications: eResult.updatedVerifications,
+      criticisms: latestCriticisms,
+      evidence: eResult.evidence,
+    });
+    dispatch({ type: 'RUN_SET_ROUTING', routing });
+    dispatch({
+      type: 'RUN_LOG',
+      stage: 'route',
+      level: routing.overall === 'blocked' ? 'error' : routing.overall === 'needs_update' ? 'warn' : 'info',
+      message:
+        `Routing: overall=${routing.overall}, ` +
+        `${routing.items.filter((i) => i.severity === 'blocking').length} blocking, ` +
+        `${routing.items.filter((i) => i.severity === 'targeted_review').length} targeted, ` +
+        `${routing.items.filter((i) => i.severity === 'ok').length} ok.`,
+    });
+    return {
+      claims: result.claims,
+      verifications: eResult.updatedVerifications,
+      evidence: eResult.evidence,
+      routing,
+    };
   };
 
   // --- Stage 1: Draft (single model) ---
@@ -756,23 +750,20 @@ function App() {
     }
   };
 
-  // --- Stage 2: Structured multi-reviewer review + aggregation (Phase 2) ---
+  // --- Stage 2: Structured multi-reviewer review + aggregation ---
   //
   // Each selected review model runs the structured review prompt in parallel.
   // Each reviewer produces, in one JSON response:
   //   - reviewProse:  the paragraph-length critique shown in the existing
   //                   Panel 2 UI (so human-facing behaviour is unchanged)
   //   - rubricVotes:  one verdict per rubric item, feeding the aggregator
-  //   - criticisms:   real Criticism records, replacing Phase 1's synthetic
-  //                   global-criticism projection
+  //   - criticisms:   Criticism records pinned to claims or the whole run
   //
   // After all reviewers return, we roll their votes up via the currently
   // selected aggregation protocol (majority / unanimity / judge). The judge
   // protocol is the only one that makes an extra LLM call; the others are
   // pure-client. A deliberation pass is still run when we have multiple
-  // successful reviews so the existing "deliberated review" UI keeps
-  // working — the chairman is no longer the aggregator of record, only a
-  // human-readable synthesis.
+  // successful reviews; it is display copy, not the aggregation source of truth.
   const handleReview = async () => {
     if (!draftContent) return;
     dispatch({ type: 'START_LOADING', phase: 'review', models: reviewModels.map((id) => getModelName(id)) });
@@ -819,10 +810,8 @@ function App() {
         throw new Error(t('error.allReviewersFailed'));
       }
 
-      // Shape successful structured reviews into the legacy `reviews[]`
-      // record the Panel 2 UI reads. This is the compatibility shim that
-      // lets Phase 2 ship without touching the review rendering code.
-      const legacyReviews = successful.map((r) => ({
+      // Shape structured reviews into the `reviews[]` record the Panel 2 UI reads.
+      const reviewSummaries = successful.map((r) => ({
         model: r.model,
         modelName: r.modelName,
         content: r.reviewProse,
@@ -832,9 +821,9 @@ function App() {
       // but still useful to the user as a consolidated read. Only runs
       // when we have 2+ reviewers.
       let deliberatedReview = null;
-      if (legacyReviews.length > 1) {
-        const deliberationPrompt = buildDeliberationPrompt(draftContent, legacyReviews, numberOfOutcomes, runRigor);
-        const delibResult = await queryModel(legacyReviews[0].model, [
+      if (reviewSummaries.length > 1) {
+        const deliberationPrompt = buildDeliberationPrompt(draftContent, reviewSummaries, numberOfOutcomes, runRigor);
+        const delibResult = await queryModel(reviewSummaries[0].model, [
           { role: 'system', content: getSystemPrompt('reviewer', runRigor) },
           { role: 'user', content: deliberationPrompt },
         ]);
@@ -844,13 +833,12 @@ function App() {
 
       dispatch({
         type: 'REVIEW_SUCCESS',
-        reviews: legacyReviews,
+        reviews: reviewSummaries,
         deliberatedReview,
         reviewConfig: buildReviewConfig(reviewModels, aggregationProtocol),
       });
 
-      // Real Criticism records from every successful reviewer go into the
-      // Run artifact. Phase 1's synthetic projection is gone.
+      // Criticism records from every successful reviewer go into the Run artifact.
       const allCriticisms = successful.flatMap((r) => r.criticisms);
       if (allCriticisms.length > 0) {
         dispatch({ type: 'RUN_APPEND_CRITICISMS', criticisms: allCriticisms });
@@ -859,7 +847,7 @@ function App() {
       // Collect every rubric vote from every reviewer, then run the
       // selected aggregation protocol.
       const allVotes = successful.flatMap((r) => r.rubricVotes);
-      const judgeModelId = legacyReviews[0]?.model;
+      const judgeModelId = reviewSummaries[0]?.model;
       const aggResult = await aggregate(
         aggregationProtocol,
         RIGOR_RUBRIC,
@@ -885,18 +873,9 @@ function App() {
 
       dispatch({ type: 'RUN_SET_AGGREGATION', aggregation: aggResult.aggregation });
 
-      // Phase 5: re-route claims now that criticisms have landed. The
-      // pre-review routing (from runClaimExtractorAndRecord) was computed
-      // off an empty criticism list; recomputing here lets blocker/major
-      // criticisms promote a claim into 'blocking' or 'targeted_review'
-      // so the Accept gate sees them immediately.
-      //
-      // Read claims/verification/evidence from the freshest ref, not a
-      // pre-await snapshot — a background runClaimExtractorAndRecord
-      // started by handleDraft/handleUpdate may have finished during the
-      // aggregate() await above and published new verify/evidence state.
-      // Union allCriticisms in explicitly because the RUN_APPEND_CRITICISMS
-      // dispatched above may not have flushed through to the ref yet.
+      // Re-route claims now that criticisms have landed. Read the freshest
+      // claim/verification/evidence state because the initial draft claim
+      // pipeline may finish while reviews are running.
       const latestRun = currentRunRef.current;
       const combinedCriticisms = [...(latestRun?.criticisms || []), ...allCriticisms];
       const routing = routeClaims({
@@ -914,12 +893,8 @@ function App() {
 
   // --- Stage 3: Update draft with review feedback, then gate on risk ---
   //
-  // Phase 0: after a successful update, immediately chain into the
-  // early-resolution analyst. The analyst's verdict gates Stage 4 — HIGH
-  // risk blocks Accept until the user acknowledges. This is intentionally
-  // pre-finalize (not post-finalize as in earlier iterations): if a draft is
-  // going to leave collateral stranded, we want to catch that before the
-  // user commits to a final JSON.
+  // After a successful update, run claim checks, early-resolution analysis,
+  // and source accessibility before the user can finalize.
   const handleUpdate = async () => {
     if (!draftContent || reviews.length === 0) return;
     dispatch({ type: 'START_LOADING', phase: 'update', models: [getModelName(selectedModel)] });
@@ -928,14 +903,12 @@ function App() {
     const runRigor = currentRunRef.current?.input?.rigor ?? rigor;
 
     let updatedDraft;
+    let updatedClaimPipeline = { claims: [] };
     try {
       // Use the deliberated review if available, otherwise fall back to first review
       const reviewText = deliberatedReview || reviews[0].content;
-      // Phase 5: feed the updater a pre-rendered focus block listing
-      // every blocking / targeted_review claim from the current routing,
-      // so the updater knows which specific claims to fix first. Falls
-      // back to an empty string (unchanged behavior) if routing hasn't
-      // run yet or there's nothing flagged.
+      // Feed the updater a focus block listing every blocking or targeted
+      // claim so it knows which specific issues to fix first.
       const focusBlock = buildRoutingFocusBlock(
         currentRunRef.current?.routing || null,
         currentRunRef.current?.claims || [],
@@ -945,7 +918,6 @@ function App() {
         { role: 'user', content: buildUpdatePrompt(displayedDraftContent, reviewText, humanReviewInput, focusBlock, numberOfOutcomes, references, runRigor) },
       ], { maxTokens: DRAFT_MAX_TOKENS });
       updatedDraft = result.content;
-      dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });
       recordCost('update', result);
       dispatch({
         type: 'RUN_APPEND_DRAFT',
@@ -953,16 +925,11 @@ function App() {
         content: updatedDraft,
         kind: 'updated',
       });
-      // Re-extract claims from the updated draft — the latest extraction
-      // is always the canonical one for downstream verifiers.
-      runClaimExtractorAndRecord(updatedDraft).catch((bgErr) => {
-        dispatch({
-          type: 'RUN_LOG',
-          stage: 'claims',
-          level: 'error',
-          message: t('log.claimExtractionCrashed', { message: bgErr?.message || bgErr }),
-        });
-      });
+      // Re-extract and verify before any gates run. This keeps the source
+      // and routing gates attached to the updated draft instead of whatever
+      // claim set happened to be in the ref from the previous version.
+      updatedClaimPipeline = await runClaimExtractorAndRecord(updatedDraft);
+      dispatch({ type: 'UPDATE_SUCCESS', content: updatedDraft });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || t('error.update') });
       dispatch({ type: 'RUN_LOG', stage: 'update', level: 'error', message: err.message || t('log.updateFailed') });
@@ -1013,7 +980,7 @@ function App() {
       const checkResult = await checkResolutionSources({
         draftContent: updatedDraft,
         references,
-        claims: currentRunRef.current?.claims || [],
+        claims: updatedClaimPipeline.claims || [],
       });
       dispatch({
         type: 'RUN_COST',
@@ -1054,7 +1021,7 @@ function App() {
   const handleAccept = async () => {
     if (!draftContent) return;
     if (needsRiskAck) return; // belt-and-braces; button should already be disabled
-    if (needsRoutingAck) return; // Phase 5: block on un-acknowledged blocking claims
+    if (needsRoutingAck) return; // block on un-acknowledged blocking claims
     if (needsSourceAck) return; // block until unreachable data sources are addressed or acknowledged
     dispatch({ type: 'START_LOADING', phase: 'accept', models: [getModelName(selectedModel)] });
 
@@ -1093,12 +1060,8 @@ function App() {
         parsedContent = { raw: result.content };
       }
 
-      // Phase 3: humanizer runs only under Human rigor. Machine runs ship
-      // the un-humanized finalizer JSON straight to the market card, which
-      // is the existing eval-baseline behavior. The RUN_LOG entry on the
-      // skip path is intentionally informative so a regression that
-      // accidentally calls the humanizer under Machine surfaces as a
-      // missing 'Humanize skipped' line in the run trace.
+      // Humanizer runs only under Human rigor; Machine mode keeps the
+      // finalizer JSON unchanged.
       let finalContent = parsedContent;
       if (runRigor === 'human') {
         const humResult = await humanizeFinalJson(selectedModel, parsedContent);
@@ -1222,7 +1185,7 @@ function App() {
   // --- Run trace: import a previously exported run ---
   // Validates with zod via parseRun; on failure the file is ignored and an
   // error is surfaced to the user. On success the reducer rehydrates the
-  // legacy view-state fields so the main UI re-renders the imported run.
+  // view-state fields so the main UI re-renders the imported run.
   const handleImportRun = (event) => {
     const file = event.target.files && event.target.files[0];
     // Reset the input so the same file can be re-imported without a page reload.
@@ -1793,7 +1756,7 @@ function App() {
 
                     <div className="toolbar-divider" />
 
-                    {/* Phase 2: Aggregation protocol selector. Governs how
+                    {/* Aggregation protocol selector. Governs how
                         per-item rubric votes are rolled up into the final
                         aggregation decision. */}
                     <div className="toolbar-group">
@@ -1966,7 +1929,7 @@ function App() {
                     </div>
                   )}
 
-                  {/* Phase 5: routing gate — runs pre-finalize. Any
+                  {/* Routing gate — runs pre-finalize. Any
                       'blocking' routing item (or a global blocker
                       criticism) prevents Accept until acknowledged. */}
                   {hasUpdated && currentRun?.routing && currentRun.routing.overall !== 'clean' && (
@@ -2699,7 +2662,7 @@ function App() {
                     </div>
                   )}
 
-                  {/* Phase 3: rigor provenance footer. Mirrors the chip on
+                  {/* Rigor provenance footer. Mirrors the chip on
                       the loading spinner so users can confirm which mode
                       this market was produced under after the run is done. */}
                   <p className={`final-doc__rigor-footer final-doc__rigor-footer--${displayRigor}`}>
@@ -2717,7 +2680,7 @@ function App() {
 
         </div>
 
-        {/* Run trace panel — Phase 1. Collapsible, shows the current Run
+        {/* Run trace panel. Collapsible, shows the current Run
             artifact (drafts, claims, cost) and provides export/import of
             the raw JSON for bug reports and round-trip verification. */}
         <section className="run-trace" aria-labelledby="run-trace-heading">
@@ -2834,7 +2797,7 @@ function App() {
                     )}
                   </div>
 
-                  {/* Phase 2: aggregation checklist — only present once
+                  {/* Aggregation checklist — only present once
                       handleReview has run. Shows the rubric decisions plus
                       every reviewer's vote under each item. */}
                   {currentRun.aggregation && (
@@ -2896,9 +2859,8 @@ function App() {
                     </div>
                   )}
 
-                  {/* Phase 2: real criticisms (replaced Phase 1's synthetic
-                      global-criticism projection). Shown here so reviewers
-                      can compare per-claim issues across models. */}
+                  {/* Reviewer criticisms, grouped so per-claim issues can be
+                      compared across models. */}
                   {currentRun.criticisms.length > 0 && (
                     <div className="run-trace__section">
                       <h4 className="run-trace__heading">
@@ -2924,7 +2886,7 @@ function App() {
                     </div>
                   )}
 
-                  {/* Phase 3: claim verification. Structural + draft
+                  {/* Claim verification. Structural + draft
                       entailment checks. Each line shows the per-claim
                       verdict plus a compact rationale pulled from either
                       the structural tool output or the entailment response. */}
@@ -2988,7 +2950,7 @@ function App() {
                     </div>
                   )}
 
-                  {/* Phase 5: uncertainty-based routing. Shows the
+                  {/* Uncertainty-based routing. Shows the
                       overall decision (clean / needs_update / blocked)
                       plus a count per severity bucket. Individual claims
                       are listed under their bucket so the user can see
@@ -3034,7 +2996,7 @@ function App() {
                     </div>
                   )}
 
-                  {/* Phase 4: harvested evidence with per-URL resolve
+                  {/* Harvested evidence with per-URL resolve
                       status. The resolve flag mirrors the underlying
                       source claim's Verification.citationResolves (when
                       linked to a source claim) or defaults to unknown. */}

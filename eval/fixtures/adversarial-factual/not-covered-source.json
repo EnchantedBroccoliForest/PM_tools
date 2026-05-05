@@ -33,8 +33,9 @@
     "expected_has_soft_fail": true,
     "expected_has_hard_fail": false,
     "expected_routing_overall": "needs_update",
-    "expected_finalize_allowed": true,
+    "expected_finalize_allowed": false,
     "expected_blocked_by_verification": false,
+    "expected_blocked_by_sources": true,
     "expected_targeted_count": "gte-1"
   }
 }

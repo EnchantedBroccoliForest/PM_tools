@@ -1,16 +1,15 @@
 /**
  * Structured review pipeline.
  *
- * Runs a single reviewer model against the draft with the Phase 2 structured
+ * Runs a single reviewer model against the draft with the structured
  * review prompt, which asks for a JSON object containing:
  *
  *   - reviewProse:    a paragraph-length critique (carried into the UI's
  *                     existing reviews[] list so the Panel 2 view is
  *                     unchanged for humans)
  *   - rubricVotes:    one {verdict, rationale} per rubric item (feeds the
- *                     Phase 2 aggregator)
- *   - criticisms:     real Criticism records, not the synthetic Phase 1
- *                     projection
+ *                     aggregator)
+ *   - criticisms:     Criticism records pinned to claims or the whole run
  *
  * The function never throws. On any failure it returns null fields plus a
  * structured logEntry the caller should surface via RUN_LOG. One strict-
@@ -55,9 +54,7 @@ import { tryParseJsonObject, createUsageAggregator } from './llmJson.js';
  * @param {'machine'|'human'} [rigor]             selects the rigor variant of
  *                                                the structured-reviewer
  *                                                system prompt and the user
- *                                                prompt builder. Phase 2 keeps
- *                                                both variants byte-identical;
- *                                                Phase 3 forks Human wording.
+ *                                                prompt builder.
  * @returns {Promise<StructuredReviewResult>}
  */
 export async function runStructuredReview(model, draftContent, rubric, numberOfOutcomes = '', rigor = 'machine') {
@@ -164,9 +161,7 @@ export async function runStructuredReview(model, draftContent, rubric, numberOfO
     rationale: v.rationale || '',
   }));
 
-  // Project structured criticisms → Run-level Criticism records. A stable
-  // id scheme is required for downstream features (e.g. Phase 3
-  // verification can reference criticisms by id).
+  // Project structured criticisms into Run-level records with stable ids.
   const now = Date.now();
   const criticisms = data.criticisms.map((c, i) => ({
     id: `criticism.${now}.${model.id}.${i}`,

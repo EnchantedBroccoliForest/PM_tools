@@ -162,13 +162,13 @@ eval/
 - **OpenRouter API** as the single LLM gateway (any model on OpenRouter can be used as drafter, reviewer, or judge)
 - **Zod 4** for runtime schema validation of LLM JSON output and Run artifacts
 - **Vitest 4** for unit tests; the eval harness for end-to-end regression tests
-- **Node.js 20+** for the CLI and eval harness
+- **Node.js 20.19+** for the CLI and eval harness
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 20.19+
 - An [OpenRouter](https://openrouter.ai/) API key
 
 ### Setup

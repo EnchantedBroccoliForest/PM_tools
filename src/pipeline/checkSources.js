@@ -21,7 +21,7 @@
  * to `status: 'error'` and the App layer surfaces that without blocking.
  */
 
-import { resolveCitation } from './gatherEvidence';
+import { resolveCitation } from './gatherEvidence.js';
 import { resolveXUrl } from './xapi.js';
 
 // Permissive URL matcher — catches URLs inside markdown links, bullet

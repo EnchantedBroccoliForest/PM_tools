@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PM_tools CLI.
+ * 42_creator_tool CLI.
  *
  * Commands:
  *   draft      Run the full pipeline and print a Run artifact
@@ -198,7 +198,7 @@ async function cmdDraft(values, stdinConfig) {
     process.exit(2);
   }
 
-  // Phase 5: rigor selection. Default to 'machine' so headless / scripted
+  // Default to 'machine' so headless / scripted
   // callers retain today's behavior — Human mode is opt-in. CLI flag wins
   // over stdin to match the rest of this command's precedence rules; an
   // unrecognised value is rejected so a typo (e.g. --rigor=Human) cannot

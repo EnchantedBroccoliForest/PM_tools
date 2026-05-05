@@ -1,7 +1,7 @@
 {
   "id": "rag-dead-url",
   "bucket": "rag-trap",
-  "description": "Cited source URL does not resolve. gatherEvidence degrades the source claim's verdict from pass to soft_fail, which routes the claim to targeted_review but does not block finalize on its own.",
+  "description": "Cited source URL does not resolve. gatherEvidence degrades the source claim to targeted_review, and the pre-finalize source gate blocks because every cited source is unreachable.",
   "input": {
     "question": "Will the referenced event occur by 2027-12-31?",
     "startDate": "2027-01-01",
@@ -31,7 +31,8 @@
     "expected_citation_resolves_all": false,
     "expected_has_soft_fail": true,
     "expected_routing_overall": "needs_update",
-    "expected_finalize_allowed": true,
+    "expected_finalize_allowed": false,
+    "expected_blocked_by_sources": true,
     "expected_targeted_count": "gte-1"
   }
 }
