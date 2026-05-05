@@ -96,11 +96,57 @@ echo '{"input":{"question":"...","startDate":"...","endDate":"..."}}' | npx pm-t
 
 Key flags: `--drafter`, `--reviewers`, `--aggregation` (majority/unanimity/judge), `--escalation` (always/selective), `--rigor` (machine/human, default machine), `--feedback`, `--output`, `--format` (json/report/html), `--level` (headline/report/full), `--no-finalize`, `--no-review`, `--timeout`.
 
+## HTTP Review Service
+
+For integrations that already have proposal text, run PM_tools as an HTTP
+service and submit the proposal for review. This path does not draft, update,
+or finalize a market; it runs claim extraction, verification, evidence checks,
+structured reviewer critique, rubric aggregation, and routing on the supplied
+text.
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+export PM_TOOLS_SERVICE_TOKEN=change-me
+
+npm run serve -- --host 127.0.0.1 --port 8787
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:8787/health
+```
+
+Review an existing proposal:
+
+```bash
+curl -X POST http://127.0.0.1:8787/review \
+  -H "Authorization: Bearer change-me" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "proposalText": "Will BTC exceed $100,000 by 2026-09-01? ...",
+    "references": ["https://example.com/source"],
+    "options": {
+      "aggregation": "majority",
+      "evidence": "retrieval",
+      "verifiers": "full"
+    }
+  }'
+```
+
+The response includes `summary`, `reviews`, and the full `run` artifact. The
+reviewer feedback is in `reviews[].reviewProse`; structured findings are in
+`run.criticisms`, `run.aggregation`, `run.verification`, and `run.routing`.
+When binding to a non-localhost host such as `0.0.0.0`, set
+`PM_TOOLS_SERVICE_TOKEN` or pass `--token`; the service refuses unauthenticated
+network-facing binds by default.
+
 ## Architecture
 
 ```
 bin/
-└── pm-tools.js                # Headless CLI entry point
+├── pm-tools.js                # Headless CLI entry point
+└── pm-tools-service.js        # HTTP review service entry point
 src/
 ├── App.jsx                    # Main UI component and workflow orchestration
 ├── App.css                    # Application styles
@@ -134,6 +180,9 @@ src/
 │   ├── models.js              # LLM model definitions, live-fetch, defaults
 │   ├── prompts.js             # System prompts and prompt builders for each stage
 │   └── rubric.js              # Six-item rigor rubric for 42.space markets
+├── service/
+│   ├── reviewProposal.js      # Existing-proposal review API
+│   └── server.js              # HTTP /review service
 └── util/
     └── riskLevel.js           # Shared early-resolution risk-level parser
 eval/

@@ -5,7 +5,8 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "pm-tools": "bin/pm-tools.js"
+    "pm-tools": "bin/pm-tools.js",
+    "pm-tools-service": "bin/pm-tools-service.js"
   },
   "files": [
     "bin/",
@@ -39,6 +40,7 @@
   },
   "scripts": {
     "pm-tools": "node bin/pm-tools.js",
+    "serve": "node bin/pm-tools-service.js",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
