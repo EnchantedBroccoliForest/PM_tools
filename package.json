@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "pm-tools": "./bin/pm-tools.js"
+    "pm-tools": "bin/pm-tools.js"
   },
   "files": [
     "bin/",
