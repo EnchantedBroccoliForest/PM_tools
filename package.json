@@ -1,17 +1,49 @@
 {
   "name": "pm-tools",
-  "private": true,
   "version": "0.1.0",
+  "description": "Headless prediction market drafting and review CLI for 42.space market proposals.",
   "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=20.19.0"
   },
   "bin": {
-    "pm-tools": "./bin/pm-tools.js"
+    "pm-tools": "bin/pm-tools.js",
+    "pm-tools-service": "bin/pm-tools-service.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE",
+    "!src/**/*.test.js",
+    "!src/**/*.test.jsx",
+    "!src/**/__snapshots__/"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EnchantedBroccoliForest/42_creator_tool.git"
+  },
+  "bugs": {
+    "url": "https://github.com/EnchantedBroccoliForest/42_creator_tool/issues"
+  },
+  "homepage": "https://github.com/EnchantedBroccoliForest/42_creator_tool#readme",
+  "keywords": [
+    "prediction-market",
+    "cli",
+    "openrouter",
+    "42-space",
+    "market-drafting"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "pm-tools": "node bin/pm-tools.js",
+    "serve": "node bin/pm-tools-service.js",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",

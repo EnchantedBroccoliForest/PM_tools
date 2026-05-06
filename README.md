@@ -72,11 +72,17 @@ The CLI accepts `--rigor=machine|human` (default `machine`); `eval/run.js` accep
 The repository ships a headless CLI (`bin/pm-tools.js`, exposed as `pm-tools`) that runs the full pipeline — including claim extraction, verification, evidence, review, aggregation, update, risk analysis, and finalization — without the React UI. It shares its orchestrator (`src/orchestrate.js`) with the eval harness, so CLI runs are byte-identical in behavior to CI runs.
 
 ```bash
+# Use without installing globally
+npx pm-tools --help
+
+# Or install the command
+npm install -g pm-tools
+
 # Run the full pipeline
 npx pm-tools draft -q "Will BTC exceed 100k?" --start 2026-06-01 --end 2026-09-01
 
-# Verbose output with summary format
-npx pm-tools draft -q "..." --start ... --end ... --verbose --format summary
+# Verbose output with the narrative report format
+npx pm-tools draft -q "..." --start ... --end ... --verbose --level report
 
 # Brainstorm market ideas
 npx pm-tools ideate -d "AI regulation in the EU"
@@ -88,13 +94,76 @@ npx pm-tools validate < run.json
 echo '{"input":{"question":"...","startDate":"...","endDate":"..."}}' | npx pm-tools draft
 ```
 
-Key flags: `--drafter`, `--reviewers`, `--aggregation` (majority/unanimity/judge), `--escalation` (always/selective), `--rigor` (machine/human, default machine), `--feedback`, `--output`, `--format` (json/summary), `--no-finalize`, `--no-review`, `--timeout`.
+Key flags: `--drafter`, `--reviewers`, `--aggregation` (majority/unanimity/judge), `--escalation` (always/selective), `--rigor` (machine/human, default machine), `--feedback`, `--output`, `--format` (json/report/html), `--level` (headline/report/full), `--no-finalize`, `--no-review`, `--timeout`.
+
+## HTTP Review Service
+
+For integrations that already have proposal text, run PM_tools as an HTTP
+service and submit the proposal for review. This path does not draft, update,
+or finalize a market; it runs claim extraction, verification, evidence checks,
+structured reviewer critique, rubric aggregation, and routing on the supplied
+text.
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+export PM_TOOLS_SERVICE_TOKEN=change-me
+export PM_TOOLS_MAX_CONCURRENT_REVIEWS=2
+export PM_TOOLS_RATE_LIMIT_MAX=20
+export PM_TOOLS_RATE_LIMIT_WINDOW_MS=60000
+
+npm run serve -- --host 127.0.0.1 --port 8787
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:8787/health
+```
+
+Review an existing proposal:
+
+```bash
+curl -X POST http://127.0.0.1:8787/review \
+  -H "Authorization: Bearer change-me" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "proposalText": "Will BTC exceed $100,000 by 2026-09-01? ...",
+    "references": ["https://example.com/source"],
+    "options": {
+      "aggregation": "majority",
+      "evidence": "retrieval",
+      "verifiers": "full"
+    }
+  }'
+```
+
+The response includes `summary`, `reviews`, and the full `run` artifact. The
+reviewer feedback is in `reviews[].reviewProse`; structured findings are in
+`run.criticisms`, `run.aggregation`, `run.verification`, and `run.routing`.
+When binding to a non-localhost host such as `0.0.0.0`, set
+`PM_TOOLS_SERVICE_TOKEN` or pass `--token`; the service refuses unauthenticated
+network-facing binds by default.
+
+Security and cost controls:
+
+- `PM_TOOLS_SERVICE_TOKEN` protects `POST /review`; send it as
+  `Authorization: Bearer <token>` or `X-PM-Tools-Token: <token>`.
+- `PM_TOOLS_MAX_BODY_BYTES` caps JSON request body size. Default: `1048576`.
+- `PM_TOOLS_MAX_CONCURRENT_REVIEWS` caps simultaneous review jobs. Default: `2`.
+- `PM_TOOLS_RATE_LIMIT_MAX` caps review requests per client window. Default: `20`.
+- `PM_TOOLS_RATE_LIMIT_WINDOW_MS` sets the rate-limit window. Default: `60000`.
+
+These in-process controls are meant to prevent accidental exposure and API
+credit burn. For an internet-facing deployment, also put the service behind a
+reverse proxy / platform rate limiter / WAF and keep the OpenRouter key only on
+the server.
 
 ## Architecture
 
 ```
 bin/
-└── pm-tools.js                # Headless CLI entry point
+├── pm-tools.js                # Headless CLI entry point
+└── pm-tools-service.js        # HTTP review service entry point
 src/
 ├── App.jsx                    # Main UI component and workflow orchestration
 ├── App.css                    # Application styles
@@ -128,6 +197,9 @@ src/
 │   ├── models.js              # LLM model definitions, live-fetch, defaults
 │   ├── prompts.js             # System prompts and prompt builders for each stage
 │   └── rubric.js              # Six-item rigor rubric for 42.space markets
+├── service/
+│   ├── reviewProposal.js      # Existing-proposal review API
+│   └── server.js              # HTTP /review service
 └── util/
     └── riskLevel.js           # Shared early-resolution risk-level parser
 eval/
