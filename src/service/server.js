@@ -265,10 +265,14 @@ export function createReviewServer(options = {}) {
         concurrency.release();
       }
     } catch (err) {
-      const statusCode = err instanceof ReviewRequestError ? err.statusCode : 500;
+      const isRequestError = err instanceof ReviewRequestError;
+      const statusCode = isRequestError ? err.statusCode : 500;
+      if (!isRequestError) {
+        console.error('Unhandled review server error:', err);
+      }
       sendJson(res, statusCode, {
         error: statusCode >= 500 ? 'internal_error' : 'bad_request',
-        message: err.message || String(err),
+        message: isRequestError ? (err.message || String(err)) : 'An internal error occurred.',
       }, corsHeaders);
     }
   });
