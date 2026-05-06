@@ -113,6 +113,24 @@ describe('SYSTEM_PROMPTS structure', () => {
     expect(SYSTEM_PROMPTS.machine.structuredReviewer).toMatch(/strictly valid JSON/i);
     expect(SYSTEM_PROMPTS.human.structuredReviewer).toMatch(/strictly valid JSON/i);
   });
+
+  it('PROTOCOL_CONTEXT carries market-suitability guidance from the 42 creation guide', () => {
+    expect(PROTOCOL_CONTEXT).toContain('time-based=preset timestamp');
+    expect(PROTOCOL_CONTEXT).toContain('event-based=external reveal + monitoring');
+    expect(PROTOCOL_CONTEXT).toContain('DESCRIPTION CONTRACT');
+    expect(PROTOCOL_CONTEXT).toMatch(/sweeping "when will X happen\?"/);
+    expect(PROTOCOL_CONTEXT).toMatch(/live-on-date\/source-tick markets/);
+    expect(PROTOCOL_CONTEXT).toMatch(/anchor\+uncertainty window/);
+    expect(PROTOCOL_CONTEXT).toMatch(/must NOT begin with "OT"/);
+    expect(PROTOCOL_CONTEXT).toMatch(/Other \/ None/);
+  });
+
+  it('PROTOCOL_CONTEXT keeps original hard protocol invariants', () => {
+    expect(PROTOCOL_CONTEXT).toContain('MECE IS HARD-REQUIRED');
+    expect(PROTOCOL_CONTEXT).toContain('FIXED OUTCOME SET AT LAUNCH');
+    expect(PROTOCOL_CONTEXT).toContain('NO STRANDED COLLATERAL');
+    expect(PROTOCOL_CONTEXT).toMatch(/single unambiguous hard UTC timestamp/);
+  });
 });
 
 describe('getSystemPrompt(role, rigor)', () => {
@@ -333,6 +351,17 @@ describe('Human-mode bodies still carry load-bearing tokens', () => {
     expect(machine).toContain('refinedQuestion: trader-facing market title, max 90 chars');
     expect(human).toContain('refinedQuestion: trader-facing market title, max 70 chars');
     expect(human).toMatch(/Keep resolver detail, sources, exact timestamps, edge cases, and protocol mechanics out of the title/);
+  });
+
+  it('buildFinalizePrompt description template starts with the guide-required summary sentence', () => {
+    const machine = buildFinalizePrompt(SAMPLE.draftContent, SAMPLE.startDate, SAMPLE.endDate, SAMPLE.numberOfOutcomes, 'machine');
+    const human = buildFinalizePrompt(SAMPLE.draftContent, SAMPLE.startDate, SAMPLE.endDate, SAMPLE.numberOfOutcomes, 'human');
+
+    for (const prompt of [machine, human]) {
+      expect(prompt).toContain('starting with one standalone summary sentence');
+      expect(prompt).toContain('<one standalone sentence capturing who/what resolves');
+      expect(prompt).toMatch(/Name a secondary fallback source/);
+    }
   });
 
   it('buildIdeatePrompt without references is byte-identical to the no-arg form (back-compat)', () => {

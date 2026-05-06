@@ -40,6 +40,7 @@ import {
 import { buildResolutionDescriptionMarkdown } from './util/resolutionDescription';
 import { buildMarketCard, formatMarketCardCopy } from './util/marketCard';
 import { formatFullSpecCopy } from './util/finalCopy';
+import { validateFinalMarketJson } from './util/finalMarketJson';
 import { isSafeExternalUrl, splitExternalUrlToken } from './util/externalUrl';
 import { useMarketReducer } from './hooks/useMarketReducer';
 import { useAmbientMode } from './hooks/useAmbientMode';
@@ -1091,6 +1092,11 @@ function App() {
         message: titleResult.logEntry.message,
       });
       finalContent = titleResult.finalJson;
+
+      const finalValidation = validateFinalMarketJson(finalContent);
+      if (!finalValidation.valid) {
+        throw new Error(`Final market JSON failed validation: ${finalValidation.errors.join('; ')}`);
+      }
 
       dispatch({ type: 'FINALIZE_SUCCESS', content: finalContent });
       dispatch({ type: 'RUN_SET_FINAL', finalJson: finalContent });
