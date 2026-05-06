@@ -39,6 +39,7 @@ import { aggregate } from './pipeline/aggregate.js';
 import { RIGOR_RUBRIC } from './constants/rubric.js';
 import { enrichReferencesWithXData } from './pipeline/xapi.js';
 import { parseRiskLevel } from './util/riskLevel.js';
+import { validateFinalMarketJson } from './util/finalMarketJson.js';
 import { createRun } from './types/run.js';
 import { assignShortIds } from './report/shortIds.js';
 import {
@@ -402,6 +403,17 @@ async function runFinalizeStage(run, riskLevel, models, cost, callbacks) {
   cost.record('title_repair', titleResult);
   if (titleResult.logEntry) {
     log(run, 'title_repair', titleResult.logEntry.level, titleResult.logEntry.message, callbacks);
+  }
+  const finalValidation = validateFinalMarketJson(titleResult.finalJson);
+  if (!finalValidation.valid) {
+    log(
+      run,
+      'accept',
+      'error',
+      `Final market JSON failed validation: ${finalValidation.errors.join('; ')}`,
+      callbacks,
+    );
+    throw new Error(`Final market JSON failed validation: ${finalValidation.errors.join('; ')}`);
   }
   run.finalJson = titleResult.finalJson;
   return gateResult;

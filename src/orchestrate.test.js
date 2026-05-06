@@ -42,7 +42,7 @@ function finalJson() {
   };
 }
 
-function makeQuery({ claimsContent, entailmentContent, onEarlyResolution }) {
+function makeQuery({ claimsContent, entailmentContent, onEarlyResolution, finalJsonOverride }) {
   const calls = {
     drafter: 0,
     claimExtractor: 0,
@@ -80,7 +80,7 @@ function makeQuery({ claimsContent, entailmentContent, onEarlyResolution }) {
     }
     if (system === getSystemPrompt('finalizer', 'machine')) {
       calls.finalizer += 1;
-      return usage(JSON.stringify(finalJson()));
+      return usage(JSON.stringify(finalJsonOverride || finalJson()));
     }
     return usage('{}');
   };
@@ -251,5 +251,50 @@ describe('orchestrate gates', () => {
     expect(run.routing).toMatchObject({ overall: 'blocked', hasBlocking: true });
     expect(run.gates.routing).toEqual({ overall: 'blocked', blocked: true });
     expect(query.calls.finalizer).toBe(0);
+  });
+
+  it('fails finalize when outcome names use the reserved OT token prefix', async () => {
+    const query = makeQuery({
+      claimsContent: JSON.stringify([
+        { id: 'claim.source.0', category: 'source', text: `Resolution source: ${SOURCE_URL}`, sourceRefs: [] },
+      ]),
+      finalJsonOverride: {
+        ...finalJson(),
+        outcomes: [
+          { name: 'OT Yes', winCondition: 'Team A wins.', resolutionCriteria: `Use ${SOURCE_URL}.` },
+          { name: 'No', winCondition: 'Team A does not win.', resolutionCriteria: `Use ${SOURCE_URL}.` },
+        ],
+      },
+    });
+    installQueryModel(query);
+
+    const run = await orchestrate({
+      input: {
+        question: 'Will Team A win?',
+        startDate: '2026-01-01T00:00:00Z',
+        endDate: '2026-01-31T23:59:59Z',
+        references: SOURCE_URL,
+        rigor: 'machine',
+      },
+      models: {
+        drafter: 'mock/drafter',
+        reviewers: [{ id: 'mock/reviewer', name: 'Reviewer' }],
+      },
+      options: {
+        aggregation: 'majority',
+        escalation: 'always',
+        evidence: 'retrieval',
+        verifiers: 'full',
+      },
+      fetchImpl: async () => ({ ok: true, status: 200, type: 'opaque' }),
+    });
+
+    expect(run.status).toBe('error');
+    expect(run.finalJson).toBeNull();
+    expect(run.log.some((entry) => (
+      entry.stage === 'accept'
+      && /reserved "OT" token prefix/.test(entry.message)
+    ))).toBe(true);
+    expect(query.calls.finalizer).toBe(1);
   });
 });

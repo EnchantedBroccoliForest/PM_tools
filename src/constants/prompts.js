@@ -19,16 +19,18 @@ export const PROTOCOL_NAME = '42.space';
 export const PROTOCOL_CONTEXT = `42.space PROTOCOL — every market is an Events Futures market on 42, NOT a Polymarket/CTF/LMSR binary-share market. Design must respect 42's mechanism:
 
 1. OUTCOME TOKENS: each outcome spawns its own Outcome Token (OT) backed by collateral on its own bonding curve. No YES/NO complement-pair invariant. Prices are conviction/flow, NOT probabilities, and uncapped (no $1 ceiling).
-2. PARIMUTUEL SETTLEMENT: at the deadline trading halts (mint/redeem/transfers disabled), ONE winner is declared by predefined objective rules, and ALL losing collateral is pooled and redistributed PRO-RATA to the winning OT holders. No partial wins, no probabilistic payouts, no scalar payouts, no residual/LP liquidity.
+2. PARIMUTUEL SETTLEMENT: at the hard market cutoff trading halts (mint/redeem/transfers disabled), ONE winner is declared by predefined objective rules, and ALL losing collateral is pooled and redistributed PRO-RATA to the winning OT holders. No partial wins, no probabilistic payouts, no scalar payouts, no residual/LP liquidity.
 3. MECE IS HARD-REQUIRED: outcomes must be mutually exclusive AND collectively exhaustive. Overlap breaks pro-rata math; gaps PERMANENTLY STRAND real collateral. A catch-all "Other / None" is REQUIRED unless the outcome space is provably closed.
 4. MULTI-OUTCOME PREFERRED: 42 is built for n-way categorical races (3–10 OTs). Binary YES/NO is a degenerate fallback only — prefer multi-outcome whenever the question permits.
 5. NO RAW SCALAR PAYOUT MECHANICS: 42 settles to a single winning Outcome Token, so it cannot pay out a continuous range. Scalar questions (price, count, %, viewership) are still valid market topics, but they MUST be discretized into clean partitioning named buckets BEFORE launch (e.g. "<$10M", "$10M–$25M", "$25M–$50M", "$50M+"). Each bucket is its own OT.
 6. OBJECTIVE MACHINE-READABLE ORACLE: official scoreboards, awards-body announcements, exchange/government feeds, on-chain data, official APIs. Editorial / paywalled / interpretive / self-referential ("if users vote X") sources are forbidden.
 7. FIXED OUTCOME SET AT LAUNCH — cannot add outcomes mid-flight. Enumerate every plausible result up front.
-8. HARD UTC DEADLINE — single unambiguous timestamp. Postponement, source-unavailable, ambiguous reporting, ties, and "no listed outcome occurred" MUST be addressed in edge cases with NAMED outcomes they map to (no "resolver discretion" without a named fallback).
-9. MEANINGFUL TRADE PHASE: 42's bonding curve rewards early conviction (two winning-OT holders can earn different returns based on entry point). A good market stays genuinely uncertain across most of the window — flag markets that collapse to certainty within ~24h.
-10. WHEELHOUSE: cultural moments, esports, awards/music races, fan-culture rivalries, viral memes, crypto narratives, headlines, pop events. Draft accordingly when user intent permits.
-11. NO STRANDED COLLATERAL: any path leaving real collateral with no defined winner — orphan outcomes, overlapping outcomes, undefined edge cases, ambiguous tie-breaks — is BLOCKING and must be fixed before finalize.
+8. HARD UTC TIMING: single unambiguous hard UTC timestamp for cutoff; later source/event windows also UTC. Postponement, unavailable/ambiguous source, ties, and "no listed outcome" -> NAMED outcomes.
+9. MARKET SUITABILITY: time-based=preset timestamp; event-based=external reveal + monitoring. Avoid sweeping "when will X happen?" buckets, live-on-date/source-tick markets, deterministic consensus. Prefer anchor+uncertainty window or broad event surface; close before answer is free. Buckets OK if all live until cutoff.
+10. OUTCOMES: at least two plausible close outcomes; exhaustive + "Other / None" tail if needed; human-readable names; must NOT begin with "OT".
+11. DESCRIPTION CONTRACT: summary sentence; exact criteria; primary+secondary source endpoints; edge cases for delays/ties/reschedules/impossible/unavailable data.
+12. WHEELHOUSE: cultural moments, esports, awards/music races, fan-culture rivalries, viral memes, crypto narratives, headlines, pop events. Draft accordingly when user intent permits.
+13. NO STRANDED COLLATERAL: any path leaving real collateral with no defined winner — orphan outcomes, overlapping outcomes, undefined edge cases, ambiguous tie-breaks — is BLOCKING and must be fixed before finalize.
 
 Do NOT import CTF/Polymarket/Kalshi/Manifold assumptions — those are different protocols with different settlement mechanics.`;
 
@@ -370,14 +372,16 @@ CONCISENESS RULES:
 - shortDescription: max 15 words.
 - fullResolutionRules: compact numbered list, max 1 line per rule. No prose.
 - edgeCases: compact numbered list, format "scenario → named outcome it resolves to", max 1 line each. Every edge case must terminate in a named outcome from the outcomes array above (or its catch-all).
-- resolutionDescriptionMarkdown: dashboard-ready Markdown for the \`description\` field. Follow the template exactly. Encode it as one JSON string with \\n line breaks. Use one clickable external source link in [label](url) syntax; no bare URLs.
+- resolutionDescriptionMarkdown: dashboard-ready Markdown for the \`description\` field. Follow the template exactly, starting with one standalone summary sentence. Encode it as one JSON string with \\n line breaks. Use one clickable external source link in [label](url) syntax; no bare URLs.
 
 DESCRIPTION MARKDOWN TEMPLATE:
+<one standalone sentence capturing who/what resolves, the eligible outcomes, the resolution timestamp or event, and how the winner is selected>
+
 ## Resolution Criteria:
 <one or two sentences stating the exact resolution condition, including the asset, venue, timeframe, and timestamp in UTC>
 
 ## Resolution Sources:
-<source name and a single linked reference using [label](url) syntax; specify any UI parameters required to reproduce the resolution value>
+<primary source name and a single linked reference using [label](url) syntax; specify any UI parameters required to reproduce the resolution value. Name a secondary fallback source if the primary is unavailable or ambiguous>
 
 ## Additional Information:
 <scope limitations, exclusions, and the resolution window, e.g. "resolved within 24 hours after the index timestamp">
